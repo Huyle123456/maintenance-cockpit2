@@ -1,0 +1,64 @@
+<core:FragmentDefinition xmlns="sap.m"
+    xmlns:core="sap.ui.core">
+
+    <Dialog id="adaptFiltersDialog" title="{i18n>adaptFiltersTitle}" contentWidth="50rem" draggable="true" resizable="true">
+
+        <content>
+
+            <HBox id="adaptFiltersContent" width="100%">
+
+                <VBox id="adaptFiltersLeftColumn" width="50%">
+
+                    <CheckBox id="adaptFiltersSearch" text="{i18n>maintenanceOrdersFilterSearchLabel}" selected="{filterConfigDraft>/search}" />
+
+                    <CheckBox id="adaptFiltersEquipment" text="{i18n>maintenanceOrdersFilterEquipmentLabel}" selected="{filterConfigDraft>/equipment}" />
+
+                    <CheckBox id="adaptFiltersPriority" text="{i18n>maintenanceOrdersFilterPriorityLabel}" selected="{filterConfigDraft>/priority}" />
+
+                    <CheckBox id="adaptFiltersMaintenanceType" text="{i18n>maintenanceOrdersFilterMaintenanceTypeLabel}" selected="{filterConfigDraft>/maintenanceType}" />
+
+                    <CheckBox id="adaptFiltersEquipmentType" text="{i18n>maintenanceOrdersFilterEquipmentTypeLabel}" selected="{filterConfigDraft>/equipmentType}" />
+
+                    <CheckBox id="adaptFiltersCriticality" text="{i18n>maintenanceOrdersFilterCriticalityLabel}" selected="{filterConfigDraft>/criticality}" />
+
+                    <CheckBox id="adaptFiltersActualStart" text="{i18n>maintenanceOrdersFilterActualStartLabel}" selected="{filterConfigDraft>/actualStart}" />
+
+                </VBox>
+
+                <VBox id="adaptFiltersRightColumn" width="50%">
+
+                    <CheckBox id="adaptFiltersPlant" text="{i18n>maintenanceOrdersFilterPlantLabel}" selected="{filterConfigDraft>/plant}" />
+
+                    <CheckBox id="adaptFiltersStatus" text="{i18n>maintenanceOrdersFilterStatusLabel}" selected="{filterConfigDraft>/status}" />
+
+                    <CheckBox id="adaptFiltersPlanner" text="{i18n>maintenanceOrdersFilterPlannerLabel}" selected="{filterConfigDraft>/planner}" />
+
+                    <CheckBox id="adaptFiltersScheduledDateFrom" text="{i18n>maintenanceOrdersFilterScheduledDateFromLabel}" selected="{filterConfigDraft>/scheduledDateFrom}" />
+
+                    <CheckBox id="adaptFiltersLocation" text="{i18n>maintenanceOrdersFilterLocationLabel}" selected="{filterConfigDraft>/location}" />
+
+                    <CheckBox id="adaptFiltersCreatedBy" text="{i18n>maintenanceOrdersFilterCreatedByLabel}" selected="{filterConfigDraft>/createdBy}" />
+
+                    <CheckBox id="adaptFiltersActualEnd" text="{i18n>maintenanceOrdersFilterActualEndLabel}" selected="{filterConfigDraft>/actualEnd}" />
+
+                </VBox>
+
+            </HBox>
+
+        </content>
+
+        <beginButton>
+
+            <Button id="adaptFiltersCancelButton" text="{i18n>commonCancel}" press="onAdaptFiltersCancel" />
+
+        </beginButton>
+
+        <endButton>
+
+            <Button id="adaptFiltersApplyButton" text="{i18n>commonApply}" type="Emphasized" press="onAdaptFiltersApply" />
+
+        </endButton>
+
+    </Dialog>
+
+</core:FragmentDefinition>

@@ -1,0 +1,6 @@
+Order,Equipment,Description,Plant,Type,Priority,Planner,ScheduledFrom,ScheduledTo
+MO-2001,EQ-001,Pump A Monthly Inspection,1000,PREVENTIVE,HIGH,John Doe,2026-09-10,2026-09-15
+MO-2002,EQ-002,Motor Bearing Check,2000,CORRECTIVE,MEDIUM,Sarah Connor,2026-09-12,2026-09-18
+MO-2003,EQ-003,Emergency Valve Fix,3000,EMERGENCY,CRITICAL,Alex Smith,2026-09-05,2026-09-05
+MO-2004,EQ-004,Conveyor Belt Alignment,1000,PREVENTIVE,LOW,John Doe,2026-09-20,2026-09-25
+MO-2005,EQ-005,Turbine Oil Replacement,2000,PREVENTIVE,HIGH,Sarah Connor,2026-09-15,2026-09-22

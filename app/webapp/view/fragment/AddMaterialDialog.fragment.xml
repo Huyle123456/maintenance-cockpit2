@@ -1,0 +1,25 @@
+<core:FragmentDefinition xmlns="sap.m" xmlns:core="sap.ui.core" xmlns:form="sap.ui.layout.form">
+    <Dialog id="addMaterialDialog" title="{i18n>orderDetailMaterialAddTitle}" contentWidth="600px">
+        <content>
+            <VBox id="vbAddMaterialContent" class="sapUiMediumMargin">
+                <form:SimpleForm id="formAddMaterial" editable="true" layout="ResponsiveGridLayout" columnsM="2" columnsL="2">
+                    <form:content>
+                        <Label id="lblAddMaterialCode" text="{i18n>orderDetailMaterialCode}" />
+                        <Select id="addMaterialSelect" selectedKey="{newMaterial>/material}" items="{materialCatalog>/}" change=".onMaterialSelectChange">
+                            <core:Item id="itemAddMaterialCode" key="{materialCatalog>key}" text="{materialCatalog>key}" />
+                        </Select>
+
+                        <Label id="lblAddMaterialQty" text="{i18n>orderDetailMaterialQty}" />
+                        <Input id="inpAddMaterialQty" value="{newMaterial>/qty}" type="Number" />
+                    </form:content>
+                </form:SimpleForm>
+
+                <MessageStrip id="msAddMaterialValidation" text="{i18n>orderDetailMaterialAddValidation}" type="Information" showIcon="false" showCloseButton="false" />
+            </VBox>
+        </content>
+        <buttons>
+            <Button id="btnAddMaterialCancel" text="{i18n>commonCancel}" press=".onCancelAddMaterial" />
+            <Button id="btnAddMaterialConfirm" text="{i18n>orderDetailMaterialAddBtn}" type="Emphasized" press=".onConfirmAddMaterial" />
+        </buttons>
+    </Dialog>
+</core:FragmentDefinition>

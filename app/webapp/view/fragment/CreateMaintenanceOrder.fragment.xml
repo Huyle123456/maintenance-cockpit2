@@ -1,0 +1,705 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:form="sap.ui.layout.form"
+    xmlns:l="sap.ui.layout"
+>
+dvdv
+    <!-- Create Maintenance Order Dialog -->
+    <Dialog
+        id="createMaintenanceOrderDialog"
+        title="{i18n>maintenanceOrderCreateDialogTitle}"
+        contentWidth="80rem"
+        draggable="true"
+        resizable="true"
+        afterClose="onCreateOrderDialogAfterClose"
+    >
+        <content>
+            <!-- Create Maintenance Order Wizard -->
+            <Wizard
+                id="createOrderWizard"
+                showNextButton="false"
+                stepActivate="onCreateOrderStepActivate"
+                renderMode="Page"
+            >
+                <!-- Step 1: Equipment -->
+                <WizardStep
+                    id="createOrderStepEquipment"
+                    title="{i18n>maintenanceOrderCreateStepEquipment}"
+                    icon="sap-icon://wrench"
+                    validated="{createOrder>/step1Validated}"
+                >
+                    <!-- Step 1 Content -->
+                    <VBox id="createOrderStepEquipmentContent">
+                        <!-- Equipment and Plant -->
+                        <l:Grid
+                            id="createOrderEquipmentPlantContainer"
+                            defaultSpan="XL6 L6 M6 S12"
+                            width="100%"
+                            hSpacing="1"
+                            vSpacing="1"
+                        >
+                            <!-- Equipment -->
+                            <VBox id="createOrderEquipmentContainer">
+                                <Label
+                                    id="createOrderEquipmentLabel"
+                                    text="{i18n>maintenanceOrderCreateEquipmentLabel}"
+                                    required="true"
+                                    labelFor="createOrderEquipment"
+                                />
+
+                                <Select
+                                    id="createOrderEquipment"
+                                    width="100%"
+                                    selectedKey="{createOrder>/selectedEquipment}"
+                                    items="{createOrder>/equipment}"
+                                    change="onCreateOrderEquipmentChange"
+                                    forceSelection="true"
+                                >
+                                    <core:Item
+                                        id="createOrderEquipmentItem"
+                                        key="{createOrder>key}"
+                                        text="{createOrder>text}"
+                                    />
+                                </Select>
+                            </VBox>
+
+                            <!-- Plant -->
+                            <VBox id="createOrderPlantContainer">
+                                <Label
+                                    id="createOrderPlantLabel"
+                                    text="{i18n>maintenanceOrderCreatePlantLabel}"
+                                    required="true"
+                                    labelFor="createOrderPlant"
+                                />
+
+                                <Select
+                                    id="createOrderPlant"
+                                    width="100%"
+                                    selectedKey="{createOrder>/selectedPlant}"
+                                    items="{createOrder>/plants}"
+                                    change="onCreateOrderPlantChange"
+                                >
+                                    <core:Item
+                                        id="createOrderPlantItem"
+                                        key="{createOrder>key}"
+                                        text="{createOrder>text}"
+                                    />
+                                </Select>
+                            </VBox>
+                        </l:Grid>
+                        <!-- Business Rule -->
+                        <MessageStrip
+                            id="createOrderInactiveEquipmentMessage"
+                            class="sapUiSmallMarginTop"
+                            text="{i18n>maintenanceOrderCreateInactiveEquipmentRule}"
+                            type="Information"
+                            showIcon="true"
+                        />
+                    </VBox>
+                </WizardStep>
+
+                <!-- Step 2: Basic Information -->
+                <WizardStep
+                    id="createOrderStepBasicInfo"
+                    title="{i18n>maintenanceOrderCreateStepBasicInfo}"
+                    icon="sap-icon://document-text"
+                >
+                    <VBox id="createOrderStepBasicInfoContent">
+                        <l:Grid
+                            id="createOrderBasicInfoGrid"
+                            defaultSpan="XL6 L6 M6 S12"
+                            hSpacing="1"
+                            vSpacing="1"
+                            width="100%"
+                        >
+                            <!-- Description -->
+                            <VBox id="createOrderDescriptionContainer">
+                                <Label
+                                    id="createOrderDescriptionLabel"
+                                    text="{i18n>maintenanceOrderCreateDescriptionLabel}"
+                                    required="true"
+                                    labelFor="createOrderDescription"
+                                />
+
+                                <Input
+                                    id="createOrderDescription"
+                                    width="100%"
+                                    value="{createOrder>/description}"
+                                    valueLiveUpdate="true"
+                                    liveChange="onCreateOrderStep2Change"
+                                    placeholder="{i18n>maintenanceOrderCreateDescriptionPlaceholder}"
+                                />
+                            </VBox>
+
+                            <!-- Maintenance Type -->
+                            <VBox id="createOrderMaintenanceTypeContainer">
+                                <Label
+                                    id="createOrderMaintenanceTypeLabel"
+                                    text="{i18n>maintenanceOrderCreateMaintenanceTypeLabel}"
+                                    labelFor="createOrderMaintenanceType"
+                                />
+
+                                <Select
+                                    id="createOrderMaintenanceType"
+                                    width="100%"
+                                    selectedKey="{createOrder>/selectedMaintenanceType}"
+                                    items="{createOrder>/maintenanceTypes}"
+                                    change="onCreateOrderStep2Change"
+                                >
+                                    <core:Item
+                                        id="createOrderMaintenanceTypeItem"
+                                        key="{createOrder>key}"
+                                        text="{createOrder>text}"
+                                    />
+                                </Select>
+                            </VBox>
+
+                            <!-- Priority -->
+                            <VBox id="createOrderPriorityContainer">
+                                <Label
+                                    id="createOrderPriorityLabel"
+                                    text="{i18n>maintenanceOrderCreatePriorityLabel}"
+                                    labelFor="createOrderPriority"
+                                />
+
+                                <Select
+                                    id="createOrderPriority"
+                                    width="100%"
+                                    selectedKey="{createOrder>/selectedPriority}"
+                                    items="{createOrder>/priorities}"
+                                    change="onCreateOrderStep2Change"
+                                >
+                                    <core:Item
+                                        id="createOrderPriorityItem"
+                                        key="{createOrder>key}"
+                                        text="{createOrder>text}"
+                                    />
+                                </Select>
+                            </VBox>
+
+                            <!-- Planner -->
+                            <VBox id="createOrderPlannerContainer">
+                                <Label
+                                    id="createOrderPlannerLabel"
+                                    text="{i18n>maintenanceOrderCreatePlannerLabel}"
+                                    labelFor="createOrderPlanner"
+                                />
+
+                                <Select
+                                    id="createOrderPlanner"
+                                    width="100%"
+                                    selectedKey="{createOrder>/selectedPlanner}"
+                                    items="{createOrder>/planners}"
+                                    change="onCreateOrderStep2Change"
+                                >
+                                    <core:Item
+                                        id="createOrderPlannerItem"
+                                        key="{createOrder>key}"
+                                        text="{createOrder>text}"
+                                    />
+                                </Select>
+                            </VBox>
+
+                            <!-- Scheduled Start -->
+                            <VBox id="createOrderScheduledStartContainer">
+                                <Label
+                                    id="createOrderScheduledStartLabel"
+                                    text="{i18n>maintenanceOrderCreateScheduledStartLabel}"
+                                    required="true"
+                                    labelFor="createOrderScheduledStart"
+                                />
+
+                                <DatePicker
+                                    id="createOrderScheduledStart"
+                                    width="100%"
+                                    value="{createOrder>/scheduledStart}"
+                                    valueFormat="yyyy-MM-dd"
+                                    displayFormat="MM/dd/yyyy"
+                                    change="onCreateOrderStep2Change"
+                                />
+                            </VBox>
+
+                            <!-- Scheduled End -->
+                            <VBox id="createOrderScheduledEndContainer">
+                                <Label
+                                    id="createOrderScheduledEndLabel"
+                                    text="{i18n>maintenanceOrderCreateScheduledEndLabel}"
+                                    required="true"
+                                    labelFor="createOrderScheduledEnd"
+                                />
+
+                                <DatePicker
+                                    id="createOrderScheduledEnd"
+                                    width="100%"
+                                    value="{createOrder>/scheduledEnd}"
+                                    valueFormat="yyyy-MM-dd"
+                                    displayFormat="MM/dd/yyyy"
+                                    change="onCreateOrderStep2Change"
+                                />
+                            </VBox>
+                        </l:Grid>
+                    </VBox>
+                </WizardStep>
+
+                <!-- Step 3: Operations -->
+                <WizardStep
+                    id="createOrderStepOperations"
+                    title="{i18n>maintenanceOrderCreateStepOperations}"
+                    icon="sap-icon://activity-items"
+                >
+                    <!-- Step 3 Content -->
+                    <VBox
+                        id="createOrderStepOperationsContent"
+                        class="sapUiSmallMargin"
+                    >
+                        <!-- Business Rule -->
+                        <MessageStrip
+                            id="createOrderOperationsMessage"
+                            text="{i18n>maintenanceOrderCreateOperationsMessage}"
+                            type="Information"
+                            showIcon="true"
+                        />
+
+                        <!-- Operation Entry Form -->
+                        <l:Grid
+                            id="createOrderOperationInputGrid"
+                            defaultSpan="XL4 L4 M6 S12"
+                            hSpacing="1"
+                            vSpacing="1"
+                            width="100%"
+                            class="sapUiSmallMarginTop"
+                        >
+                            <!-- Operation Number -->
+                            <VBox id="createOrderOperationNoContainer">
+                                <Label
+                                    id="createOrderOperationNoLabel"
+                                    text="{i18n>maintenanceOrderCreateOperationNoLabel}"
+                                    required="true"
+                                    labelFor="createOrderOperationNo"
+                                />
+
+                                <Input
+                                    id="createOrderOperationNo"
+                                    type="Number"
+                                    width="100%"
+                                    value="{createOrder>/operationNo}"
+                                    valueLiveUpdate="true"
+                                    liveChange="onOperationNoLiveChange"
+                                    placeholder="{i18n>maintenanceOrderCreateOperationNoPlaceholder}"
+                                />
+                            </VBox>
+
+                            <!-- Description -->
+                            <VBox id="createOrderOperationDescriptionContainer">
+                                <Label
+                                    id="createOrderOperationDescriptionLabel"
+                                    text="{i18n>maintenanceOrderCreateOperationDescriptionLabel}"
+                                    required="true"
+                                    labelFor="createOrderOperationDescription"
+                                />
+
+                                <Input
+                                    id="createOrderOperationDescription"
+                                    width="100%"
+                                    value="{createOrder>/operationDescription}"
+                                    placeholder="{i18n>maintenanceOrderCreateOperationDescriptionPlaceholder}"
+                                />
+                            </VBox>
+
+                            <!-- Planned Hours -->
+                            <VBox id="createOrderPlannedHoursContainer">
+                                <Label
+                                    id="createOrderPlannedHoursLabel"
+                                    text="{i18n>maintenanceOrderCreatePlannedHoursLabel}"
+                                    required="true"
+                                    labelFor="createOrderPlannedHours"
+                                />
+
+                                <Input
+                                    id="createOrderPlannedHours"
+                                    type="Number"
+                                    width="100%"
+                                    value="{createOrder>/plannedHours}"
+                                    valueLiveUpdate="true"
+                                    liveChange="onPlannedHoursLiveChange"
+                                    placeholder="{i18n>maintenanceOrderCreatePlannedHoursPlaceholder}"
+                                />
+                            </VBox>
+                        </l:Grid>
+                        <!-- Add Operation Button -->
+                        <Button
+                            id="createOrderAddOperationButton"
+                            text="{i18n>maintenanceOrderCreateAddOperation}"
+                            class="sapUiSmallMarginTop"
+                            press="onAddOperation"
+                        />
+
+                        <!-- Operations Table -->
+                        <Table
+                            id="createOrderOperationsTable"
+                            class="sapUiSmallMarginTop"
+                            items="{createOrder>/operations}"
+                        >
+                            <columns>
+                                <!-- Operation Number -->
+                                <Column
+                                    id="createOrderOperationNoColumn"
+                                    width="120px"
+                                >
+                                    <Text
+                                        id="createOrderOperationNoHeader"
+                                        text="{i18n>maintenanceOrderCreateTableNo}"
+                                    />
+                                </Column>
+
+                                <!-- Description -->
+                                <Column
+                                    id="createOrderOperationDescriptionColumn"
+                                    width="120px"
+                                >
+                                    <Text
+                                        id="createOrderOperationDescriptionHeader"
+                                        text="{i18n>maintenanceOrderCreateTableDescription}"
+                                    />
+                                </Column>
+
+                                <!-- Planned Hours -->
+                                <Column
+                                    id="createOrderPlannedHoursColumn"
+                                    width="120px"
+                                >
+                                    <Text
+                                        id="createOrderPlannedHoursHeader"
+                                        text="{i18n>maintenanceOrderCreateTableHours}"
+                                    />
+                                </Column>
+
+                                <!-- Action -->
+                                <Column
+                                    id="createOrderOperationActionColumn"
+                                    width="8rem"
+                                >
+                                    <Text
+                                        id="createOrderOperationActionHeader"
+                                        text=""
+                                    />
+                                </Column>
+                            </columns>
+
+                            <items>
+                                <ColumnListItem
+                                    id="createOrderOperationRowTemplate"
+                                >
+                                    <cells>
+                                        <Text
+                                            id="createOrderOperationNoCell"
+                                            text="{createOrder>operationNo}"
+                                        />
+
+                                        <Text
+                                            id="createOrderOperationDescriptionCell"
+                                            text="{createOrder>description}"
+                                        />
+
+                                        <Text
+                                            id="createOrderPlannedHoursCell"
+                                            text="{createOrder>plannedHours}"
+                                        />
+
+                                        <Button
+                                            id="createOrderDeleteOperationButton"
+                                            text="{i18n>maintenanceOrderCreateDelete}"
+                                            type="Reject"
+                                            icon="sap-icon://delete"
+                                            press="onDeleteOperation"
+                                        />
+                                    </cells>
+                                </ColumnListItem>
+                            </items>
+                        </Table>
+                    </VBox>
+                </WizardStep>
+
+                <!-- Step 4: Materials -->
+                <WizardStep
+                    id="createOrderStepMaterials"
+                    title="{i18n>maintenanceOrderCreateStepMaterials}"
+                    icon="sap-icon://product"
+                >
+                    <!-- Step 4 Content -->
+                    <VBox
+                        id="createOrderStepMaterialsContent"
+                        class="sapUiSmallMargin"
+                    >
+                        <!-- Business Rule -->
+                        <MessageStrip
+                            id="createOrderMaterialsMessage"
+                            text="{i18n>maintenanceOrderCreateMaterialsMessage}"
+                            type="Information"
+                            showIcon="true"
+                        />
+
+                        <!-- Material Input Area -->
+                        <l:Grid
+                            id="createOrderMaterialInputGrid"
+                            defaultSpan="XL6 L6 M6 S12"
+                            hSpacing="1"
+                            vSpacing="1"
+                            width="100%"
+                            class="sapUiSmallMarginTop"
+                        >
+                            <!-- Material -->
+                            <VBox id="createOrderMaterialContainer">
+                                <Label
+                                    id="createOrderMaterialLabel"
+                                    text="{i18n>maintenanceOrderCreateMaterialLabel}"
+                                    required="true"
+                                    labelFor="createOrderMaterial"
+                                />
+
+                                <Select
+                                    id="createOrderMaterial"
+                                    width="100%"
+                                    selectedKey="{createOrder>/selectedMaterial}"
+                                    items="{createOrder>/materialsMaster}"
+                                >
+                                    <core:Item
+                                        id="createOrderMaterialItem"
+                                        key="{createOrder>key}"
+                                        text="{createOrder>text}"
+                                    />
+                                </Select>
+                            </VBox>
+
+                            <!-- Quantity -->
+                            <VBox id="createOrderMaterialQuantityContainer">
+                                <Label
+                                    id="createOrderMaterialQuantityLabel"
+                                    text="{i18n>maintenanceOrderCreateQuantityLabel}"
+                                    required="true"
+                                    labelFor="createOrderMaterialQuantity"
+                                />
+
+                                <Input
+                                    id="createOrderMaterialQuantity"
+                                    width="100%"
+                                    type="Number"
+                                    value="{createOrder>/materialQuantity}"
+                                />
+                            </VBox>
+                        </l:Grid>
+
+                        <!-- Add Material Button -->
+                        <Button
+                            id="createOrderAddMaterialButton"
+                            text="{i18n>maintenanceOrderCreateAddMaterial}"
+                            class="sapUiSmallMarginTop"
+                            press="onAddMaterial"
+                        />
+
+                        <!-- Materials Table -->
+                        <Table
+                            id="createOrderMaterialsTable"
+                            class="sapUiSmallMarginTop"
+                            items="{createOrder>/materials}"
+                        >
+                            <columns>
+                                <!-- Material -->
+                                <Column id="createOrderMaterialColumn">
+                                    <Text
+                                        id="createOrderMaterialHeader"
+                                        text="{i18n>maintenanceOrderCreateTableMaterial}"
+                                    />
+                                </Column>
+
+                                <!-- Quantity -->
+                                <Column id="createOrderMaterialQuantityColumn">
+                                    <Text
+                                        id="createOrderMaterialQuantityHeader"
+                                        text="{i18n>maintenanceOrderCreateTableQty}"
+                                    />
+                                </Column>
+
+                                <!-- Action -->
+                                <Column
+                                    id="createOrderMaterialActionColumn"
+                                    width="8rem"
+                                    hAlign="Center"
+                                >
+                                    <Text
+                                        id="createOrderMaterialActionHeader"
+                                        text=""
+                                    />
+                                </Column>
+                            </columns>
+
+                            <items>
+                                <ColumnListItem
+                                    id="createOrderMaterialRowTemplate"
+                                >
+                                    <cells>
+                                        <!-- Material -->
+                                        <Text
+                                            id="createOrderMaterialCell"
+                                            text="{createOrder>materialId}"
+                                        />
+
+                                        <!-- Quantity -->
+                                        <Text
+                                            id="createOrderMaterialQuantityCell"
+                                            text="{createOrder>quantity}"
+                                        />
+
+                                        <!-- Delete -->
+                                        <Button
+                                            id="createOrderDeleteMaterialButton"
+                                            text="{i18n>maintenanceOrderCreateDelete}"
+                                            icon="sap-icon://delete"
+                                            type="Reject"
+                                            press="onDeleteMaterial"
+                                        />
+                                    </cells>
+                                </ColumnListItem>
+                            </items>
+                        </Table>
+                    </VBox>
+                </WizardStep>
+
+                <!-- Step 5: Review -->
+                <WizardStep
+                    id="createOrderStepReview"
+                    title="{i18n>maintenanceOrderCreateStepReview}"
+                    icon="sap-icon://inspection"
+                >
+                    <VBox
+                        id="createOrderReviewContent"
+                        class="sapUiSmallMargin"
+                    >
+                        <MessageStrip
+                            id="createOrderReviewMessage"
+                            text="{i18n>maintenanceOrderCreateReviewMessage}"
+                            type="Success"
+                            showIcon="true"
+                        />
+
+                        <form:SimpleForm
+                            id="createOrderReviewForm"
+                            editable="false"
+                            layout="ResponsiveGridLayout"
+                            class="sapUiSmallMarginTop"
+                        >
+                            <Label
+                                id="createOrderReviewEquipmentLabel"
+                                text="{i18n>maintenanceOrderCreateEquipmentLabel}"
+                            />
+                            <Text
+                                id="createOrderReviewEquipmentText"
+                                text="{createOrder>/selectedEquipment}"
+                            />
+
+                            <Label
+                                id="createOrderReviewPlantLabel"
+                                text="{i18n>maintenanceOrderCreatePlantLabel}"
+                            />
+                            <Text
+                                id="createOrderReviewPlantText"
+                                text="{createOrder>/selectedPlant}"
+                            />
+
+                            <Label
+                                id="createOrderReviewDescriptionLabel"
+                                text="{i18n>maintenanceOrderCreateDescriptionLabel}"
+                            />
+                            <Text
+                                id="createOrderReviewDescriptionText"
+                                text="{createOrder>/description}"
+                            />
+
+                            <Label
+                                id="createOrderReviewTypeLabel"
+                                text="{i18n>maintenanceOrderCreateTypeLabel}"
+                            />
+                            <Text
+                                id="createOrderReviewTypeText"
+                                text="{createOrder>/selectedMaintenanceType}"
+                            />
+
+                            <Label
+                                id="createOrderReviewPriorityLabel"
+                                text="{i18n>maintenanceOrderCreatePriorityLabel}"
+                            />
+                            <Text
+                                id="createOrderReviewPriorityText"
+                                text="{createOrder>/selectedPriority}"
+                            />
+
+                            <Label
+                                id="createOrderReviewPlannerLabel"
+                                text="{i18n>maintenanceOrderCreatePlannerLabel}"
+                            />
+                            <Text
+                                id="createOrderReviewPlannerText"
+                                text="{createOrder>/selectedPlanner}"
+                            />
+
+                            <Label
+                                id="createOrderReviewScheduleLabel"
+                                text="{i18n>maintenanceOrderCreateScheduleLabel}"
+                            />
+                            <Text
+                                id="createOrderReviewScheduleText"
+                                text="{= ${createOrder>/scheduledStart} + ' → ' + ${createOrder>/scheduledEnd} }"
+                            />
+
+                            <Label
+                                id="createOrderReviewOperationsLabel"
+                                text="{i18n>maintenanceOrderCreateOperationsLabel}"
+                            />
+                            <Text
+                                id="createOrderReviewOperationsText"
+                                text="{= ${createOrder>/operations}.length }"
+                            />
+
+                            <Label
+                                id="createOrderReviewMaterialsLabel"
+                                text="{i18n>maintenanceOrderCreateMaterialsLabel}"
+                            />
+                            <Text
+                                id="createOrderReviewMaterialsText"
+                                text="{= ${createOrder>/materials}.length }"
+                            />
+                        </form:SimpleForm>
+                    </VBox>
+                </WizardStep>
+            </Wizard>
+        </content>
+
+        <!-- Dialog Buttons -->
+        <buttons>
+            <!-- Back -->
+            <Button
+                id="createOrderBackButton"
+                text="{i18n>maintenanceOrderCreateBack}"
+                visible="{createOrder>/showBackButton}"
+                press="onCreateOrderBack"
+            />
+
+            <!-- Cancel -->
+            <Button
+                id="createOrderCancelButton"
+                text="{i18n>maintenanceOrderCreateCancel}"
+                press="onCreateOrderCancel"
+            />
+
+            <!-- Next / Create -->
+            <Button
+                id="createOrderNextButton"
+                text="{createOrder>/nextButtonText}"
+                type="Emphasized"
+                enabled="{createOrder>/currentStepValid}"
+                press="onCreateOrderNext"
+            />
+        </buttons>
+    </Dialog>
+</core:FragmentDefinition>

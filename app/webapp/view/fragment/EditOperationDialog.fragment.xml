@@ -1,0 +1,40 @@
+<core:FragmentDefinition xmlns="sap.m" xmlns:core="sap.ui.core" xmlns:l="sap.ui.layout">
+    <Dialog id="editOperationDialog" title="{i18n>orderDetailOperationEditTitle} {editOperation>/no}" contentWidth="700px">
+        <l:Grid id="gridEditOperation" defaultSpan="XL6 L6 M6 S12" class="sapUiSmallMargin">
+            <VBox id="vbEditOpDesc">
+                <Label id="lblEditOpDesc" text="{i18n>orderDetailOperationDescription}" required="true" />
+                <Input id="inpEditOpDesc" value="{editOperation>/description}" width="100%" />
+            </VBox>
+            <VBox id="vbEditOpPlanned">
+                <Label id="lblEditOpPlanned" text="{i18n>orderDetailOperationPlanned}" required="true" />
+                <Input id="inpEditOpPlanned" value="{editOperation>/plannedHours}" type="Number" width="100%" />
+            </VBox>
+            <VBox id="vbEditOpActual">
+                <Label id="lblEditOpActual" text="{i18n>orderDetailActualHours}" />
+                <Input id="inpEditOpActual" value="{editOperation>/actualHours}" type="Number" width="100%" />
+            </VBox>
+            <VBox id="vbEditOpStatus">
+                <Label id="lblEditOpStatus" text="{i18n>orderDetailOperationStatus}" />
+                <Select id="selEditOpStatus" selectedKey="{editOperation>/status}" items="{masterData>/statuses}" width="100%">
+                    <core:Item id="itemEditOpStatus" key="{masterData>key}" text="{masterData>text}" />
+                </Select>
+            </VBox>
+            <VBox id="vbEditOpWorkCenter">
+                <Label id="lblEditOpWorkCenter" text="{i18n>orderDetailOperationWorkCenter}" />
+                <Select id="selEditOpWorkCenter" selectedKey="{editOperation>/workCenter}" items="{masterData>/work_centers}" width="100%">
+                    <core:Item id="itemEditOpWorkCenter" key="{masterData>key}" text="{masterData>text}" />
+                </Select>
+            </VBox>
+            <VBox id="vbEditOpTechnician">
+                <Label id="lblEditOpTechnician" text="{i18n>orderDetailOperationTechnician}" />
+                <Select id="selEditOpTechnician" selectedKey="{editOperation>/technician}" items="{technicianData>/technicians}" width="100%">
+                    <core:Item id="itemEditOpTechnician" key="{technicianData>key}" text="{technicianData>text}" />
+                </Select>
+            </VBox>
+        </l:Grid>
+        <buttons>
+            <Button id="btnEditOpCancel" text="{i18n>commonCancel}" press=".onCancelEditOperation" />
+            <Button id="btnEditOpSave" text="{i18n>commonSave}" type="Emphasized" press=".onConfirmEditOperation" />
+        </buttons>
+    </Dialog>
+</core:FragmentDefinition>

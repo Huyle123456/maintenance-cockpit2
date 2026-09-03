@@ -1,0 +1,408 @@
+<mvc:View
+    controllerName="com.fsoft.zpmmaintenancecockpit.controller.OperationsDashboard"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:f="sap.f"
+    xmlns:l="sap.ui.layout"
+    xmlns:card="sap.f.cards"
+    displayBlock="true"
+>
+    <Page
+        id="operationsDashboardPage"
+        showHeader="false"
+        enableScrolling="true"
+    >
+        <content>
+            <f:DynamicPage
+                id="dashboardDynamicPage"
+                showFooter="false"
+                toggleHeaderOnTitleClick="false"
+            >
+                <!-- Page header: screen title and global actions. -->
+                <f:title>
+                    <f:DynamicPageTitle id="dashboardPageTitle">
+                        <f:heading>
+                            <Title
+                                id="dashboardPageHeading"
+                                text="{i18n>operationsDashboardTitle}"
+                            />
+                        </f:heading>
+                        <f:actions>
+                            <Button
+                                id="btnOpenOrder"
+                                text="{i18n>operationsDashboardActionOpenOrder}"
+                                press="onOpenOrderPress"
+                                type="Transparent"
+                            />
+                        </f:actions>
+                    </f:DynamicPageTitle>
+                </f:title>
+
+                <f:content>
+                    <VBox
+                        id="dashboardContentVBox"
+                        width="100%"
+                        class="sapUiNoContentPadding"
+                    >
+                        <!-- KPI cards keep 4 items per row on wide screens and wrap responsively via minWidth. -->
+                        <HBox
+                            id="kpiCardsRow"
+                            width="100%"
+                            wrap="Wrap"
+                            justifyContent="Start"
+                            renderType="Bare"
+                            class="statsRow"
+                        >
+                            <!-- KPI card item 1/4 -->
+                            <VBox
+                                id="kpiOpenVBox"
+                                width="calc(25% - 1rem)"
+                                class="sapUiTinyMargin"
+                            >
+                                <layoutData>
+                                    <FlexItemData
+                                        id="kpiOpenFlexData"
+                                        baseSize="calc(25% - 1rem)"
+                                        minWidth="13rem"
+                                        growFactor="1"
+                                        shrinkFactor="1"
+                                    />
+                                </layoutData>
+                                <f:Card
+                                    id="kpiOpenCard"
+                                    width="100%"
+                                >
+                                    <f:content>
+                                        <VBox
+                                            id="kpiOpenContent"
+                                            class="sapUiSmallMargin"
+                                        >
+                                            <Text
+                                                id="kpiOpenLabel"
+                                                text="{i18n>operationsDashboardKpiOpen}"
+                                                class="sapUiTinyMarginBottom"
+                                            />
+                                            <Title
+                                                id="kpiOpenValue"
+                                                text="{dashboard>/kpi/open}"
+                                                titleStyle="H2"
+                                            />
+                                        </VBox>
+                                    </f:content>
+                                </f:Card>
+                            </VBox>
+
+                            <!-- KPI card item 2/4 -->
+                            <VBox
+                                id="kpiInProcessVBox"
+                                width="calc(25% - 1rem)"
+                                class="sapUiTinyMargin"
+                            >
+                                <layoutData>
+                                    <FlexItemData
+                                        id="kpiInProcessFlexData"
+                                        baseSize="calc(25% - 1rem)"
+                                        minWidth="13rem"
+                                        growFactor="1"
+                                        shrinkFactor="1"
+                                    />
+                                </layoutData>
+                                <f:Card
+                                    id="kpiInProcessCard"
+                                    width="100%"
+                                >
+                                    <f:content>
+                                        <VBox
+                                            id="kpiInProcessContent"
+                                            class="sapUiSmallMargin"
+                                        >
+                                            <Text
+                                                id="kpiInProcessLabel"
+                                                text="{i18n>operationsDashboardKpiInProcess}"
+                                                class="sapUiTinyMarginBottom"
+                                            />
+                                            <Title
+                                                id="kpiInProcessValue"
+                                                text="{dashboard>/kpi/inProcess}"
+                                                titleStyle="H2"
+                                            />
+                                        </VBox>
+                                    </f:content>
+                                </f:Card>
+                            </VBox>
+
+                            <!-- KPI card item 3/4 -->
+                            <VBox
+                                id="kpiCriticalVBox"
+                                width="calc(25% - 1rem)"
+                                class="sapUiTinyMargin"
+                            >
+                                <layoutData>
+                                    <FlexItemData
+                                        id="kpiCriticalFlexData"
+                                        baseSize="calc(25% - 1rem)"
+                                        minWidth="13rem"
+                                        growFactor="1"
+                                        shrinkFactor="1"
+                                    />
+                                </layoutData>
+                                <f:Card
+                                    id="kpiCriticalCard"
+                                    width="100%"
+                                >
+                                    <f:content>
+                                        <VBox
+                                            id="kpiCriticalContent"
+                                            class="sapUiSmallMargin"
+                                        >
+                                            <Text
+                                                id="kpiCriticalLabel"
+                                                text="{i18n>operationsDashboardKpiCritical}"
+                                                class="sapUiTinyMarginBottom"
+                                            />
+                                            <Title
+                                                id="kpiCriticalValue"
+                                                text="{dashboard>/kpi/critical}"
+                                                titleStyle="H2"
+                                            />
+                                        </VBox>
+                                    </f:content>
+                                </f:Card>
+                            </VBox>
+
+                            <!-- KPI card item 4/4 -->
+                            <VBox
+                                id="kpiCompletedVBox"
+                                width="calc(25% - 1rem)"
+                                class="sapUiTinyMargin"
+                            >
+                                <layoutData>
+                                    <FlexItemData
+                                        id="kpiCompletedFlexData"
+                                        baseSize="calc(25% - 1rem)"
+                                        minWidth="13rem"
+                                        growFactor="1"
+                                        shrinkFactor="1"
+                                    />
+                                </layoutData>
+                                <f:Card
+                                    id="kpiCompletedCard"
+                                    width="100%"
+                                >
+                                    <f:content>
+                                        <VBox
+                                            id="kpiCompletedContent"
+                                            class="sapUiSmallMargin"
+                                        >
+                                            <Text
+                                                id="kpiCompletedLabel"
+                                                text="{i18n>operationsDashboardKpiCompleted}"
+                                                class="sapUiTinyMarginBottom"
+                                            />
+                                            <Title
+                                                id="kpiCompletedValue"
+                                                text="{dashboard>/kpi/completed}"
+                                                titleStyle="H2"
+                                            />
+                                        </VBox>
+                                    </f:content>
+                                </f:Card>
+                            </VBox>
+                        </HBox>
+
+                        <HBox
+                            id="panelsRow"
+                            width="100%"
+                            wrap="Wrap"
+                            justifyContent="SpaceBetween"
+                            class="sapUiLargeMarginBottom"
+                        >
+                            <!-- Status Distribution Panel -->
+                            <VBox
+                                id="statusCardContainer"
+                                width="calc(50% - 1rem)"
+                                class="sapUiTinyMargin"
+                            >
+                                <layoutData>
+                                    <FlexItemData
+                                        id="statusPanelFlexData"
+                                        baseSize="calc(50% - 1rem)"
+                                        minWidth="25rem"
+                                        growFactor="1"
+                                        shrinkFactor="1"
+                                    />
+                                </layoutData>
+                                <f:Card
+                                    id="statusCard"
+                                    height="100%"
+                                >
+                                    <f:header>
+                                        <card:Header
+                                            title="{i18n>operationsDashboardPanelStatusDistribution}"
+                                        />
+                                    </f:header>
+
+                                    <f:content>
+                                        <VBox
+                                            id="statusDistributionContent"
+                                            width="100%"
+                                            class="sapUiSmallMargin"
+                                        >
+                                            <!-- OPEN -->
+                                            <VBox
+                                                id="statusOpenItem"
+                                                class="sapUiTinyMarginBottom"
+                                            >
+                                                <Title
+                                                    id="statusOpenTitle"
+                                                    text="{i18n>operationsDashboardStatusOpen}"
+                                                    class="sapUiTinyMarginBottom"
+                                                />
+                                                <ProgressIndicator
+                                                    id="statusOpenPI"
+                                                    percentValue="{dashboard>/statusDistribution/openPercent}"
+                                                    displayValue="{dashboard>/statusDistribution/openCount}"
+                                                    state="Information"
+                                                    height="1rem"
+                                                />
+                                            </VBox>
+
+                                            <!-- IN_PROCESS -->
+                                            <VBox
+                                                id="statusInProcessItem"
+                                                class="sapUiTinyMarginBottom"
+                                            >
+                                                <Title
+                                                    id="statusInProcessTitle"
+                                                    text="{i18n>operationsDashboardStatusInProcess}"
+                                                    class="sapUiTinyMarginBottom"
+                                                />
+                                                <ProgressIndicator
+                                                    id="statusInProcessPI"
+                                                    percentValue="{dashboard>/statusDistribution/inProcessPercent}"
+                                                    displayValue="{dashboard>/statusDistribution/inProcessCount}"
+                                                    state="Warning"
+                                                    height="1rem"
+                                                />
+                                            </VBox>
+
+                                            <!-- COMPLETED -->
+                                            <VBox
+                                                id="statusCompletedItem"
+                                                class="sapUiTinyMarginBottom"
+                                            >
+                                                <Title
+                                                    id="statusCompletedTitle"
+                                                    text="{i18n>operationsDashboardStatusCompleted}"
+                                                    class="sapUiTinyMarginBottom"
+                                                />
+                                                <ProgressIndicator
+                                                    id="statusCompletedPI"
+                                                    percentValue="{dashboard>/statusDistribution/completedPercent}"
+                                                    displayValue="{dashboard>/statusDistribution/completedCount}"
+                                                    state="Success"
+                                                    height="1rem"
+                                                />
+                                            </VBox>
+
+                                            <!-- CANCELLED -->
+                                            <VBox
+                                                id="statusCancelledItem"
+                                                class="sapUiTinyMarginBottom"
+                                            >
+                                                <Title
+                                                    id="statusCancelledTitle"
+                                                    text="{i18n>operationsDashboardStatusCancelled}"
+                                                    class="sapUiTinyMarginBottom"
+                                                />
+                                                <ProgressIndicator
+                                                    id="statusCancelledPI"
+                                                    percentValue="{dashboard>/statusDistribution/cancelledPercent}"
+                                                    displayValue="{dashboard>/statusDistribution/cancelledCount}"
+                                                    state="Error"
+                                                    height="1rem"
+                                                />
+                                            </VBox>
+                                        </VBox>
+                                    </f:content>
+                                </f:Card>
+                            </VBox>
+
+                            <!-- Critical Orders Panel -->
+                            <VBox
+                                id="criticalOrdersPanelContainer"
+                                width="calc(50% - 1rem)"
+                                class="sapUiTinyMargin"
+                            >
+                                <layoutData>
+                                    <FlexItemData
+                                        id="criticalOrdersPanelFlexData"
+                                        baseSize="calc(50% - 1rem)"
+                                        minWidth="25rem"
+                                        growFactor="1"
+                                        shrinkFactor="1"
+                                    />
+                                </layoutData>
+                                <f:Card
+                                    id="criticalOrdersPanel"
+                                    height="100%"
+                                >
+                                    <f:header>
+                                        <card:Header
+                                            title="{i18n>operationsDashboardPanelCriticalOrders}"
+                                        />
+                                    </f:header>
+
+                                    <f:content>
+                                        <VBox
+                                            id="criticalOrdersList"
+                                            items="{dashboard>/criticalOrders}"
+                                            class="sapUiSmallMargin"
+                                        >
+                                            <VBox
+                                                id="criticalOrderItem"
+                                                class="sapUiMediumMarginBottom"
+                                            >
+                                                <HBox
+                                                    id="criticalOrderHeader"
+                                                    alignItems="Center"
+                                                >
+                                                    <ObjectIdentifier
+                                                        id="criticalOrderLinkOperation"
+                                                        title="{dashboard>order_no}"
+                                                        titleActive="true"
+                                                        titlePress="onCriticalOrderPress"
+                                                    />
+                                                    <Text
+                                                        id="criticalOrderDesc"
+                                                        text="{= '— ' + ${dashboard>description} }"
+                                                    />
+                                                </HBox>
+                                                <HBox
+                                                    id="criticalOrderStatusContainer"
+                                                    class="sapUiTinyMarginTop"
+                                                >
+                                                    <ObjectStatus
+                                                        id="statusDashboardState"
+                                                        text="{dashboard>status}"
+                                                        state="{
+                                                            path: 'dashboard>status',
+                                                            formatter: '.formatter.formatStatusState'
+                                                        }"
+                                                        active="true"
+                                                        inverted="true"
+                                                    />
+                                                </HBox>
+                                            </VBox>
+                                        </VBox>
+                                    </f:content>
+                                </f:Card>
+                            </VBox>
+                        </HBox>
+                    </VBox>
+                </f:content>
+            </f:DynamicPage>
+        </content>
+    </Page>
+</mvc:View>

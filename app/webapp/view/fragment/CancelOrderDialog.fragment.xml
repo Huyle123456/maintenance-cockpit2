@@ -1,0 +1,16 @@
+<core:FragmentDefinition xmlns="sap.m" xmlns:core="sap.ui.core">
+    <Dialog id="cancelOrderDialog" title="{i18n>orderDetailCancelOrderTitle}" contentWidth="500px">
+        <content>
+            <VBox id="vbCancelOrderContent" class="sapUiMediumMargin">
+                <MessageStrip id="msCancelOrderWarning" text="{i18n>orderDetailCancelOrderWarning}" type="Warning" showIcon="false" showCloseButton="false" class="sapUiSmallMarginBottom" />
+                
+                <Label id="lblCancelOrderReason" text="{i18n>orderDetailCancelOrderReason} *" />
+                <TextArea id="taCancelOrderReason" value="{cancelOrder>/reason}" placeholder="{i18n>orderDetailCancelOrderReasonPlaceholder}" rows="4" width="100%" />
+            </VBox>
+        </content>
+        <buttons>
+            <Button id="btnCancelOrderBack" text="{i18n>commonBack}" press=".onCancelCancelOrder" />
+            <Button id="btnCancelOrderConfirm" text="{i18n>orderDetailCancelOrderBtn}" type="Reject" press=".onConfirmCancelOrder" />
+        </buttons>
+    </Dialog>
+</core:FragmentDefinition>

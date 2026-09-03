@@ -1,0 +1,1163 @@
+<mvc:View
+    controllerName="com.fsoft.zpmmaintenancecockpit.controller.MaintenanceOrderDetail"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.uxap"
+    xmlns:f="sap.f"
+    xmlns:card="sap.f.cards"
+    xmlns:suite="sap.suite.ui.commons"
+    xmlns:m="sap.m"
+    xmlns:l="sap.ui.layout"
+    height="100%"
+>
+    <m:Page
+        id="page"
+        showNavButton="true"
+        navButtonPress=".onBack"
+        title="{i18n>maintenanceOrdersPageTitle}"
+        showHeader="true"
+        enableScrolling="false"
+    >
+        <m:content>
+            <ObjectPageLayout
+                id="mod_orderObjectPage"
+                enableLazyLoading="true"
+                useIconTabBar="true"
+                showTitleInHeaderContent="true"
+                upperCaseAnchorBar="false"
+            >
+                <!-- =========================================================
+                                     HEADER
+                ========================================================= -->
+
+                <headerTitle>
+                    <ObjectPageDynamicHeaderTitle
+                        id="mod_orderDynamicHeaderTitle"
+                    >
+                        <!-- Order description -->
+                        <expandedHeading>
+                            <m:Title
+                                id="mod_orderDescriptionTitle"
+                                text="{orderDetail>/description}"
+                                wrapping="true"
+                            />
+                        </expandedHeading>
+
+                        <!-- Compact title -->
+                        <snappedHeading>
+                            <m:Title
+                                id="mod_orderSnappedTitle"
+                                text="{orderDetail>/order}"
+                                wrapping="true"
+                            />
+                        </snappedHeading>
+
+                        <!-- Maintenance type + Equipment + Plant -->
+                        <expandedContent>
+                            <m:Text
+                                id="mod_orderHeaderSummaryText"
+                                text="{orderDetail>/type} · {orderDetail>/equipment} · {i18n>equipmentTableColPlant} {orderDetail>/plant}"
+                            />
+                        </expandedContent>
+
+                        <snappedContent>
+                            <m:Text
+                                id="mod_orderSnappedSummaryText"
+                                text="{orderDetail>/type} · {orderDetail>/equipment} · {i18n>equipmentTableColPlant} {orderDetail>/plant}"
+                            />
+                        </snappedContent>
+
+                        <snappedTitleOnMobile>
+                            <m:Title
+                                id="mod_orderMobileTitle"
+                                text="{orderDetail>/order}"
+                            />
+                        </snappedTitleOnMobile>
+
+                        <!-- Order Status Badge (moved to actions) -->
+                        <actions>
+                            <m:ObjectStatus
+                                text="{orderDetail>/status}"
+                                state="{
+                        path: 'orderDetail>/status',
+                        formatter: '.formatter.formatStatusState'
+                    }"
+                                inverted="true"
+                                class="sapUiTinyMarginEnd sapUiTinyMarginTop"
+                            />
+                            <m:Button
+                                id="mod_orderEditButton"
+                                text="{i18n>edit}"
+                                enabled="{= ${auth>/currentUser/permissions/editOrder} &amp;&amp; ${orderDetail>/status} !== 'COMPLETED' &amp;&amp; ${orderDetail>/status} !== 'CANCELLED' }"
+                                press=".onEdit"
+                            />
+                            <m:Button
+                                id="mod_orderSubmitButton"
+                                text="{i18n>orderDetailSubmit}"
+                                enabled="{= ${auth>/currentUser/permissions/editOrder} &amp;&amp; ${orderDetail>/canSubmit} }"
+                                press=".onSubmit"
+                            />
+                            <m:Button
+                                id="mod_orderCompleteButton"
+                                text="{i18n>orderDetailComplete}"
+                                enabled="{= ${auth>/currentUser/permissions/completeOrder} &amp;&amp; ${orderDetail>/status} === 'IN_PROCESS' }"
+                                press=".onComplete"
+                            />
+                            <m:Button
+                                id="mod_orderCancelButton"
+                                text="{i18n>orderDetailCancel}"
+                                type="Reject"
+                                enabled="{= ${auth>/currentUser/permissions/cancelOrder} &amp;&amp; ${orderDetail>/status} !== 'COMPLETED' &amp;&amp; ${orderDetail>/status} !== 'CANCELLED' }"
+                                press=".onCancel"
+                            />
+                            <m:Button
+                                id="mod_orderMoreButton"
+                                icon="sap-icon://overflow"
+                            />
+                        </actions>
+                    </ObjectPageDynamicHeaderTitle>
+                </headerTitle>
+
+                <!-- =========================================================
+                                HEADER CONTENT
+                ========================================================= -->
+
+                <headerContent>
+                    <m:FlexBox
+                        id="mod_orderHeaderFlexBox"
+                        wrap="Wrap"
+                        fitContainer="true"
+                        justifyContent="SpaceBetween"
+                    >
+                        <!-- Equipment -->
+                        <m:VBox id="mod_headerEquipmentVBox" class="sapUiLargeMarginEnd sapUiSmallMarginBottom">
+                            <m:Label
+                                id="mod_headerEquipmentLabel"
+                                text="{i18n>orderDetailEquipment}"
+                            />
+
+                            <m:Title
+                                id="mod_headerEquipmentText"
+                                text="{orderDetail>/equipment}"
+                                titleStyle="H4"
+                                class="sapUiTinyMarginTop"
+                            />
+                        </m:VBox>
+
+                        <!-- Priority -->
+                        <m:VBox id="mod_headerPriorityVBox" class="sapUiLargeMarginEnd sapUiSmallMarginBottom">
+                            <m:Label
+                                id="mod_headerPriorityLabel"
+                                text="{i18n>orderDetailPriority}"
+                            />
+
+                            <m:ObjectStatus
+                                id="mod_headerPriorityStatus"
+                                text="{orderDetail>/priority}"
+                                state="{
+                            path: 'orderDetail>/priority',
+                            formatter: '.formatter.formatPriorityState'
+                        }"
+                                class="sapUiTinyMarginTop"
+                            />
+                        </m:VBox>
+
+                        <!-- Planner -->
+                        <m:VBox id="mod_headerPlannerVBox" class="sapUiLargeMarginEnd sapUiSmallMarginBottom">
+                            <m:Label
+                                id="mod_headerPlannerLabel"
+                                text="{i18n>orderDetailPlanner}"
+                            />
+
+                            <m:Title
+                                id="mod_headerPlannerText"
+                                text="{orderDetail>/planner}"
+                                titleStyle="H4"
+                                class="sapUiTinyMarginTop"
+                            />
+                        </m:VBox>
+
+                        <!-- Scheduled -->
+                        <m:VBox id="mod_headerScheduledVBox" class="sapUiLargeMarginEnd sapUiSmallMarginBottom">
+                            <m:Label
+                                id="mod_headerScheduledLabel"
+                                text="{i18n>orderDetailScheduled}"
+                            />
+
+                            <m:Title
+                                id="mod_headerScheduledText"
+                                text="{orderDetail>/scheduled}"
+                                titleStyle="H4"
+                                class="sapUiTinyMarginTop"
+                            />
+                        </m:VBox>
+
+                        <!-- ETag -->
+                        <m:VBox id="mod_headerEtagVBox" class="sapUiLargeMarginEnd sapUiSmallMarginBottom">
+                            <m:Label
+                                id="mod_headerEtagLabel"
+                                text="{i18n>orderDetailETag}"
+                            />
+
+                            <m:Title
+                                id="mod_headerEtagText"
+                                text="{orderDetail>/etag}"
+                                titleStyle="H4"
+                                class="sapUiTinyMarginTop"
+                            />
+                        </m:VBox>
+
+                        <!-- Dirty State -->
+                        <m:VBox id="mod_headerDirtyStateVBox" class="sapUiLargeMarginEnd sapUiSmallMarginBottom">
+                            <m:Label
+                                id="mod_headerDirtyStateLabel"
+                                text="{i18n>orderDetailDirtyState}"
+                            />
+
+                            <m:Title
+                                id="mod_headerDirtyStateText"
+                                text="{orderDetail>/dirtyState}"
+                                titleStyle="H4"
+                                class="sapUiTinyMarginTop"
+                            />
+                        </m:VBox>
+                    </m:FlexBox>
+                </headerContent>
+
+                <!-- =========================================================
+                                SECTIONS
+                ========================================================= -->
+
+                <sections>
+                    <!-- =====================================================
+                                OVERVIEW
+                    ===================================================== -->
+
+                    <ObjectPageSection
+                        id="mod_sectionOverview"
+                        title="{i18n>orderDetailOverview}"
+                        titleUppercase="false"
+                    >
+                        <subSections>
+                            <!-- General Information + Execution Summary -->
+                            <ObjectPageSubSection
+                                id="mod_subSectionOverviewMain"
+                                titleUppercase="false"
+                            >
+                                <blocks>
+                                    <f:Card id="mod_orderOverviewCard" width="100%">
+                                        <f:content>
+                                            <m:VBox
+                                                id="mod_overviewContainer"
+                                                class="sapUiSmallMargin"
+                                            >
+                                                <l:Grid
+                                                    id="mod_overviewMainHBox"
+                                                    defaultSpan="XL6 L6 M12 S12"
+                                                    vSpacing="1"
+                                                    hSpacing="1"
+                                                    width="100%"
+                                                >
+                                                    <!-- =================================================
+                                                    GENERAL INFORMATION
+                                            ================================================= -->
+
+                                                    <m:VBox
+                                                        id="mod_overviewGeneralInfoVBox"
+                                                        width="100%"
+                                                    >
+                                                        <m:Title
+                                                            id="mod_overviewGeneralInfoTitle"
+                                                            text="{i18n>orderDetailGeneralInformation}"
+                                                            level="H3"
+                                                            class="sapUiSmallMarginBottom"
+                                                        />
+
+                                                        <!-- Order -->
+                                                        <m:HBox
+                                                            id="mod_overviewOrderHBox"
+                                                            alignItems="Center"
+                                                        >
+                                                            <m:Label
+                                                                id="mod_overviewOrderLabel"
+                                                                text="{i18n>orderDetailOrder}"
+                                                                width="175px"
+                                                            />
+
+                                                            <m:Label
+                                                                id="mod_overviewOrderText"
+                                                                text="{orderDetail>/order}"
+                                                                design="Bold"
+                                                                wrapping="true"
+                                                                class="orderDetailValue"
+                                                            />
+                                                        </m:HBox>
+
+                                                        <!-- Description -->
+                                                        <m:HBox
+                                                            id="mod_overviewDescriptionHBox"
+                                                            alignItems="Center"
+                                                        >
+                                                            <m:Label
+                                                                id="mod_overviewDescriptionLabel"
+                                                                text="{i18n>orderDetailDescription}"
+                                                                width="175px"
+                                                            />
+
+                                                            <m:Label
+                                                                id="mod_overviewDescriptionText"
+                                                                text="{orderDetail>/description}"
+                                                                design="Bold"
+                                                                wrapping="true"
+                                                                class="orderDetailValue"
+                                                            />
+                                                        </m:HBox>
+
+                                                        <!-- Equipment -->
+                                                        <m:HBox
+                                                            id="mod_overviewEquipmentHBox"
+                                                            alignItems="Center"
+                                                        >
+                                                            <m:Label
+                                                                id="mod_overviewEquipmentLabel"
+                                                                text="{i18n>orderDetailEquipment}"
+                                                                width="175px"
+                                                            />
+
+                                                            <m:Label
+                                                                id="mod_overviewEquipmentText"
+                                                                text="{orderDetail>/equipment}"
+                                                                design="Bold"
+                                                                wrapping="true"
+                                                                class="orderDetailValue"
+                                                            />
+                                                        </m:HBox>
+
+                                                        <!-- Plant -->
+                                                        <m:HBox
+                                                            id="mod_overviewPlantHBox"
+                                                            alignItems="Center"
+                                                        >
+                                                            <m:Label
+                                                                id="mod_overviewPlantLabel"
+                                                                text="{i18n>orderDetailPlant}"
+                                                                width="175px"
+                                                            />
+
+                                                            <m:Label
+                                                                id="mod_overviewPlantText"
+                                                                text="{orderDetail>/plant}"
+                                                                design="Bold"
+                                                                wrapping="true"
+                                                                class="orderDetailValue"
+                                                            />
+                                                        </m:HBox>
+
+                                                        <!-- Maintenance Type -->
+                                                        <m:HBox
+                                                            id="mod_overviewMaintenanceTypeHBox"
+                                                            alignItems="Center"
+                                                        >
+                                                            <m:Label
+                                                                id="mod_overviewMaintenanceTypeLabel"
+                                                                text="{i18n>orderDetailMaintenanceType}"
+                                                                width="175px"
+                                                            />
+
+                                                            <m:Label
+                                                                id="mod_overviewMaintenanceTypeText"
+                                                                text="{orderDetail>/type}"
+                                                                design="Bold"
+                                                                wrapping="true"
+                                                                class="orderDetailValue"
+                                                            />
+                                                        </m:HBox>
+
+                                                        <!-- Planner -->
+                                                        <m:HBox
+                                                            id="mod_overviewPlannerHBox"
+                                                            alignItems="Center"
+                                                        >
+                                                            <m:Label
+                                                                id="mod_overviewPlannerLabel"
+                                                                text="{i18n>orderDetailPlanner}"
+                                                                width="175px"
+                                                            />
+
+                                                            <m:Label
+                                                                id="mod_overviewPlannerText"
+                                                                text="{orderDetail>/planner}"
+                                                                design="Bold"
+                                                                wrapping="true"
+                                                                class="orderDetailValue"
+                                                            />
+                                                        </m:HBox>
+
+                                                        <!-- Priority -->
+                                                        <m:HBox
+                                                            id="mod_overviewPriorityHBox"
+                                                            alignItems="Center"
+                                                        >
+                                                            <m:Label
+                                                                id="mod_overviewPriorityLabel"
+                                                                text="{i18n>orderDetailPriority}"
+                                                                width="175px"
+                                                            />
+
+                                                            <m:ObjectStatus
+                                                                id="mod_overviewPriorityStatus"
+                                                                text="{orderDetail>/priority}"
+                                                                state="{
+                                                path: 'orderDetail>/priority',
+                                                formatter: '.formatter.formatPriorityState'
+                                            }"
+                                                            />
+                                                        </m:HBox>
+
+                                                        <!-- Status -->
+                                                        <m:HBox
+                                                            id="mod_overviewStatusHBox"
+                                                            alignItems="Center"
+                                                        >
+                                                            <m:Label
+                                                                id="mod_overviewStatusLabel"
+                                                                text="{i18n>orderDetailStatus}"
+                                                                width="175px"
+                                                            />
+
+                                                            <m:ObjectStatus
+                                                                id="mod_overviewStatusObjectStatus"
+                                                                text="{orderDetail>/status}"
+                                                                state="{
+                                                path: 'orderDetail>/status',
+                                                formatter: '.formatter.formatStatusState'
+                                            }"
+                                                                inverted="true"
+                                                            />
+                                                        </m:HBox>
+                                                    </m:VBox>
+
+                                                    <!-- =================================================
+                                     EXECUTION SUMMARY
+                                     ================================================= -->
+
+                                                    <m:VBox
+                                                        id="mod_overviewExecutionSummaryVBox"
+                                                        width="100%"
+                                                    >
+                                                        <m:Title
+                                                            id="mod_overviewExecutionSummaryTitle"
+                                                            text="{i18n>orderDetailExecutionSummary}"
+                                                            level="H3"
+                                                            class="sapUiSmallMarginBottom"
+                                                        />
+
+                                                        <!-- Row 1 -->
+                                                        <m:HBox
+                                                            id="mod_executionTopCardsHBox"
+                                                            width="100%"
+                                                            justifyContent="SpaceBetween"
+                                                        >
+                                                            <!-- Operations -->
+                                                            <m:VBox id="mod_execSummaryVBox1" width="49%">
+                                                                <f:Card id="mod_execSummaryCard1" width="100%">
+                                                                    <f:content>
+                                                                        <m:VBox id="mod_execSummaryContentVBox1" class="sapUiSmallMargin">
+                                                                            <m:Label
+                                                                                id="mod_executionOperationsLabel"
+                                                                                text="{i18n>orderDetailOperations}"
+                                                                            />
+                                                                            <m:Title
+                                                                                id="mod_executionOperationsNumber"
+                                                                                text="{orderDetail>/operationCount}"
+                                                                                titleStyle="H1"
+                                                                            />
+                                                                        </m:VBox>
+                                                                    </f:content>
+                                                                </f:Card>
+                                                            </m:VBox>
+
+                                                            <!-- Completed -->
+                                                            <m:VBox id="mod_execSummaryVBox2" width="49%" class="sapUiTinyMarginBegin">
+                                                                <f:Card id="mod_execSummaryCard2" width="100%">
+                                                                    <f:content>
+                                                                        <m:VBox id="mod_execSummaryContentVBox2" class="sapUiSmallMargin">
+                                                                            <m:Label
+                                                                                id="mod_executionCompletedLabel"
+                                                                                text="{i18n>orderDetailCompleted}"
+                                                                            />
+                                                                            <m:Title
+                                                                                id="mod_executionCompletedNumber"
+                                                                                text="{orderDetail>/completedOperationCount}"
+                                                                                titleStyle="H1"
+                                                                            />
+                                                                        </m:VBox>
+                                                                    </f:content>
+                                                                </f:Card>
+                                                            </m:VBox>
+                                                        </m:HBox>
+
+                                                        <!-- Row 2 -->
+                                                        <m:HBox
+                                                            id="mod_executionBottomCardsHBox"
+                                                            width="100%"
+                                                            justifyContent="SpaceBetween"
+                                                            class="sapUiTinyMarginTop"
+                                                        >
+                                                            <!-- Planned Hours -->
+                                                            <m:VBox id="mod_execSummaryVBox3" width="49%">
+                                                                <f:Card id="mod_execSummaryCard3" width="100%">
+                                                                    <f:content>
+                                                                        <m:VBox id="mod_execSummaryContentVBox3" class="sapUiSmallMargin">
+                                                                            <m:Label
+                                                                                id="mod_executionPlannedHoursLabel"
+                                                                                text="{i18n>orderDetailPlannedHours}"
+                                                                            />
+                                                                            <m:Title
+                                                                                id="mod_executionPlannedHoursNumber"
+                                                                                text="{orderDetail>/plannedHours} h"
+                                                                                titleStyle="H1"
+                                                                            />
+                                                                        </m:VBox>
+                                                                    </f:content>
+                                                                </f:Card>
+                                                            </m:VBox>
+
+                                                            <!-- Actual Hours -->
+                                                            <m:VBox id="mod_execSummaryVBox4" width="49%" class="sapUiTinyMarginBegin">
+                                                                <f:Card id="mod_execSummaryCard4" width="100%">
+                                                                    <f:content>
+                                                                        <m:VBox id="mod_execSummaryContentVBox4" class="sapUiSmallMargin">
+                                                                            <m:Label
+                                                                                id="mod_executionActualHoursLabel"
+                                                                                text="{i18n>orderDetailActualHours}"
+                                                                            />
+                                                                            <m:Title
+                                                                                id="mod_executionActualHoursNumber"
+                                                                                text="{orderDetail>/actualHours} h"
+                                                                                titleStyle="H1"
+                                                                            />
+                                                                        </m:VBox>
+                                                                    </f:content>
+                                                                </f:Card>
+                                                            </m:VBox>
+                                                        </m:HBox>
+                                                    </m:VBox>
+                                                </l:Grid>
+                                                <m:VBox
+                                                    id="mod_businessRulesVBox"
+                                                    width="100%"
+                                                >
+                                                    <m:Title
+                                                        id="mod_businessRulesTitle"
+                                                        text="{i18n>orderDetailBusinessRules}"
+                                                        level="H3"
+                                                        class="sapUiSmallMarginBottom"
+                                                    />
+
+                                                    <m:MessageStrip
+                                                        id="mod_businessRulesMessageStrip"
+                                                        text="{i18n>orderDetailBusinessRulesMessage}"
+                                                        type="Information"
+                                                        showIcon="true"
+                                                        showCloseButton="false"
+                                                    />
+                                                </m:VBox>
+                                            </m:VBox>
+                                        </f:content>
+                                    </f:Card>
+                                </blocks>
+                            </ObjectPageSubSection>
+                        </subSections>
+                    </ObjectPageSection>
+
+                    <!-- =====================================================
+                                    OPERATIONS
+                    ===================================================== -->
+
+                    <ObjectPageSection
+                        id="mod_sectionOperations"
+                        title="{i18n>orderDetailOperationsSection}"
+                        titleUppercase="false"
+                    >
+                        <subSections>
+                            <ObjectPageSubSection
+                                id="mod_subSectionOperations"
+                                titleUppercase="false"
+                            >
+                                <blocks>
+                                    <f:Card id="mod_operationsCard">
+                                        <f:content>
+                                            <m:VBox
+                                                id="mod_operationsContentVBox"
+                                                width="100%"
+                                            >
+                                        <!-- Operations Table -->
+                                        <m:ScrollContainer
+                                            horizontal="true"
+                                            vertical="false"
+                                        >
+                                        <m:Table
+                                            id="mod_operationsTable"
+                                            items="{orderDetail>/operations}"
+                                            mode="MultiSelect"
+                                        >
+                                            <m:headerToolbar>
+                                                <m:OverflowToolbar
+                                                    id="mod_operationsToolbar"
+                                                >
+                                                    <m:Title
+                                                        id="mod_operationsTableTitle"
+                                                        text="{i18n>orderDetailOperations}"
+                                                        level="H2"
+                                                    />
+                                                    <m:ToolbarSpacer
+                                                        id="mod_operationsSpacer"
+                                                    />
+                                                    <m:Button
+                                                        id="mod_operationsAddBtn"
+                                                        text="{i18n>orderDetailOperationAdd}"
+                                                        enabled="{auth>/currentUser/permissions/addOperation}"
+                                                        press=".onAddOperation"
+                                                    />
+                                                    <m:Button
+                                                        id="mod_operationsBatchEditBtn"
+                                                        text="{i18n>orderDetailOperationBatchEdit}"
+                                                        enabled="{auth>/currentUser/permissions/batchEditOperations}"
+                                                        press=".onBatchEditOperations"
+                                                    />
+                                                </m:OverflowToolbar>
+                                            </m:headerToolbar>
+                                            <m:columns>
+                                                <!-- No -->
+                                                <m:Column
+                                                    id="mod_opColNo"
+                                                    width="4rem"
+                                                >
+                                                    <m:Text
+                                                        id="mod_opColNoText"
+                                                        text="{i18n>orderDetailOperationNo}"
+                                                    />
+                                                </m:Column>
+                                                <!-- Description -->
+                                                <m:Column
+                                                    id="mod_opColDesc"
+                                                    width="14rem"
+                                                >
+                                                    <m:Text
+                                                        id="mod_opColDescText"
+                                                        text="{i18n>orderDetailOperationDescription}"
+                                                    />
+                                                </m:Column>
+                                                <!-- Work Center -->
+                                                <m:Column
+                                                    id="mod_opColWc"
+                                                    width="8rem"
+                                                >
+                                                    <m:Text
+                                                        id="mod_opColWcText"
+                                                        text="{i18n>orderDetailOperationWorkCenter}"
+                                                    />
+                                                </m:Column>
+                                                <!-- Technician -->
+                                                <m:Column
+                                                    id="mod_opColTech"
+                                                    width="10rem"
+                                                >
+                                                    <m:Text
+                                                        id="mod_opColTechText"
+                                                        text="{i18n>orderDetailOperationTechnician}"
+                                                    />
+                                                </m:Column>
+                                                <!-- Planned -->
+                                                <m:Column
+                                                    id="mod_opColPlanned"
+                                                    width="6rem"
+                                                >
+                                                    <m:Text
+                                                        id="mod_opColPlannedText"
+                                                        text="{i18n>orderDetailOperationPlanned}"
+                                                    />
+                                                </m:Column>
+                                                <!-- Actual -->
+                                                <m:Column
+                                                    id="mod_opColActual"
+                                                    width="6rem"
+                                                >
+                                                    <m:Text
+                                                        id="mod_opColActualText"
+                                                        text="{i18n>orderDetailOperationActual}"
+                                                    />
+                                                </m:Column>
+                                                <!-- Status -->
+                                                <m:Column
+                                                    id="mod_opColStatus"
+                                                    width="10rem"
+                                                >
+                                                    <m:Text
+                                                        id="mod_opColStatusText"
+                                                        text="{i18n>orderDetailOperationStatus}"
+                                                    />
+                                                </m:Column>
+                                                <!-- Actions -->
+                                                <m:Column
+                                                    id="mod_opColActions"
+                                                    width="10rem"
+                                                    hAlign="End"
+                                                >
+                                                    <m:Text
+                                                        id="mod_opColActionsText"
+                                                        text=""
+                                                    />
+                                                </m:Column>
+                                            </m:columns>
+                                            <m:items>
+                                                <m:ColumnListItem
+                                                    id="mod_opColListItem"
+                                                    vAlign="Middle"
+                                                >
+                                                    <m:cells>
+                                                        <!-- No -->
+                                                        <m:Text
+                                                            id="mod_opCellNo"
+                                                            text="{orderDetail>no}"
+                                                        />
+                                                        <!-- Description -->
+                                                        <m:Text
+                                                            id="mod_opCellDesc"
+                                                            text="{orderDetail>description}"
+                                                        />
+                                                        <!-- Work Center -->
+                                                        <m:Text
+                                                            id="mod_opCellWc"
+                                                            text="{orderDetail>workCenter}"
+                                                        />
+                                                        <!-- Technician -->
+                                                        <m:Text
+                                                            id="mod_opCellTech"
+                                                            text="{orderDetail>technician}"
+                                                        />
+                                                        <!-- Planned -->
+                                                        <m:Text
+                                                            id="mod_opCellPlanned"
+                                                            text="{orderDetail>plannedHours}h"
+                                                        />
+                                                        <!-- Actual -->
+                                                        <m:Text
+                                                            id="mod_opCellActual"
+                                                            text="{orderDetail>actualHours}h"
+                                                        />
+                                                        <!-- Status -->
+                                                        <m:ObjectStatus
+                                                            id="mod_opCellStatus"
+                                                            text="{orderDetail>status}"
+                                                            state="{
+                                                    path: 'orderDetail>status',
+                                                   formatter: '.formatter.formatStatusState'
+                                                }"
+                                                            inverted="true"
+                                                        />
+                                                        <!-- Actions -->
+                                                        <m:HBox
+                                                            id="mod_opCellActionsHBox"
+                                                            justifyContent="End"
+                                                        >
+                                                            <m:Button
+                                                                id="mod_opBtnEdit"
+                                                                text="{i18n>orderDetailOperationActionEdit}"
+                                                                class="sapUiTinyMarginEnd"
+                                                                enabled="{auth>/currentUser/permissions/editOrder}"
+                                                                press=".onEditOperation"
+                                                            />
+                                                            <m:Button
+                                                                id="mod_opBtnDelete"
+                                                                text="{i18n>orderDetailOperationActionDelete}"
+                                                                type="Reject"
+                                                                enabled="{auth>/currentUser/permissions/deleteOperation}"
+                                                                press=".onDeleteOperation"
+                                                            />
+                                                        </m:HBox>
+                                                    </m:cells>
+                                                </m:ColumnListItem>
+                                            </m:items>
+                                        </m:Table>
+                                        </m:ScrollContainer>
+                                            </m:VBox>
+                                        </f:content>
+                                    </f:Card>
+                                </blocks>
+                            </ObjectPageSubSection>
+                        </subSections>
+                    </ObjectPageSection>
+
+                    <!-- =====================================================
+                                    MATERIALS
+                    ===================================================== -->
+
+                    <ObjectPageSection
+                        id="mod_sectionMaterials"
+                        title="{i18n>orderDetailMaterialsSection}"
+                        titleUppercase="false"
+                    >
+                        <subSections>
+                            <ObjectPageSubSection
+                                id="mod_subSectionMaterials"
+                                titleUppercase="false"
+                            >
+                                <blocks>
+                                    <f:Card id="mod_materialsCard">
+                                        <f:content>
+                                            <m:VBox
+                                                id="mod_materialsContentVBox"
+                                                width="100%"
+                                            >
+                                        <!-- Materials Table -->
+                                        <m:ScrollContainer
+                                            horizontal="true"
+                                            vertical="false"
+                                        >
+                                        <m:Table
+                                            id="mod_materialsTable"
+                                            items="{orderDetail>/materials}"
+                                        >
+                                            <m:headerToolbar>
+                                                <m:OverflowToolbar
+                                                    id="mod_materialsToolbar"
+                                                >
+                                                    <m:Title
+                                                        id="mod_materialsTableTitle"
+                                                        text="{i18n>orderDetailMaterials}"
+                                                        level="H2"
+                                                    />
+                                                    <m:ToolbarSpacer
+                                                        id="mod_materialsSpacer"
+                                                    />
+                                                    <m:Button
+                                                        id="mod_materialsAddBtn"
+                                                        text="{i18n>orderDetailMaterialAdd}"
+                                                        enabled="{auth>/currentUser/permissions/addMaterial}"
+                                                        press=".onAddMaterial"
+                                                    />
+                                                </m:OverflowToolbar>
+                                            </m:headerToolbar>
+                                            <m:columns>
+                                                <!-- Material -->
+                                                <m:Column
+                                                    id="mod_matColMaterial"
+                                                    width="8rem"
+                                                >
+                                                    <m:Text
+                                                        id="mod_matColMaterialText"
+                                                        text="{i18n>orderDetailMaterialCode}"
+                                                    />
+                                                </m:Column>
+                                                <!-- Description -->
+                                                <m:Column
+                                                    id="mod_matColDesc"
+                                                    width="14rem"
+                                                >
+                                                    <m:Text
+                                                        id="mod_matColDescText"
+                                                        text="{i18n>orderDetailMaterialDescription}"
+                                                    />
+                                                </m:Column>
+                                                <!-- Qty -->
+                                                <m:Column
+                                                    id="mod_matColQty"
+                                                    width="5rem"
+                                                    hAlign="End"
+                                                >
+                                                    <m:Text
+                                                        id="mod_matColQtyText"
+                                                        text="{i18n>orderDetailMaterialQty}"
+                                                    />
+                                                </m:Column>
+                                                <!-- Unit -->
+                                                <m:Column
+                                                    id="mod_matColUnit"
+                                                    width="5rem"
+                                                >
+                                                    <m:Text
+                                                        id="mod_matColUnitText"
+                                                        text="{i18n>orderDetailMaterialUnit}"
+                                                    />
+                                                </m:Column>
+                                                <!-- Available Stock -->
+                                                <m:Column
+                                                    id="mod_matColStock"
+                                                    width="8rem"
+                                                    hAlign="End"
+                                                >
+                                                    <m:Text
+                                                        id="mod_matColStockText"
+                                                        text="{i18n>orderDetailMaterialAvailableStock}"
+                                                    />
+                                                </m:Column>
+                                                <!-- Value -->
+                                                <m:Column
+                                                    id="mod_matColValue"
+                                                    width="8rem"
+                                                    hAlign="End"
+                                                >
+                                                    <m:Text
+                                                        id="mod_matColValueText"
+                                                        text="{i18n>orderDetailMaterialValue}"
+                                                    />
+                                                </m:Column>
+                                            </m:columns>
+                                            <m:items>
+                                                <m:ColumnListItem
+                                                    id="mod_matColListItem"
+                                                    vAlign="Middle"
+                                                >
+                                                    <m:cells>
+                                                        <m:Text
+                                                            id="mod_matCellMaterial"
+                                                            text="{orderDetail>material}"
+                                                        />
+                                                        <m:Text
+                                                            id="mod_matCellDesc"
+                                                            text="{orderDetail>description}"
+                                                        />
+                                                        <m:Text
+                                                            id="mod_matCellQty"
+                                                            text="{orderDetail>qty}"
+                                                        />
+                                                        <m:Text
+                                                            id="mod_matCellUnit"
+                                                            text="{orderDetail>unit}"
+                                                        />
+                                                        <m:Text
+                                                            id="mod_matCellStock"
+                                                            text="{orderDetail>availableStock}"
+                                                        />
+                                                        <m:Text
+                                                            id="mod_matCellValue"
+                                                            text="{
+                                                    path: 'orderDetail>value',
+                                             formatter: '.formatter.formatCurrency'
+                                                }"
+                                                        />
+                                                    </m:cells>
+                                                </m:ColumnListItem>
+                                            </m:items>
+                                        </m:Table>
+                                        </m:ScrollContainer>
+
+                                        <!-- Validation info -->
+                                        <m:MessageStrip
+                                            id="mod_materialsValidationStrip"
+                                            text="{i18n>orderDetailMaterialValidation}"
+                                            type="Information"
+                                            showIcon="false"
+                                            showCloseButton="false"
+                                            class="sapUiSmallMargin"
+                                        />
+                                    </m:VBox>
+                                        </f:content>
+                                    </f:Card>
+                                </blocks>
+                            </ObjectPageSubSection>
+                        </subSections>
+                    </ObjectPageSection>
+
+                    <!-- =====================================================
+                                TECHNICIANS
+                    ===================================================== -->
+
+                    <ObjectPageSection
+                        id="mod_sectionTechnicians"
+                        title="{i18n>orderDetailTechniciansSection}"
+                        titleUppercase="false"
+                    >
+                        <subSections>
+                            <ObjectPageSubSection
+                                id="mod_subSectionTechnicians"
+                                titleUppercase="false"
+                            >
+                                <blocks>
+                                    <f:Card id="mod_techniciansCard">
+                                        <f:content>
+                                            <m:VBox
+                                                id="mod_techniciansContentVBox"
+                                                width="100%"
+                                            >
+                                        <!-- Technician Assignments Table -->
+                                        <m:ScrollContainer
+                                            horizontal="true"
+                                            vertical="false"
+                                        >
+                                        <m:Table
+                                            id="mod_techniciansTable"
+                                            items="{orderDetail>/assignedTechnicians}"
+                                        >
+                                            <m:headerToolbar>
+                                                <m:OverflowToolbar
+                                                    id="mod_techniciansToolbar"
+                                                >
+                                                    <m:Title
+                                                        id="mod_techniciansTableTitle"
+                                                        text="{i18n>orderDetailTechnicianAssignments}"
+                                                        level="H2"
+                                                    />
+                                                    <m:ToolbarSpacer
+                                                        id="mod_techniciansSpacer"
+                                                    />
+                                                    <m:Button
+                                                        id="mod_techniciansAssignBtn"
+                                                        text="{i18n>orderDetailTechnicianAssign}"
+                                                        enabled="{auth>/currentUser/permissions/assignTechnician}"
+                                                        press=".onAssignTechnician"
+                                                    />
+                                                </m:OverflowToolbar>
+                                            </m:headerToolbar>
+                                            <m:columns>
+                                                <!-- Employee -->
+                                                <m:Column
+                                                    id="mod_techColEmployee"
+                                                    width="8rem"
+                                                >
+                                                    <m:Text
+                                                        id="mod_techColEmployeeText"
+                                                        text="{i18n>orderDetailTechnicianEmployee}"
+                                                    />
+                                                </m:Column>
+                                                <!-- Name -->
+                                                <m:Column
+                                                    id="mod_techColName"
+                                                    width="12rem"
+                                                >
+                                                    <m:Text
+                                                        id="mod_techColNameText"
+                                                        text="{i18n>orderDetailTechnicianName}"
+                                                    />
+                                                </m:Column>
+                                                <!-- Skill -->
+                                                <m:Column
+                                                    id="mod_techColSkill"
+                                                    width="10rem"
+                                                >
+                                                    <m:Text
+                                                        id="mod_techColSkillText"
+                                                        text="{i18n>orderDetailTechnicianSkill}"
+                                                    />
+                                                </m:Column>
+                                                <!-- Work Center -->
+                                                <m:Column
+                                                    id="mod_techColWc"
+                                                    width="8rem"
+                                                >
+                                                    <m:Text
+                                                        id="mod_techColWcText"
+                                                        text="{i18n>orderDetailTechnicianWorkCenter}"
+                                                    />
+                                                </m:Column>
+                                                <!-- Available -->
+                                                <m:Column
+                                                    id="mod_techColAvailable"
+                                                    width="8rem"
+                                                >
+                                                    <m:Text
+                                                        id="mod_techColAvailableText"
+                                                        text="{i18n>orderDetailTechnicianAvailable}"
+                                                    />
+                                                </m:Column>
+                                            </m:columns>
+                                            <m:items>
+                                                <m:ColumnListItem
+                                                    id="mod_techColListItem"
+                                                    vAlign="Middle"
+                                                >
+                                                    <m:cells>
+                                                        <m:Text
+                                                            id="mod_techCellEmployee"
+                                                            text="{orderDetail>employee}"
+                                                        />
+                                                        <m:Text
+                                                            id="mod_techCellName"
+                                                            text="{orderDetail>name}"
+                                                        />
+                                                        <m:Text
+                                                            id="mod_techCellSkill"
+                                                            text="{orderDetail>skill}"
+                                                        />
+                                                        <m:Text
+                                                            id="mod_techCellWc"
+                                                            text="{orderDetail>workCenter}"
+                                                        />
+                                                        <m:Text
+                                                            id="mod_techCellAvailable"
+                                                            text="{orderDetail>available}"
+                                                        />
+                                                    </m:cells>
+                                                </m:ColumnListItem>
+                                            </m:items>
+                                        </m:Table>
+                                        </m:ScrollContainer>
+                                            </m:VBox>
+                                        </f:content>
+                                    </f:Card>
+                                </blocks>
+                            </ObjectPageSubSection>
+                        </subSections>
+                    </ObjectPageSection>
+
+                    <!-- =====================================================
+                                HISTORY
+                    ===================================================== -->
+
+                    <ObjectPageSection
+                        id="mod_sectionHistory"
+                        title="{i18n>orderDetailHistorySection}"
+                        titleUppercase="false"
+                    >
+                        <subSections>
+                            <ObjectPageSubSection
+                                id="mod_subSectionHistory"
+                                titleUppercase="false"
+                            >
+                                <blocks>
+                                    <f:Card id="mod_historyCard">
+                                        <f:header>
+                                            <card:Header id="mod_historyCardHeader" title="{i18n>orderDetailHistoryCardTitle}" />
+                                        </f:header>
+                                        <f:content>
+                                            <m:ScrollContainer id="mod_historyScrollContainer" height="400px" vertical="true" horizontal="false">
+                                                <m:VBox
+                                                    id="mod_historyContentVBox"
+                                                    width="100%"
+                                                    class="sapUiSmallMargin"
+                                                >
+                                        <suite:Timeline
+                                            id="mod_historyTimeline"
+                                            content="{orderDetail>/history}"
+                                            enableDoubleSided="false"
+                                            growingThreshold="0"
+                                            sortOldestFirst="false"
+                                            showIcons="true"
+                                            showFilterBar="false"
+                                            axisOrientation="Vertical"
+                                        >
+                                            <suite:content>
+                                                <suite:TimelineItem
+                                                    dateTime="{orderDetail>dateTime}"
+                                                    title="{orderDetail>title}"
+                                                    userName="{orderDetail>userName}"
+                                                    text="{orderDetail>text}"
+                                                    icon="{orderDetail>icon}"
+                                                    userNameClickable="false"
+                                                />
+                                            </suite:content>
+                                        </suite:Timeline>
+                                                </m:VBox>
+                                            </m:ScrollContainer>
+                                        </f:content>
+                                    </f:Card>
+                                </blocks>
+                            </ObjectPageSubSection>
+                        </subSections>
+                    </ObjectPageSection>
+                </sections>
+            </ObjectPageLayout>
+        </m:content>
+    </m:Page>
+</mvc:View>

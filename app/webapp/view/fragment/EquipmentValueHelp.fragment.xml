@@ -1,0 +1,70 @@
+<core:FragmentDefinition xmlns="sap.m"
+    xmlns:core="sap.ui.core">
+
+    <Dialog id="dlgEqValueHelp" title="{i18n>equipmentValueHelp}" contentWidth="700px" draggable="true" resizable="true">
+
+        <content>
+
+            <VBox id="equipmentValueHelpContent" class="sapUiSmallMargin">
+
+                <Label id="equipmentValueHelpSearchLabel" text="{i18n>search}" labelFor="inpEqVhSearch" />
+
+                <Input id="inpEqVhSearch" placeholder="{i18n>equipmentSearchPlaceholder}" liveChange="onSearchEquipmentValueHelp" class="sapUiSmallMarginBottom" />
+
+                <Table id="tblEqValueHelp" mode="MultiSelect" items="{equipmentVH>/equipments}">
+
+                    <columns>
+
+                        <Column id="equipmentValueHelpEquipmentColumn">
+                            <Text id="equipmentValueHelpEquipmentHeader" text="{i18n>equipmentId}" />
+                        </Column>
+
+                        <Column id="equipmentValueHelpDescriptionColumn">
+                            <Text id="equipmentValueHelpDescriptionHeader" text="{i18n>description}" />
+                        </Column>
+
+                        <Column id="equipmentValueHelpPlantColumn">
+                            <Text id="equipmentValueHelpPlantHeader" text="{i18n>plant}" />
+                        </Column>
+
+                    </columns>
+
+                    <items>
+
+                        <ColumnListItem id="equipmentValueHelpRowTemplate">
+
+                            <cells>
+
+                                <Text id="equipmentValueHelpEquipmentCell" text="{equipmentVH>equipment}" />
+
+                                <Text id="equipmentValueHelpDescriptionCell" text="{equipmentVH>description}" />
+
+                                <Text id="equipmentValueHelpPlantCell" text="{equipmentVH>plant}" />
+
+                            </cells>
+
+                        </ColumnListItem>
+
+                    </items>
+
+                </Table>
+
+            </VBox>
+
+        </content>
+
+        <beginButton>
+
+            <Button id="equipmentValueHelpCancelButton" text="{i18n>cancel}" press="onCloseEquipmentValueHelp" />
+
+        </beginButton>
+
+        <endButton>
+
+            <Button id="equipmentValueHelpConfirmButton" text="{i18n>ok}" type="Emphasized" press="onConfirmEquipmentValueHelp" />
+
+        </endButton>
+
+    </Dialog>
+
+</core:FragmentDefinition>

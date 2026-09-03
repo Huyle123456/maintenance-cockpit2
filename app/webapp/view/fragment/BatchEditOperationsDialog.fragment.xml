@@ -1,0 +1,19 @@
+<core:FragmentDefinition xmlns="sap.m" xmlns:core="sap.ui.core">
+    <Dialog id="batchEditOperationsDialog" title="{i18n>orderDetailOperationBatchEditTitle}" contentWidth="500px">
+        <content>
+            <VBox id="vbBatchEditOpContent" class="sapUiMediumMargin">
+                <Text id="txtBatchEditOpDesc" text="{i18n>orderDetailOperationBatchEditDesc}" class="sapUiSmallMarginBottom" />
+                
+                <Select id="batchEditStatusSelect" selectedKey="{batchEdit>/status}" items="{masterData>/statuses}" width="100%" class="sapUiSmallMarginBottom">
+                    <core:Item id="itemBatchEditStatus" key="{masterData>key}" text="{masterData>text}" />
+                </Select>
+
+                <MessageStrip id="msBatchEditOpInfo" text="{i18n>orderDetailOperationBatchEditInfo}" type="Information" showIcon="false" showCloseButton="false" />
+            </VBox>
+        </content>
+        <buttons>
+            <Button id="btnBatchEditOpCancel" text="{i18n>commonCancel}" press=".onCancelBatchEdit" />
+            <Button id="btnBatchEditOpApply" text="{i18n>orderDetailOperationBatchEditApply}" type="Emphasized" press=".onConfirmBatchEdit" />
+        </buttons>
+    </Dialog>
+</core:FragmentDefinition>

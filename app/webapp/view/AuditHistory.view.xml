@@ -1,0 +1,155 @@
+<mvc:View
+    controllerName="com.fsoft.zpmmaintenancecockpit.controller.AuditHistory"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m"
+    xmlns:f="sap.f"
+    xmlns:card="sap.f.cards"
+    displayBlock="true"
+>
+    <!-- Main page container for the Audit History view -->
+    <Page
+        id="auditHistoryPage"
+        showHeader="false"
+        enableScrolling="true"
+    >
+        <content>
+            <!-- Dynamic Page layout to optimize screen space and provide a modern UX -->
+            <f:DynamicPage
+                id="auditHistoryDynamicPage"
+                showFooter="false"
+                toggleHeaderOnTitleClick="false"
+            >
+                <!-- Page Title Area -->
+                <f:title>
+                    <f:DynamicPageTitle id="auditHistoryPageTitle">
+                        <f:heading>
+                            <Title
+                                id="auditHistoryPageHeading"
+                                text="{i18n>auditHistoryPageTitle}"
+                                level="H1"
+                            />
+                        </f:heading>
+                    </f:DynamicPageTitle>
+                </f:title>
+
+                <!-- Main Content Area -->
+                <f:content>
+                    <VBox
+                        id="auditHistoryContentVBox"
+                        width="100%"
+                        class="sapUiNoContentPadding"
+                    >
+                        <!-- Panel grouping the Audit History Table -->
+                        <f:Card
+                            id="auditHistoryPanel"
+                            expandable="false"
+                            class="sapUiSmallMarginTop sapUiLargeMarginBottom"
+                        >
+                            <f:header>
+                                <card:Header
+                                    title="{i18n>auditHistoryPanelTitle}"
+                                />
+                            </f:header>
+                            <f:content>
+                                <ScrollContainer
+                                    id="auditHistoryTableScrollContainer"
+                                    horizontal="true"
+                                    vertical="false"
+                                >
+                                    <!-- Audit History Data Table bound to the 'auditHistory' model -->
+                                    <Table
+                                        id="auditHistoryTable"
+                                        inset="false"
+                                        items="{auditHistory>/history}"
+                                        class="sapUiNoMarginTop"
+                                    >
+                                        <!-- Table Columns Definition -->
+                                        <columns>
+                                            <Column
+                                                id="colTimestamp"
+                                                width="200px"
+                                            >
+                                                <Text
+                                                    id="txtColTimestamp"
+                                                    text="{i18n>auditHistoryTableColTimestamp}"
+                                                />
+                                            </Column>
+                                            <Column
+                                                id="colUser"
+                                                width="150px"
+                                            >
+                                                <Text
+                                                    id="txtColUser"
+                                                    text="{i18n>auditHistoryTableColUser}"
+                                                />
+                                            </Column>
+                                            <Column
+                                                id="colObject"
+                                                width="150px"
+                                            >
+                                                <Text
+                                                    id="txtColObject"
+                                                    text="{i18n>auditHistoryTableColObject}"
+                                                />
+                                            </Column>
+                                            <Column
+                                                id="colAction"
+                                                width="120px"
+                                            >
+                                                <Text
+                                                    id="txtColAction"
+                                                    text="{i18n>auditHistoryTableColAction}"
+                                                />
+                                            </Column>
+                                            <Column
+                                                id="colDetails"
+                                                width="300px"
+                                            >
+                                                <Text
+                                                    id="txtColDetails"
+                                                    text="{i18n>auditHistoryTableColDetails}"
+                                                />
+                                            </Column>
+                                        </columns>
+
+                                        <!-- Table Row Template for Binding Data -->
+                                        <items>
+                                            <ColumnListItem
+                                                id="auditHistoryRowTemplate"
+                                                vAlign="Middle"
+                                            >
+                                                <cells>
+                                                    <Text
+                                                        id="txtTimestamp"
+                                                        text="{auditHistory>timestamp}"
+                                                    />
+                                                    <Text
+                                                        id="txtUser"
+                                                        text="{auditHistory>user}"
+                                                    />
+                                                    <Link
+                                                        id="lnkObject"
+                                                        text="{auditHistory>object}"
+                                                        press="onObjectPress"
+                                                    />
+                                                    <Text
+                                                        id="txtAction"
+                                                        text="{auditHistory>action}"
+                                                    />
+                                                    <Text
+                                                        id="txtDetails"
+                                                        text="{auditHistory>details}"
+                                                    />
+                                                </cells>
+                                            </ColumnListItem>
+                                        </items>
+                                    </Table>
+                                </ScrollContainer>
+                            </f:content>
+                        </f:Card>
+                    </VBox>
+                </f:content>
+            </f:DynamicPage>
+        </content>
+    </Page>
+</mvc:View>

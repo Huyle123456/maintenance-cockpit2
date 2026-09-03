@@ -1,0 +1,13 @@
+<core:FragmentDefinition xmlns="sap.m" xmlns:core="sap.ui.core">
+    <Dialog id="cannotCompleteDialog" title="{i18n>orderDetailCannotCompleteTitle}" contentWidth="500px">
+        <content>
+            <VBox id="vbCannotCompleteContent" class="sapUiMediumMargin">
+                <MessageStrip id="msCannotCompleteError" text="Operation {cannotComplete>/opNo} — {cannotComplete>/opDesc} is still {cannotComplete>/opStatus}." type="Error" showIcon="false" showCloseButton="false" class="sapUiSmallMarginBottom" />
+                <Text id="txtCannotCompleteMsg" text="{i18n>orderDetailCannotCompleteMsg}" />
+            </VBox>
+        </content>
+        <buttons>
+            <Button id="btnCannotCompleteOk" text="{i18n>commonOk}" type="Emphasized" press=".onCloseCannotComplete" />
+        </buttons>
+    </Dialog>
+</core:FragmentDefinition>

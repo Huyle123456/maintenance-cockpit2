@@ -1,0 +1,115 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:u="sap.ui.unified"
+>
+    <Dialog
+        id="importOrdersDialog"
+        title="{i18n>importOrdersDialogTitle}"
+        icon="sap-icon://excel-attachment"
+        contentWidth="680px"
+        resizable="true"
+        draggable="true"
+    >
+        <content>
+            <VBox class="sapUiMediumMargin">
+                <!-- Instruction & Mode Banner -->
+                <MessageStrip
+                    id="importOrdersBackendBanner"
+                    text="Files are processed directly on Backend using ExcelJS Streaming and Batch Database Transactions, optimized for large datasets."
+                    type="Information"
+                    showIcon="true"
+                    class="sapUiSmallMarginBottom"
+                />
+
+                <!-- File Selection Box -->
+                <VBox class="sapUiSmallMarginBottom">
+                    <Label
+                        text="{i18n>importOrdersUploadLabel}"
+                        design="Bold"
+                        class="sapUiTinyMarginBottom"
+                    />
+                    <HBox alignItems="Center" width="100%">
+                        <u:FileUploader
+                            id="orderFileUploader"
+                            name="file"
+                            fileType="xlsx,xls,csv"
+                            mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
+                            placeholder="{i18n>importOrdersUploadPlaceholder}"
+                            change=".onImportFileChange"
+                            width="400px"
+                            buttonOnly="false"
+                            buttonText="Browse Excel..."
+                            icon="sap-icon://attachment"
+                            class="sapUiSmallMarginEnd"
+                        />
+                        <Button
+                            id="btnDownloadTemplate"
+                            text="{i18n>importOrdersDownloadTemplate}"
+                            icon="sap-icon://download"
+                            type="Transparent"
+                            press=".onDownloadImportTemplate"
+                        />
+                    </HBox>
+                </VBox>
+
+                <!-- Selected File Info Card -->
+                <Panel
+                    id="pnlSelectedFileInfo"
+                    headerText="Selected File Summary"
+                    expandable="false"
+                    expanded="true"
+                    visible="{= !!${importModel>/fileName} }"
+                    class="sapUiNoContentPadding sapUiSmallMarginBottom"
+                >
+                    <VBox class="sapUiSmallMargin">
+                        <HBox alignItems="Center" class="sapUiTinyMarginBottom">
+                            <Label text="File Name:" width="120px" design="Bold" />
+                            <Text text="{importModel>/fileName}" />
+                        </HBox>
+                        <HBox alignItems="Center" class="sapUiTinyMarginBottom">
+                            <Label text="File Size:" width="120px" design="Bold" />
+                            <Text text="{importModel>/fileSize}" />
+                        </HBox>
+                        <HBox alignItems="Center">
+                            <Label text="Status:" width="120px" design="Bold" />
+                            <ObjectStatus
+                                text="{importModel>/statusText}"
+                                state="{importModel>/statusState}"
+                                inverted="true"
+                            />
+                        </HBox>
+                    </VBox>
+                </Panel>
+
+                <!-- Dynamic Status Message Strip -->
+                <MessageStrip
+                    id="importOrdersMessageStrip"
+                    text="{importModel>/statusMessage}"
+                    type="{importModel>/statusType}"
+                    showIcon="true"
+                    showCloseButton="false"
+                    visible="{= !!${importModel>/statusMessage} }"
+                    class="sapUiSmallMarginTop"
+                />
+            </VBox>
+        </content>
+        <beginButton>
+            <Button
+                id="btnConfirmImport"
+                text="Upload &amp; Process on Backend"
+                type="Emphasized"
+                icon="sap-icon://upload"
+                enabled="{importModel>/canImport}"
+                press=".onConfirmImportOrders"
+            />
+        </beginButton>
+        <endButton>
+            <Button
+                id="btnCancelImport"
+                text="{i18n>commonCancel}"
+                press=".onCancelImportOrders"
+            />
+        </endButton>
+    </Dialog>
+</core:FragmentDefinition>

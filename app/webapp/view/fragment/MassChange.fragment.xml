@@ -1,0 +1,35 @@
+<core:FragmentDefinition xmlns="sap.m"
+    xmlns:core="sap.ui.core">
+    <Dialog id="massChangeDialog" title="{i18n>massChangeTitle}" contentWidth="40rem" draggable="true" resizable="true">
+        <content>
+            <VBox id="massChangeContent" class="sapUiMediumMargin">
+                <!-- Selected Orders Count -->
+                <Text id="massChangeSelectedOrdersCount" text="{= ${massChange>/selectedOrders}.length + ' ' + ${i18n>massChangeSelectedOrdersSuffix} }" />
+
+                <!-- New Priority -->
+                <Label id="massChangePriorityLabel" text="{i18n>massChangeNewPriority}" required="true" class="sapUiSmallMarginTop" />
+
+                <Select id="massChangePrioritySelect" selectedKey="{massChange>/priority}" width="100%">
+                    <core:Item id="massChangePriorityLowItem" key="LOW" text="{i18n>priorityLow}" />
+
+                    <core:Item id="massChangePriorityMediumItem" key="MEDIUM" text="{i18n>priorityMedium}" />
+
+                    <core:Item id="massChangePriorityHighItem" key="HIGH" text="{i18n>priorityHigh}" />
+
+                    <core:Item id="massChangePriorityCriticalItem" key="CRITICAL" text="{i18n>priorityCritical}" />
+                </Select>
+
+                <!-- Information Message -->
+                <MessageStrip id="massChangeInformationMessage" text="{i18n>massChangeInfoMessage}" type="Information" showIcon="false" showCloseButton="false" class="sapUiSmallMarginTop sapUiSmallMarginBottom" />
+            </VBox>
+        </content>
+
+        <beginButton>
+            <Button id="massChangeApplyButton" text="{i18n>massChangeApply}" type="Emphasized" press="onMassChangeApply" />
+        </beginButton>
+
+        <endButton>
+            <Button id="massChangeCancelButton" text="{i18n>commonCancel}" press="onMassChangeCancel" />
+        </endButton>
+    </Dialog>
+</core:FragmentDefinition>

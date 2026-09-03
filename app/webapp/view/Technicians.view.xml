@@ -1,0 +1,167 @@
+<mvc:View
+    controllerName="com.fsoft.zpmmaintenancecockpit.controller.Technicians"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m"
+    xmlns:f="sap.f"
+    xmlns:card="sap.f.cards"
+    displayBlock="true"
+>
+    <!-- Main page container for the Technicians view -->
+    <Page
+        id="techniciansPage"
+        showHeader="false"
+        enableScrolling="true"
+    >
+        <content>
+            <!-- Dynamic Page layout to optimize screen space and provide a modern UX -->
+            <f:DynamicPage
+                id="techniciansDynamicPage"
+                showFooter="false"
+                toggleHeaderOnTitleClick="false"
+            >
+                <!-- Page Title Area -->
+                <f:title>
+                    <f:DynamicPageTitle id="techniciansPageTitle">
+                        <f:heading>
+                            <Title
+                                id="techniciansPageHeading"
+                                text="{i18n>techniciansPageTitle}"
+                                level="H1"
+                            />
+                        </f:heading>
+                    </f:DynamicPageTitle>
+                </f:title>
+
+                <!-- Main Content Area -->
+                <f:content>
+                    <VBox
+                        id="techniciansContentVBox"
+                        width="100%"
+                        class="sapUiNoContentPadding"
+                    >
+                        <!-- Panel grouping the Technicians Availability Table -->
+                        <f:Card
+                            id="techniciansCard"
+                            expandable="false"
+                            class="sapUiSmallMarginTop sapUiLargeMarginBottom"
+                        >
+                            <f:header>
+                                <card:Header
+                                    title="{i18n>techniciansPanelAvailabilityTitle}"
+                                />
+                            </f:header>
+
+                            <f:content>
+                                <ScrollContainer
+                                    id="techniciansTableScrollContainer"
+                                    horizontal="true"
+                                    vertical="false"
+                                >
+                                    <!-- Technicians Data Table bound to the 'technicians' model -->
+                                    <Table
+                                        id="techniciansTable"
+                                        inset="false"
+                                        items="{technicians>/catalog}"
+                                    >
+                                        <!-- Table Columns Definition -->
+                                        <columns>
+                                            <Column
+                                                id="colEmployee"
+                                                width="120px"
+                                            >
+                                                <Text
+                                                    id="txtColEmployee"
+                                                    text="{i18n>techniciansTableColEmployee}"
+                                                />
+                                            </Column>
+                                            <Column
+                                                id="colName"
+                                                width="180px"
+                                            >
+                                                <Text
+                                                    id="txtColName"
+                                                    text="{i18n>techniciansTableColName}"
+                                                />
+                                            </Column>
+                                            <Column
+                                                id="colSkill"
+                                                width="160px"
+                                            >
+                                                <Text
+                                                    id="txtColSkill"
+                                                    text="{i18n>techniciansTableColSkill}"
+                                                />
+                                            </Column>
+                                            <Column
+                                                id="colWorkCenter"
+                                                width="130px"
+                                            >
+                                                <Text
+                                                    id="txtColWorkCenter"
+                                                    text="{i18n>techniciansTableColWorkCenter}"
+                                                />
+                                            </Column>
+                                            <Column
+                                                id="colAvailable"
+                                                width="120px"
+                                            >
+                                                <Text
+                                                    id="txtColAvailable"
+                                                    text="{i18n>techniciansTableColAvailable}"
+                                                />
+                                            </Column>
+                                            <Column
+                                                id="colAssignedOperations"
+                                                width="180px"
+                                            >
+                                                <Text
+                                                    id="txtColAssignedOperations"
+                                                    text="{i18n>techniciansTableColAssignedOperations}"
+                                                />
+                                            </Column>
+                                        </columns>
+
+                                        <!-- Table Row Template for Binding Data -->
+                                        <items>
+                                            <ColumnListItem
+                                                id="techniciansRowTemplate"
+                                                vAlign="Middle"
+                                            >
+                                                <cells>
+                                                    <Text
+                                                        id="txtEmployee"
+                                                        text="{technicians>key}"
+                                                    />
+                                                    <Text
+                                                        id="txtName"
+                                                        text="{technicians>name}"
+                                                    />
+                                                    <Text
+                                                        id="txtSkill"
+                                                        text="{technicians>skill}"
+                                                    />
+                                                    <Text
+                                                        id="txtWorkCenter"
+                                                        text="{technicians>workCenter}"
+                                                    />
+                                                    <Text
+                                                        id="txtAvailable"
+                                                        text="{technicians>available}"
+                                                    />
+                                                    <Text
+                                                        id="txtAssignedOperations"
+                                                        text="{technicians>assignedOperations}"
+                                                    />
+                                                </cells>
+                                            </ColumnListItem>
+                                        </items>
+                                    </Table>
+                                </ScrollContainer>
+                            </f:content>
+                        </f:Card>
+                    </VBox>
+                </f:content>
+            </f:DynamicPage>
+        </content>
+    </Page>
+</mvc:View>

@@ -1,0 +1,33 @@
+sap.ui.define([], () => {
+  "use strict";
+
+  return {
+    STATUS: Object.freeze({
+      OPEN: "OPEN",
+      IN_PROCESS: "IN_PROCESS",
+      IN_PROCESS_DISPLAY: "IN PROCESS",
+      COMPLETED: "COMPLETED",
+      CANCELLED: "CANCELLED",
+    }),
+
+    EQUIPMENT_STATUS: Object.freeze({
+      ACTIVE: "ACTIVE",
+      INACTIVE: "INACTIVE",
+    }),
+
+    PRIORITY: Object.freeze({
+      LOW: "LOW",
+      MEDIUM: "MEDIUM",
+      HIGH: "HIGH",
+      CRITICAL: "CRITICAL",
+    }),
+
+    VALUE_STATE: Object.freeze({
+      NONE: "None",
+      SUCCESS: "Success",
+      WARNING: "Warning",
+      ERROR: "Error",
+      INFORMATION: "Information",
+    }),
+  };
+});

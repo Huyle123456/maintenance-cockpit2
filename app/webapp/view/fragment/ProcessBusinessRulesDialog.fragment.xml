@@ -1,0 +1,29 @@
+<core:FragmentDefinition xmlns="sap.m" xmlns:core="sap.ui.core">
+    <Dialog
+        id="processBusinessRulesDialog"
+        title="{i18n>processBusinessRulesTitle}"
+        contentWidth="600px"
+        resizable="true"
+        draggable="true"
+    >
+        <content>
+            <VBox id="vbProcessRulesContent" class="sapUiMediumMargin">
+                <List id="businessRulesList" showSeparators="None">
+                    <StandardListItem id="ruleItem1"  title="{i18n>processBusinessRulesRule1}"  wrapping="true" />
+                    <StandardListItem id="ruleItem2"  title="{i18n>processBusinessRulesRule2}"  wrapping="true" />
+                    <StandardListItem id="ruleItem3"  title="{i18n>processBusinessRulesRule3}"  wrapping="true" />
+                    <StandardListItem id="ruleItem4"  title="{i18n>processBusinessRulesRule4}"  wrapping="true" />
+                    <StandardListItem id="ruleItem5"  title="{i18n>processBusinessRulesRule5}"  wrapping="true" />
+                    <StandardListItem id="ruleItem6"  title="{i18n>processBusinessRulesRule6}"  wrapping="true" />
+                    <StandardListItem id="ruleItem7"  title="{i18n>processBusinessRulesRule7}"  wrapping="true" />
+                    <StandardListItem id="ruleItem8"  title="{i18n>processBusinessRulesRule8}"  wrapping="true" />
+                    <StandardListItem id="ruleItem9"  title="{i18n>processBusinessRulesRule9}"  wrapping="true" />
+                    <StandardListItem id="ruleItem10" title="{i18n>processBusinessRulesRule10}" wrapping="true" />
+                </List>
+            </VBox>
+        </content>
+        <buttons>
+            <Button id="btnCloseProcessRules" text="{i18n>commonClose}" type="Emphasized" press=".onCloseProcessBusinessRules" />
+        </buttons>
+    </Dialog>
+</core:FragmentDefinition>

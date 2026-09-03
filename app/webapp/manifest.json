@@ -1,0 +1,179 @@
+{
+    "_version": "1.86.0",
+    "sap.app": {
+        "id": "com.fsoft.zpmmaintenancecockpit",
+        "type": "application",
+        "i18n": {
+            "bundleUrl": "i18n/i18n.properties",
+            "supportedLocales": [
+                "",
+                "en",
+                "vi"
+            ]
+        },
+        "applicationVersion": {
+            "version": "0.0.1"
+        },
+        "title": "{{appTitle}}",
+        "description": "{{appDescription}}",
+        "resources": "resources.json",
+        "sourceTemplate": {
+            "id": "@sap/generator-fiori:basic",
+            "version": "1.29.0",
+            "toolsId": "3b28a4fa-61c6-4c29-a5cf-270da916b741"
+        }
+    },
+    "sap.ui": {
+        "technology": "UI5",
+        "icons": {
+            "icon": "",
+            "favIcon": "",
+            "phone": "",
+            "phone@2": "",
+            "tablet": "",
+            "tablet@2": ""
+        },
+        "deviceTypes": {
+            "desktop": true,
+            "tablet": true,
+            "phone": true
+        }
+    },
+    "sap.ui5": {
+        "flexEnabled": true,
+        "config": {
+            "theme": "sap_fiori_3"
+        },
+        "dependencies": {
+            "minUI5Version": "1.151.0",
+            "libs": {
+                "sap.f": {},
+                "sap.m": {},
+                "sap.ui.comp": {},
+                "sap.ui.core": {},
+                "sap.ui.layout": {},
+                "sap.tnt": {},
+                "sap.suite.ui.commons": {}
+            }
+        },
+        "contentDensities": {
+            "compact": true,
+            "cozy": true
+        },
+        "models": {
+            "i18n": {
+                "type": "sap.ui.model.resource.ResourceModel",
+                "settings": {
+                    "bundleName": "com.fsoft.zpmmaintenancecockpit.i18n.i18n",
+                    "supportedLocales": [
+                        "",
+                        "en",
+                        "vi"
+                    ],
+                    "fallbackLocale": "en"
+                }
+            }
+        },
+        "resources": {
+            "css": [
+                {
+                    "uri": "css/style.css"
+                }
+            ]
+        },
+        "routing": {
+            "config": {
+                "routerClass": "sap.m.routing.Router",
+                "controlAggregation": "pages",
+                "controlId": "mainLayoutApp",
+                "transition": "slide",
+                "type": "View",
+                "viewType": "XML",
+                "path": "com.fsoft.zpmmaintenancecockpit.view",
+                "async": true,
+                "viewPath": "com.fsoft.zpmmaintenancecockpit.view"
+            },
+            "routes": [
+                {
+                    "name": "RouteMaintenanceOrders",
+                    "pattern": ":?query:",
+                    "target": [
+                        "TargetMaintenanceOrders"
+                    ]
+                },
+                {
+                    "name": "RouteOrderDetail",
+                    "pattern": "orders/{orderId}",
+                    "target": "TargetOrderDetail"
+                },
+                {
+                    "name": "RouteEquipment",
+                    "pattern": "equipment",
+                    "target": [
+                        "TargetEquipment"
+                    ]
+                },
+                {
+                    "name": "RouteOperationsDashboard",
+                    "pattern": "operations",
+                    "target": [
+                        "TargetOperationsDashboard"
+                    ]
+                },
+                {
+                    "name": "RouteTechnicians",
+                    "pattern": "technicians",
+                    "target": [
+                        "TargetTechnicians"
+                    ]
+                },
+                {
+                    "name": "RouteAuditHistory",
+                    "pattern": "audit-history",
+                    "target": [
+                        "TargetAuditHistory"
+                    ]
+                }
+            ],
+            "targets": {
+                "TargetMaintenanceOrders": {
+                    "viewName": "MaintenanceOrders",
+                    "viewId": "MaintenanceOrders",
+                    "controlAggregation": "pages"
+                },
+                "TargetEquipment": {
+                    "viewName": "Equipment",
+                    "viewId": "Equipment",
+                    "controlAggregation": "pages"
+                },
+                "TargetOrderDetail": {
+                    "viewName": "MaintenanceOrderDetail",
+                    "viewId": "MaintenanceOrderDetail",
+                    "controlAggregation": "pages"
+                },
+                "TargetOperationsDashboard": {
+                    "viewName": "OperationsDashboard",
+                    "viewId": "OperationsDashboard",
+                    "controlAggregation": "pages"
+                },
+                "TargetTechnicians": {
+                    "viewName": "Technicians",
+                    "viewId": "Technicians",
+                    "controlAggregation": "pages"
+                },
+                "TargetAuditHistory": {
+                    "viewName": "AuditHistory",
+                    "viewId": "AuditHistory",
+                    "controlAggregation": "pages"
+                }
+            }
+        },
+        "rootView": {
+            "viewName": "com.fsoft.zpmmaintenancecockpit.view.MainLayout",
+            "type": "XML",
+            "id": "MainLayout",
+            "async": true
+        },
+        "flexBundle": false
+    }
+}

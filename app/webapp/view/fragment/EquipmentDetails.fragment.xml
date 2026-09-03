@@ -1,0 +1,198 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:cssgrid="sap.ui.layout.cssgrid"
+>
+    <Panel
+        id="equipmentDetailsPanel"
+        backgroundDesign="Solid"
+    >
+        <headerToolbar id="equipmentDetailsHeaderToolbar">
+            <OverflowToolbar id="equipmentDetailsToolbar">
+                <Title
+                    id="equipmentDetailsTitle"
+                    text="{equipmentDetail>/header}"
+                    level="H1"
+                    titleStyle="H3"
+                />
+
+                <ToolbarSpacer id="equipmentDetailsToolbarSpacer" />
+
+                <Button
+                    id="closeEquipmentPanelButton"
+                    icon="sap-icon://decline"
+                    type="Transparent"
+                    press="onCloseEquipmentPanel"
+                />
+            </OverflowToolbar>
+        </headerToolbar>
+
+        <content>
+            <VBox
+                id="equipmentDetailsContent"
+                width="100%"
+            >
+                <Title
+                    id="generalInformationTitle"
+                    text="{i18n>equipmentGeneralInformation}"
+                    level="H4"
+                    class="sapUiTinyMarginBottom"
+                />
+
+                <cssgrid:CSSGrid
+                    id="equipmentGeneralInfoGrid"
+                    width="100%"
+                    gridTemplateColumns="1fr"
+                    gridGap="1rem 3rem"
+                    class="sapUiSmallMarginTop"
+                >
+                    <HBox
+                        id="equipmentTypeRow"
+                        alignItems="Center"
+                    >
+                        <Label
+                            id="equipmentTypeLabel"
+                            text="{i18n>equipmentType}"
+                            width="120px"
+                        />
+                        <Text
+                            id="equipmentTypeText"
+                            text="{equipmentDetail>/type}"
+                        />
+                    </HBox>
+
+                    <HBox
+                        id="equipmentPlantRow"
+                        alignItems="Center"
+                    >
+                        <Label
+                            id="equipmentPlantLabel"
+                            text="{i18n>equipmentPlant}"
+                            width="120px"
+                        />
+                        <Text
+                            id="equipmentPlantText"
+                            text="{equipmentDetail>/plant}"
+                        />
+                    </HBox>
+
+                    <HBox
+                        id="equipmentLocationRow"
+                        alignItems="Center"
+                    >
+                        <Label
+                            id="equipmentLocationLabel"
+                            text="{i18n>equipmentLocation}"
+                            width="120px"
+                        />
+                        <Text
+                            id="equipmentLocationText"
+                            text="{equipmentDetail>/location}"
+                        />
+                    </HBox>
+
+                    <HBox
+                        id="equipmentStatusRow"
+                        alignItems="Center"
+                    >
+                        <Label
+                            id="equipmentStatusLabel"
+                            text="{i18n>equipmentStatus}"
+                            width="120px"
+                        />
+                        <ObjectStatus
+                            id="equipmentStatus"
+                            text="{equipmentDetail>/status}"
+                            state="{equipmentDetail>/statusState}"
+                        />
+                    </HBox>
+
+                    <HBox
+                        id="equipmentCriticalityRow"
+                        alignItems="Center"
+                    >
+                        <Label
+                            id="equipmentCriticalityLabel"
+                            text="{i18n>equipmentCriticality}"
+                            width="120px"
+                        />
+                        <Text
+                            id="equipmentCriticalityText"
+                            text="{equipmentDetail>/criticality}"
+                        />
+                    </HBox>
+
+                    <HBox
+                        id="equipmentManufacturerRow"
+                        alignItems="Center"
+                    >
+                        <Label
+                            id="equipmentManufacturerLabel"
+                            text="{i18n>equipmentManufacturer}"
+                            width="120px"
+                        />
+                        <Text
+                            id="equipmentManufacturerText"
+                            text="{equipmentDetail>/manufacturer}"
+                        />
+                    </HBox>
+                </cssgrid:CSSGrid>
+
+                <Title
+                    id="recentOrdersTitle"
+                    text="{i18n>equipmentRecentOrders}"
+                    level="H4"
+                    class="sapUiMediumMarginTop sapUiTinyMarginBottom"
+                />
+
+                <List
+                    id="recentOrdersList"
+                    items="{equipmentDetail>/recentOrders}"
+                    showSeparators="All"
+                    growing="false"
+                >
+                    <CustomListItem id="recentOrderItem">
+                        <VBox
+                            id="recentOrderItemContent"
+                            class="sapUiSmallMarginBeginEnd sapUiTinyMarginTopBottom"
+                        >
+                            <HBox
+                                id="recentOrderHeader"
+                                alignItems="Center"
+                            >
+                                <ObjectIdentifier
+                                    id="recentOrderIdentifier"
+                                    title="{equipmentDetail>order}"
+                                    class="sapUiTinyMarginEnd"
+                                />
+
+                                <Text
+                                    id="recentOrderSeparator"
+                                    text="-"
+                                    class="sapUiTinyMarginEnd"
+                                />
+
+                                <Text
+                                    id="recentOrderDescription"
+                                    text="{equipmentDetail>description}"
+                                />
+                            </HBox>
+
+                            <HBox
+                                id="recentOrderStatusContainer"
+                                class="sapUiTinyMarginTop"
+                            >
+                                <ObjectStatus
+                                    id="recentOrderStatus"
+                                    text="{equipmentDetail>status}"
+                                    state="{equipmentDetail>statusState}"
+                                    inverted="true"
+                                />
+                            </HBox>
+                        </VBox>
+                    </CustomListItem>
+                </List>
+            </VBox>
+        </content>
+    </Panel>
+</core:FragmentDefinition>

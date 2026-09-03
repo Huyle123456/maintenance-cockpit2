@@ -1,0 +1,137 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    xmlns:f="sap.ui.layout.form"
+>
+    <Popover
+        id="userProfilePopover"
+        title="{i18n>userProfileTitle}"
+        placement="Bottom"
+        contentWidth="460px"
+        horizontalScrolling="false"
+        verticalScrolling="false"
+        class="sapUiContentPadding"
+    >
+        <content>
+            <VBox class="sapUiSmallMargin">
+                <!-- User Profile Header Summary -->
+                <HBox
+                    alignItems="Center"
+                    class="sapUiSmallMarginBottom"
+                >
+                    <Avatar
+                        initials="{auth>/currentUser/avatarInitials}"
+                        backgroundColor="{auth>/currentUser/avatarColor}"
+                        displaySize="M"
+                        class="sapUiSmallMarginEnd"
+                    />
+                    <VBox width="100%">
+                        <HBox alignItems="Center">
+                            <Title
+                                text="{auth>/currentUser/name}"
+                                level="H4"
+                                class="sapUiTinyMarginEnd"
+                            />
+                            <ObjectStatus
+                                text="{auth>/currentUser/roleText}"
+                                state="{= ${auth>/currentUser/isAdmin} ? 'Success' : 'Information' }"
+                                inverted="true"
+                            />
+                        </HBox>
+                        <Text
+                            text="{auth>/currentUser/email}"
+                            wrapping="true"
+                            class="sapUiFontSmall sapUiDimColor"
+                        />
+                        <Text
+                            text="{auth>/currentUser/description}"
+                            wrapping="true"
+                            class="sapUiTinyMarginTop sapUiFontSmall"
+                        />
+                    </VBox>
+                </HBox>
+
+                <!-- Role Switcher Section -->
+                <VBox class="sapUiSmallMarginTop">
+                    <Label
+                        text="{i18n>userSwitchAccountLabel}"
+                        design="Bold"
+                        class="sapUiTinyMarginBottom"
+                    />
+                    <SegmentedButton
+                        id="accountSegmentedButton"
+                        selectedKey="{auth>/currentUser/id}"
+                        select=".onSwitchAccount"
+                        width="100%"
+                    >
+                        <items>
+                            <SegmentedButtonItem
+                                key="admin"
+                                text="Admin (AD)"
+                                icon="sap-icon://user-settings"
+                                width="50%"
+                            />
+                            <SegmentedButtonItem
+                                key="user"
+                                text="User (US)"
+                                icon="sap-icon://person-placeholder"
+                                width="50%"
+                            />
+                        </items>
+                    </SegmentedButton>
+                </VBox>
+
+                <!-- Permissions Info Card -->
+                <VBox class="sapUiMediumMarginTop">
+                    <Label
+                        text="{i18n>userPermissionsLabel}"
+                        design="Bold"
+                        class="sapUiTinyMarginBottom"
+                    />
+                    <List
+                        id="userPermissionsList"
+                        showSeparators="None"
+                        class="sapUiNoContentPadding"
+                    >
+                        <StandardListItem
+                            title="{i18n>permCreateOrders}"
+                            icon="{= ${auth>/currentUser/permissions/createOrder} ? 'sap-icon://accept' : 'sap-icon://decline' }"
+                            info="{= ${auth>/currentUser/permissions/createOrder} ? ${i18n>permAllowed} : ${i18n>permRestricted} }"
+                            infoState="{= ${auth>/currentUser/permissions/createOrder} ? 'Success' : 'Error' }"
+                        />
+                        <StandardListItem
+                            title="{i18n>permMassChange}"
+                            icon="{= ${auth>/currentUser/permissions/massChange} ? 'sap-icon://accept' : 'sap-icon://decline' }"
+                            info="{= ${auth>/currentUser/permissions/massChange} ? ${i18n>permAllowed} : ${i18n>permRestricted} }"
+                            infoState="{= ${auth>/currentUser/permissions/massChange} ? 'Success' : 'Error' }"
+                        />
+                        <StandardListItem
+                            title="{i18n>permEditCancelComplete}"
+                            icon="{= ${auth>/currentUser/permissions/editOrder} ? 'sap-icon://accept' : 'sap-icon://decline' }"
+                            info="{= ${auth>/currentUser/permissions/editOrder} ? ${i18n>permAllowed} : ${i18n>permRestricted} }"
+                            infoState="{= ${auth>/currentUser/permissions/editOrder} ? 'Success' : 'Error' }"
+                        />
+                        <StandardListItem
+                            title="{i18n>permManageOperationsMaterials}"
+                            icon="{= ${auth>/currentUser/permissions/addOperation} ? 'sap-icon://accept' : 'sap-icon://decline' }"
+                            info="{= ${auth>/currentUser/permissions/addOperation} ? ${i18n>permAllowed} : ${i18n>permRestricted} }"
+                            infoState="{= ${auth>/currentUser/permissions/addOperation} ? 'Success' : 'Error' }"
+                        />
+                        <StandardListItem
+                            title="{i18n>permViewExportData}"
+                            icon="sap-icon://accept"
+                            info="{i18n>permAllowed}"
+                            infoState="Success"
+                        />
+                    </List>
+                </VBox>
+            </VBox>
+        </content>
+        <beginButton>
+            <Button
+                text="{i18n>commonClose}"
+                press=".onCloseUserPopover"
+            />
+        </beginButton>
+    </Popover>
+</core:FragmentDefinition>

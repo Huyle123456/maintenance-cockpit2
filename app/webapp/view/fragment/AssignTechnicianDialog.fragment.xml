@@ -1,0 +1,19 @@
+<core:FragmentDefinition xmlns="sap.m" xmlns:core="sap.ui.core">
+    <SelectDialog id="assignTechnicianDialog"
+        title="{i18n>orderDetailTechnicianAssignTitle}"
+        items="{techCatalog>/}"
+        confirm=".onConfirmAssignTechnician"
+        cancel=".onCancelAssignTechnician"
+        search=".onSearchAssignTechnician"
+        noDataText="{i18n>orderDetailTechnicianAssignNoData}">
+        <StandardListItem
+            title="{techCatalog>key} — {techCatalog>name}"
+            description="{techCatalog>skill} · {techCatalog>workCenter}"
+            info="{techCatalog>available}"
+            infoState="{
+                path: 'techCatalog>available',
+                formatter: '.formatter.formatAvailableState'
+            }"
+            type="Active" />
+    </SelectDialog>
+</core:FragmentDefinition>

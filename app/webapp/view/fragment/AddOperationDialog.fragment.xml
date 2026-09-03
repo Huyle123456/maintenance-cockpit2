@@ -1,0 +1,40 @@
+<core:FragmentDefinition xmlns="sap.m" xmlns:core="sap.ui.core" xmlns:l="sap.ui.layout">
+    <Dialog id="addOperationDialog" title="{i18n>orderDetailOperationAddTitle}" contentWidth="700px">
+        <l:Grid id="gridAddOperation" defaultSpan="XL6 L6 M6 S12" class="sapUiSmallMargin">
+            <VBox id="vbAddOpNo">
+                <Label id="lblAddOpNo" text="{i18n>orderDetailOperationNo}" />
+                <Input id="inpAddOpNo" value="{newOperation>/no}" type="Number" width="100%" />
+            </VBox>
+            <VBox id="vbAddOpDesc">
+                <Label id="lblAddOpDesc" text="{i18n>orderDetailOperationDescription}" required="true" />
+                <Input id="inpAddOpDesc" value="{newOperation>/description}" width="100%" />
+            </VBox>
+            <VBox id="vbAddOpWorkCenter">
+                <Label id="lblAddOpWorkCenter" text="{i18n>orderDetailOperationWorkCenter}" />
+                <Select id="selAddOpWorkCenter" selectedKey="{newOperation>/workCenter}" items="{masterData>/work_centers}" width="100%">
+                    <core:Item id="itemAddOpWorkCenter" key="{masterData>key}" text="{masterData>text}" />
+                </Select>
+            </VBox>
+            <VBox id="vbAddOpTechnician">
+                <Label id="lblAddOpTechnician" text="{i18n>orderDetailOperationTechnician}" />
+                <Select id="selAddOpTechnician" selectedKey="{newOperation>/technician}" items="{technicianData>/technicians}" width="100%">
+                    <core:Item id="itemAddOpTechnician" key="{technicianData>key}" text="{technicianData>text}" />
+                </Select>
+            </VBox>
+            <VBox id="vbAddOpPlanned">
+                <Label id="lblAddOpPlanned" text="{i18n>orderDetailOperationPlanned}" required="true" />
+                <Input id="inpAddOpPlanned" value="{newOperation>/plannedHours}" type="Number" width="100%" />
+            </VBox>
+            <VBox id="vbAddOpStatus">
+                <Label id="lblAddOpStatus" text="{i18n>orderDetailOperationStatus}" />
+                <Select id="selAddOpStatus" selectedKey="{newOperation>/status}" items="{masterData>/statuses}" width="100%">
+                    <core:Item id="itemAddOpStatus" key="{masterData>key}" text="{masterData>text}" />
+                </Select>
+            </VBox>
+        </l:Grid>
+        <buttons>
+            <Button id="btnAddOpCancel" text="{i18n>commonCancel}" press=".onCancelAddOperation" />
+            <Button id="btnAddOpConfirm" text="{i18n>orderDetailOperationAddAction}" type="Emphasized" press=".onConfirmAddOperation" />
+        </buttons>
+    </Dialog>
+</core:FragmentDefinition>

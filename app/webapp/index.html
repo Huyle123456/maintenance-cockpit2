@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <title>Maintenance Management Cockpit</title>
+    <style>
+      html,
+      body,
+      body > div,
+      #container,
+      #container-uiarea {
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+      }
+    </style>
+    <script src="util/xlsx.full.min.js"></script>
+    <script
+      id="sap-ui-bootstrap"
+      src="https://ui5.sap.com/resources/sap-ui-core.js"
+      data-sap-ui-resource-roots='{
+            "com.fsoft.zpmmaintenancecockpit": "./"
+        }'
+      data-sap-ui-on-init="module:sap/ui/core/ComponentSupport"
+      data-sap-ui-compat-version="edge"
+      data-sap-ui-async="true"
+      data-sap-ui-preload="none"
+      data-sap-ui-theme="sap_fiori_3"
+      data-sap-ui-frame-options="trusted"
+    ></script>
+  </head>
+
+  <body class="sapUiBody sapUiSizeCompact" id="content">
+    <div
+      data-sap-ui-component
+      data-name="com.fsoft.zpmmaintenancecockpit"
+      data-id="container"
+      data-settings='{"id" : "com.fsoft.zpmmaintenancecockpit"}'
+      data-handle-validation="true"
+    ></div>
+  </body>
+</html>
