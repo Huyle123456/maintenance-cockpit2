@@ -17,6 +17,7 @@
   },
   "devDependencies": {
     "@sap/cds-dk": "^10",
+    "archiver": "^7.0.1",
     "mbt": "^1.2.49",
     "rimraf": "^5.0.5"
   },

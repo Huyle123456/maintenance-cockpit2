@@ -3,6 +3,26 @@
   "authenticationMethod": "route",
   "routes": [
     {
+      "source": "^/odata/v4/maintenance/(.*)$",
+      "target": "/odata/v4/maintenance/$1",
+      "destination": "srv-api",
+      "authenticationType": "xsuaa",
+      "csrfProtection": false
+    },
+    {
+      "source": "^/api/maintenance/(.*)$",
+      "target": "/api/maintenance/$1",
+      "destination": "srv-api",
+      "authenticationType": "xsuaa",
+      "csrfProtection": false
+    },
+    {
+      "source": "^/user-api/(.*)$",
+      "target": "/user-api/$1",
+      "service": "user-info",
+      "authenticationType": "xsuaa"
+    },
+    {
       "source": "^/resources/(.*)$",
       "target": "/resources/$1",
       "authenticationType": "none",

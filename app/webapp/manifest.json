@@ -21,6 +21,22 @@
             "id": "@sap/generator-fiori:basic",
             "version": "1.29.0",
             "toolsId": "3b28a4fa-61c6-4c29-a5cf-270da916b741"
+        },
+        "crossNavigation": {
+            "inbounds": {
+                "MaintenanceCockpit-display": {
+                    "semanticObject": "MaintenanceCockpit",
+                    "action": "display",
+                    "title": "{{appTitle}}",
+                    "subTitle": "Maintenance Orders & Operations Cockpit",
+                    "icon": "sap-icon://wrench",
+                    "description": "{{appDescription}}",
+                    "signature": {
+                        "parameters": {},
+                        "additionalParameters": "allowed"
+                    }
+                }
+            }
         }
     },
     "sap.ui": {

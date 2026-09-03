@@ -1,10 +1,11 @@
 _schema-version: 3.3.0
 ID: ZPM_MAINTENANCE_COCKPIT
 version: 1.0.0
-description: "SAP CAP Full Stack Maintenance Management Cockpit"
+description: "SAP CAP Maintenance Cockpit - SAP Build Work Zone Edition"
 
 parameters:
   enable-parallel-deployments: true
+  deploy_mode: html5-repo
 
 build-parameters:
   before-all:
@@ -12,12 +13,10 @@ build-parameters:
       commands:
         - npm ci
         - npx cds build --production
-        - mkdir -p gen/srv/app
-        - cp -r app/webapp gen/srv/app/
-        - cp app/index.html gen/srv/app/
+        - node scripts/package-app.js
 
 modules:
-  # ---------------- BACKEND & FIORI UI SERVICE ----------------
+  # ---------------- BACKEND CAP SERVICE ----------------
   - name: ZPM_MAINTENANCE_COCKPIT-srv
     type: nodejs
     path: gen/srv
@@ -45,8 +44,56 @@ modules:
     requires:
       - name: ZPM_MAINTENANCE_COCKPIT-db
 
+  # ---------------- HTML5 APP REPOSITORY DEPLOYER (BUILD WORK ZONE) ----------------
+  - name: ZPM_MAINTENANCE_COCKPIT-app-deployer
+    type: com.sap.application.content
+    path: gen/app
+    requires:
+      - name: ZPM_MAINTENANCE_COCKPIT-html5-repo-host
+        parameters:
+          content-target: true
+
+  # ---------------- DESTINATIONS FOR SAP BUILD WORK ZONE ----------------
+  - name: ZPM_MAINTENANCE_COCKPIT-destination-content
+    type: com.sap.application.content
+    build-parameters:
+      no-source: true
+    requires:
+      - name: ZPM_MAINTENANCE_COCKPIT-destination
+        parameters:
+          content-target: true
+      - name: ZPM_MAINTENANCE_COCKPIT-html5-repo-host
+        parameters:
+          service-key:
+            name: ZPM_MAINTENANCE_COCKPIT-html5-repo-host-key
+      - name: ZPM_MAINTENANCE_COCKPIT-auth
+        parameters:
+          service-key:
+            name: ZPM_MAINTENANCE_COCKPIT-auth-key
+      - name: srv-api
+    parameters:
+      content:
+        instance:
+          destinations:
+            - Name: ZPM_MAINTENANCE_COCKPIT_HTML5_REPO
+              ServiceInstanceName: ZPM_MAINTENANCE_COCKPIT-html5-repo-host
+              ServiceKeyName: ZPM_MAINTENANCE_COCKPIT-html5-repo-host-key
+              sap.cloud.service: com.fsoft.zpmmaintenancecockpit
+            - Name: ZPM_MAINTENANCE_COCKPIT_AUTH
+              Authentication: OAuth2UserTokenExchange
+              ServiceInstanceName: ZPM_MAINTENANCE_COCKPIT-auth
+              ServiceKeyName: ZPM_MAINTENANCE_COCKPIT-auth-key
+              sap.cloud.service: com.fsoft.zpmmaintenancecockpit
+            - Name: srv-api
+              URL: ~{srv-api/srv-url}
+              Authentication: OAuth2UserTokenExchange
+              TokenServiceInstanceName: ZPM_MAINTENANCE_COCKPIT-auth
+              TokenServiceKeyName: ZPM_MAINTENANCE_COCKPIT-auth-key
+              sap.cloud.service: com.fsoft.zpmmaintenancecockpit
+          existing_destinations_policy: update
+
 resources:
-  # ---------------- XSUAA SECURITY ----------------
+  # ---------------- XSUAA SECURITY SERVICE ----------------
   - name: ZPM_MAINTENANCE_COCKPIT-auth
     type: org.cloudfoundry.managed-service
     parameters:
@@ -67,3 +114,20 @@ resources:
     parameters:
       service: hana
       service-plan: hdi-shared
+
+  # ---------------- HTML5 APPLICATION REPOSITORY HOST ----------------
+  - name: ZPM_MAINTENANCE_COCKPIT-html5-repo-host
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: html5-apps-repo
+      service-plan: app-host
+
+  # ---------------- DESTINATION SERVICE ----------------
+  - name: ZPM_MAINTENANCE_COCKPIT-destination
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: destination
+      service-plan: lite
+      config:
+        HTML5Runtime_enabled: true
+        version: 1.0.0
