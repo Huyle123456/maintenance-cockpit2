@@ -1064,10 +1064,29 @@
     "MaintenanceService": {
       "@source": "srv/maintenance-service.cds",
       "kind": "service",
-      "@path": "/odata/v4/maintenance"
+      "@path": "/odata/v4/maintenance",
+      "@requires": "authenticated-user"
     },
     "MaintenanceService.MaintenanceOrders": {
       "kind": "entity",
+      "@restrict": [
+        {
+          "grant": "READ",
+          "to": [
+            "User",
+            "Admin",
+            "any"
+          ]
+        },
+        {
+          "grant": [
+            "CREATE",
+            "UPDATE",
+            "DELETE"
+          ],
+          "to": "Admin"
+        }
+      ],
       "projection": {
         "from": {
           "ref": [
@@ -1297,6 +1316,24 @@
     },
     "MaintenanceService.Equipments": {
       "kind": "entity",
+      "@restrict": [
+        {
+          "grant": "READ",
+          "to": [
+            "User",
+            "Admin",
+            "any"
+          ]
+        },
+        {
+          "grant": [
+            "CREATE",
+            "UPDATE",
+            "DELETE"
+          ],
+          "to": "Admin"
+        }
+      ],
       "projection": {
         "from": {
           "ref": [
@@ -1415,6 +1452,24 @@
     },
     "MaintenanceService.MaintenanceOperations": {
       "kind": "entity",
+      "@restrict": [
+        {
+          "grant": "READ",
+          "to": [
+            "User",
+            "Admin",
+            "any"
+          ]
+        },
+        {
+          "grant": [
+            "CREATE",
+            "UPDATE",
+            "DELETE"
+          ],
+          "to": "Admin"
+        }
+      ],
       "projection": {
         "from": {
           "ref": [
@@ -1541,6 +1596,24 @@
     },
     "MaintenanceService.Materials": {
       "kind": "entity",
+      "@restrict": [
+        {
+          "grant": "READ",
+          "to": [
+            "User",
+            "Admin",
+            "any"
+          ]
+        },
+        {
+          "grant": [
+            "CREATE",
+            "UPDATE",
+            "DELETE"
+          ],
+          "to": "Admin"
+        }
+      ],
       "projection": {
         "from": {
           "ref": [
@@ -1633,6 +1706,16 @@
     },
     "MaintenanceService.MaterialCatalog": {
       "kind": "entity",
+      "@restrict": [
+        {
+          "grant": "READ",
+          "to": [
+            "User",
+            "Admin",
+            "any"
+          ]
+        }
+      ],
       "projection": {
         "from": {
           "ref": [
@@ -1720,6 +1803,24 @@
     },
     "MaintenanceService.Technicians": {
       "kind": "entity",
+      "@restrict": [
+        {
+          "grant": "READ",
+          "to": [
+            "User",
+            "Admin",
+            "any"
+          ]
+        },
+        {
+          "grant": [
+            "CREATE",
+            "UPDATE",
+            "DELETE"
+          ],
+          "to": "Admin"
+        }
+      ],
       "projection": {
         "from": {
           "ref": [
@@ -1813,6 +1914,16 @@
     },
     "MaintenanceService.TechnicianCatalog": {
       "kind": "entity",
+      "@restrict": [
+        {
+          "grant": "READ",
+          "to": [
+            "User",
+            "Admin",
+            "any"
+          ]
+        }
+      ],
       "projection": {
         "from": {
           "ref": [
@@ -1898,6 +2009,24 @@
     },
     "MaintenanceService.AuditHistory": {
       "kind": "entity",
+      "@restrict": [
+        {
+          "grant": "READ",
+          "to": [
+            "User",
+            "Admin",
+            "any"
+          ]
+        },
+        {
+          "grant": "CREATE",
+          "to": [
+            "User",
+            "Admin",
+            "any"
+          ]
+        }
+      ],
       "projection": {
         "from": {
           "ref": [
@@ -1986,6 +2115,24 @@
     },
     "MaintenanceService.OrderHistory": {
       "kind": "entity",
+      "@restrict": [
+        {
+          "grant": "READ",
+          "to": [
+            "User",
+            "Admin",
+            "any"
+          ]
+        },
+        {
+          "grant": "CREATE",
+          "to": [
+            "User",
+            "Admin",
+            "any"
+          ]
+        }
+      ],
       "projection": {
         "from": {
           "ref": [
@@ -2078,6 +2225,16 @@
     },
     "MaintenanceService.Plants": {
       "kind": "entity",
+      "@restrict": [
+        {
+          "grant": "READ",
+          "to": [
+            "User",
+            "Admin",
+            "any"
+          ]
+        }
+      ],
       "projection": {
         "from": {
           "ref": [
@@ -2099,6 +2256,16 @@
     },
     "MaintenanceService.MaintenanceTypes": {
       "kind": "entity",
+      "@restrict": [
+        {
+          "grant": "READ",
+          "to": [
+            "User",
+            "Admin",
+            "any"
+          ]
+        }
+      ],
       "projection": {
         "from": {
           "ref": [
@@ -2120,6 +2287,16 @@
     },
     "MaintenanceService.Priorities": {
       "kind": "entity",
+      "@restrict": [
+        {
+          "grant": "READ",
+          "to": [
+            "User",
+            "Admin",
+            "any"
+          ]
+        }
+      ],
       "projection": {
         "from": {
           "ref": [
@@ -2141,6 +2318,16 @@
     },
     "MaintenanceService.Planners": {
       "kind": "entity",
+      "@restrict": [
+        {
+          "grant": "READ",
+          "to": [
+            "User",
+            "Admin",
+            "any"
+          ]
+        }
+      ],
       "projection": {
         "from": {
           "ref": [
@@ -2162,6 +2349,16 @@
     },
     "MaintenanceService.WorkCenters": {
       "kind": "entity",
+      "@restrict": [
+        {
+          "grant": "READ",
+          "to": [
+            "User",
+            "Admin",
+            "any"
+          ]
+        }
+      ],
       "projection": {
         "from": {
           "ref": [
@@ -2183,6 +2380,16 @@
     },
     "MaintenanceService.Statuses": {
       "kind": "entity",
+      "@restrict": [
+        {
+          "grant": "READ",
+          "to": [
+            "User",
+            "Admin",
+            "any"
+          ]
+        }
+      ],
       "projection": {
         "from": {
           "ref": [
@@ -2225,6 +2432,37 @@
       },
       "returns": {
         "type": "MaintenanceService.MaintenanceOrders"
+      }
+    },
+    "MaintenanceService.CurrentUserProfile": {
+      "kind": "type",
+      "elements": {
+        "id": {
+          "type": "cds.String"
+        },
+        "name": {
+          "type": "cds.String"
+        },
+        "email": {
+          "type": "cds.String"
+        },
+        "roles": {
+          "items": {
+            "type": "cds.String"
+          }
+        },
+        "isAdmin": {
+          "type": "cds.Boolean"
+        },
+        "isUser": {
+          "type": "cds.Boolean"
+        }
+      }
+    },
+    "MaintenanceService.getUserInfo": {
+      "kind": "function",
+      "returns": {
+        "type": "MaintenanceService.CurrentUserProfile"
       }
     },
     "cds.outbox.Messages": {

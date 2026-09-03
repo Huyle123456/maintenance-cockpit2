@@ -1,7 +1,41 @@
-const cds = require('@sap/cds');
+const cds = global.cds || require('@sap/cds');
 
 module.exports = cds.service.impl(async function () {
   const { MaintenanceOrders, AuditHistory, OrderHistory, MaintenanceOperations } = this.entities;
+
+  // Retrieve current user profile and roles from SAP XSUAA or mock auth
+  this.on('getUserInfo', async (req) => {
+    const user = req.user;
+    const userId = (user && user.id) ? user.id : 'admin';
+    const isAdmin = (user && typeof user.is === 'function') ? user.is('Admin') : (userId.toLowerCase().includes('admin'));
+    const isUser = (user && typeof user.is === 'function') ? user.is('User') : true;
+
+    const roles = [];
+    if (isAdmin) roles.push('Admin');
+    if (isUser) roles.push('User');
+
+    let displayName = userId;
+    if (user && user.attr && user.attr.logon_name) {
+      displayName = user.attr.logon_name;
+    } else if (userId === 'admin') {
+      displayName = 'Administrator';
+    } else if (userId === 'user') {
+      displayName = 'Standard User';
+    }
+
+    const email = (user && user.attr && user.attr.email)
+      ? user.attr.email
+      : (userId.includes('@') ? userId : `${userId}@maintenance.sap`);
+
+    return {
+      id: userId,
+      name: displayName,
+      email: email,
+      roles: roles,
+      isAdmin: isAdmin,
+      isUser: isUser
+    };
+  });
 
   this.before('CREATE', 'MaintenanceOrders', async (req) => {
     const data = req.data;
@@ -20,9 +54,10 @@ module.exports = cds.service.impl(async function () {
   });
 
   this.after('CREATE', 'MaintenanceOrders', async (data, req) => {
+    const currentUser = req.user?.id || 'Current User';
     await INSERT.into(AuditHistory).entries({
       timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      user: req.user?.id || 'Current User',
+      user: currentUser,
       object: data.order_no,
       action: 'CREATE',
       details: 'Maintenance order created'
@@ -32,7 +67,7 @@ module.exports = cds.service.impl(async function () {
       order_no: data.order_no,
       title: 'Order created',
       dateTime: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      userName: req.user?.id || 'Current User',
+      userName: currentUser,
       text: 'Order initialized in system',
       icon: 'sap-icon://create'
     });
@@ -46,9 +81,10 @@ module.exports = cds.service.impl(async function () {
       .set({ status: 'CANCELLED', status_state: 'Error' })
       .where({ order_no });
 
+    const currentUser = req.user?.id || 'Current User';
     await INSERT.into(AuditHistory).entries({
       timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      user: req.user?.id || 'Current User',
+      user: currentUser,
       object: order_no,
       action: 'CANCEL',
       details: reason || 'Order cancelled by user'
@@ -58,7 +94,7 @@ module.exports = cds.service.impl(async function () {
       order_no: order_no,
       title: 'Status changed to CANCELLED',
       dateTime: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      userName: req.user?.id || 'Current User',
+      userName: currentUser,
       text: reason || 'Order cancelled',
       icon: 'sap-icon://cancel'
     });
@@ -74,9 +110,10 @@ module.exports = cds.service.impl(async function () {
       .set({ status: 'COMPLETED', status_state: 'Success' })
       .where({ order_no });
 
+    const currentUser = req.user?.id || 'Current User';
     await INSERT.into(AuditHistory).entries({
       timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      user: req.user?.id || 'Current User',
+      user: currentUser,
       object: order_no,
       action: 'COMPLETE',
       details: 'Order marked as completed'
@@ -86,7 +123,7 @@ module.exports = cds.service.impl(async function () {
       order_no: order_no,
       title: 'Status changed to COMPLETED',
       dateTime: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      userName: req.user?.id || 'Current User',
+      userName: currentUser,
       text: 'Maintenance work finished',
       icon: 'sap-icon://complete'
     });

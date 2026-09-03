@@ -7,18 +7,22 @@
   "private": true,
   "dependencies": {
     "@cap-js/hana": "^3",
-    "@cap-js/sqlite": "^3",
-    "@sap/cds": "^10",
+    "@cap-js/sqlite": "^3.0.2",
+    "@sap/cds": "^10.0.6",
     "@sap/xssec": "^4.15.0",
-    "express": "^4"
+    "exceljs": "^4.4.0",
+    "express": "^4.22.2",
+    "multer": "^1.4.5-lts.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@sap/cds-dk": "^10",
-    "rimraf": "^5.0.5",
-    "mbt": "^1.2.49"
+    "archiver": "^7.0.1",
+    "mbt": "^1.2.49",
+    "rimraf": "^5.0.5"
   },
   "scripts": {
-    "start": "cds-serve",
+    "start": "cds serve",
     "watch": "cds watch",
     "build": "rimraf resources mta_archives && mbt build --mtar archive",
     "deploy": "cf deploy mta_archives/archive.mtar --retries 1",
@@ -29,15 +33,36 @@
       "[development]": {
         "db": {
           "kind": "sqlite"
+        },
+        "auth": {
+          "kind": "basic-auth",
+          "users": {
+            "admin": {
+              "password": "123",
+              "roles": [
+                "Admin",
+                "User"
+              ],
+              "features": [
+                "*"
+              ]
+            },
+            "user": {
+              "password": "123",
+              "roles": [
+                "User"
+              ]
+            }
+          }
         }
       },
       "[production]": {
         "db": {
           "kind": "hana"
+        },
+        "auth": {
+          "kind": "xsuaa"
         }
-      },
-      "auth": {
-        "kind": "mocked"
       }
     }
   },

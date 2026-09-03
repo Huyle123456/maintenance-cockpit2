@@ -45,6 +45,7 @@
         <EntitySet Name="Statuses" EntityType="MaintenanceService.Statuses"/>
         <ActionImport Name="cancelOrder" Action="MaintenanceService.cancelOrder" EntitySet="MaintenanceOrders"/>
         <ActionImport Name="completeOrder" Action="MaintenanceService.completeOrder" EntitySet="MaintenanceOrders"/>
+        <FunctionImport Name="getUserInfo" Function="MaintenanceService.getUserInfo"/>
       </EntityContainer>
       <EntityType Name="MaintenanceOrders">
         <Key>
@@ -256,6 +257,14 @@
         <Property Name="key" Type="Edm.String" MaxLength="50" Nullable="false"/>
         <Property Name="text" Type="Edm.String" MaxLength="100"/>
       </EntityType>
+      <ComplexType Name="CurrentUserProfile">
+        <Property Name="id" Type="Edm.String"/>
+        <Property Name="name" Type="Edm.String"/>
+        <Property Name="email" Type="Edm.String"/>
+        <Property Name="roles" Type="Collection(Edm.String)" Nullable="true"/>
+        <Property Name="isAdmin" Type="Edm.Boolean"/>
+        <Property Name="isUser" Type="Edm.Boolean"/>
+      </ComplexType>
       <Action Name="cancelOrder" IsBound="false">
         <Parameter Name="order_no" Type="Edm.String"/>
         <Parameter Name="reason" Type="Edm.String"/>
@@ -265,6 +274,9 @@
         <Parameter Name="order_no" Type="Edm.String"/>
         <ReturnType Type="MaintenanceService.MaintenanceOrders"/>
       </Action>
+      <Function Name="getUserInfo" IsBound="false" IsComposable="false">
+        <ReturnType Type="MaintenanceService.CurrentUserProfile"/>
+      </Function>
       <Annotations Target="MaintenanceService.MaintenanceOrders/createdAt">
         <Annotation Term="UI.HiddenFilter" Bool="true"/>
         <Annotation Term="UI.ExcludeFromNavigationContext" Bool="true"/>
