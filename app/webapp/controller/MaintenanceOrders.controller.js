@@ -1813,12 +1813,35 @@ sap.ui.define(
 
             await this._reloadOrdersFromBackend();
 
-            this.onCancelImportOrders();
+            let sMsg = `Import completed in ${result.durationSec || '1s'}!\n\n` +
+              `• Total Rows: ${result.totalRows}\n` +
+              `• Successfully Imported: ${result.importedCount} orders\n`;
 
-            const sMsg = `Import completed!\n- Total rows: ${result.totalRows}\n- Successfully imported: ${result.importedCount} orders${result.failedCount > 0 ? `\n- Failed / Skipped: ${result.failedCount} rows` : ''}`;
-            MessageBox.success(sMsg, {
-              title: "Backend Excel Import Summary"
-            });
+            if (result.failedCount > 0) {
+              sMsg += `• Failed / Invalid Rows: ${result.failedCount}\n\nRow-by-Row Error Details:\n`;
+              const maxDisplayErrors = Math.min((result.errors || []).length, 20);
+              for (let i = 0; i < maxDisplayErrors; i++) {
+                const errItem = result.errors[i];
+                sMsg += `  - Line ${errItem.row} (${errItem.order}): ${errItem.details || errItem.error}\n`;
+              }
+              if ((result.errors || []).length > 20) {
+                sMsg += `  ... and ${result.errors.length - 20} more invalid rows.\n`;
+              }
+
+              if (result.importedCount > 0) {
+                MessageBox.warning(sMsg, {
+                  title: "Import Summary (Partial Success with Warnings)"
+                });
+              } else {
+                MessageBox.error(sMsg, {
+                  title: "Import Failed (Validation Errors)"
+                });
+              }
+            } else {
+              MessageBox.success(sMsg, {
+                title: "Backend Excel Import Summary"
+              });
+            }
           } catch (err) {
             console.error("Backend Excel import error:", err);
             oImportModel.setProperty("/statusMessage", "Import failed: " + err.message);

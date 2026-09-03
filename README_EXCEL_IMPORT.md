@@ -164,6 +164,42 @@ for await (const worksheetReader of workbookReader) {
 
 ---
 
+### 3.5. Thuật toán Kiểm tra & Báo cáo Lỗi Chi tiết Từng Dòng (Row-by-Row Error Reporting)
+* **Vấn đề**: Trong file Excel 10.000 dòng, người dùng cần biết **chính xác dòng số mấy bị lỗi** và **lỗi cụ thể là gì** (ví dụ: thiếu Description, mã Thiết bị không tồn tại, ngày bắt đầu lớn hơn ngày kết thúc), đồng thời các dòng hợp lệ khác vẫn được import bình thường (hoặc cảnh báo rõ ràng).
+* **Cơ chế Kiểm tra Đa tầng (Multi-Rule Row Validation)**:
+  1. **Kiểm tra trường bắt buộc**: `Description` không được để trống.
+  2. **Kiểm tra Master Data Integrity**:
+     - `Equipment`: Tra cứu trong `setEquipments`.
+     - `Plant`: Tra cứu trong `setPlants`.
+     - `Maintenance Type`: Tra cứu trong `setTypes`.
+     - `Priority`: Tra cứu trong `setPriorities`.
+  3. **Kiểm tra Tính hợp lệ Logic Ngày tháng**:
+     - `scheduled_from` $\le$ `scheduled_to`.
+* **Cấu trúc Thu thập Lỗi**:
+  Khi phát hiện dòng lỗi, hệ thống ghi nhận vị trí dòng thực tế trong file Excel (1-indexed) kèm mã Order và nguyên nhân:
+  ```json
+  {
+    "row": 14,
+    "order": "MO-2014",
+    "details": "Equipment 'EQ-999' does not exist; Maintenance Type 'CUSTOM' is invalid"
+  }
+  ```
+* **Phản hồi Giao diện Fiori**:
+  - **Thành công 100%**: Hiển thị hộp thoại `MessageBox.success`.
+  - **Có dòng lỗi (Partial Success / Warning)**: Hiển thị hộp thoại cảnh báo `MessageBox.warning` liệt kê chi tiết từng dòng bị lỗi:
+    ```
+    Import completed in 1.85s!
+    • Total Rows: 10
+    • Successfully Imported: 8 orders
+    • Failed / Invalid Rows: 2
+
+    Row-by-Row Error Details:
+      - Line 4 (MO-1004): Equipment 'EQ-999' does not exist
+      - Line 7 (Row #7): Description is required
+    ```
+
+---
+
 ## 4. Bảng So sánh Hiệu năng (Benchmark: 10.000 records)
 
 | Tiêu chí | Client-side DOM Parsing (Cũ) | Backend ExcelJS Streaming (Mới) | Mức cải thiện |

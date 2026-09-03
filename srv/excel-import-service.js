@@ -153,16 +153,49 @@ async function processExcelImport(fileSource, currentUser = 'Current User', opti
       const rawFrom = getVal(['scheduledfrom', 'from', 'startdate', 'scheduledstart']);
       const rawTo = getVal(['scheduledto', 'to', 'enddate', 'scheduledend']);
 
-      // Validations
+      // Row-Level Validations
+      const rowErrors = [];
+
       if (!rawDescription) {
+        rowErrors.push('Description is required');
+      }
+
+      if (rawEquipment && setEquipments.size > 0 && !setEquipments.has(rawEquipment)) {
+        rowErrors.push(`Equipment '${rawEquipment}' does not exist`);
+      }
+
+      if (rawPlant && setPlants.size > 0 && !setPlants.has(rawPlant)) {
+        rowErrors.push(`Plant '${rawPlant}' is invalid`);
+      }
+
+      if (rawType && setTypes.size > 0 && !setTypes.has(rawType)) {
+        rowErrors.push(`Maintenance Type '${rawType}' is invalid`);
+      }
+
+      if (rawPriority && setPriorities.size > 0 && !setPriorities.has(rawPriority)) {
+        rowErrors.push(`Priority '${rawPriority}' is invalid`);
+      }
+
+      const scheduledFrom = normalizeDate(rawFrom);
+      const scheduledTo = normalizeDate(rawTo || rawFrom);
+
+      if (scheduledFrom && scheduledTo && scheduledFrom > scheduledTo) {
+        rowErrors.push(`Scheduled start date (${scheduledFrom}) is after end date (${scheduledTo})`);
+      }
+
+      if (rowErrors.length > 0) {
         failedCount++;
-        if (errors.length < 50) {
-          errors.push({ row: rowNum, error: 'Description is required' });
+        if (errors.length < 200) {
+          errors.push({
+            row: rowNum,
+            order: rawOrderNo || `Row #${rowNum}`,
+            details: rowErrors.join('; ')
+          });
         }
         continue;
       }
 
-      // Generate or validate order_no
+      // Generate or validate unique order_no
       let orderNo = rawOrderNo;
       if (!orderNo || setExistingOrderNos.has(orderNo)) {
         while (setExistingOrderNos.has(`MO-${nextOrderNum}`)) {
@@ -172,14 +205,11 @@ async function processExcelImport(fileSource, currentUser = 'Current User', opti
       }
       setExistingOrderNos.add(orderNo);
 
-      // Normalize Priority & Status
+      // Normalize Priority State
       let priorityState = 'Information';
       if (rawPriority === 'CRITICAL' || rawPriority === 'HIGH') priorityState = 'Error';
       else if (rawPriority === 'MEDIUM') priorityState = 'Warning';
       else if (rawPriority === 'LOW') priorityState = 'Success';
-
-      const scheduledFrom = normalizeDate(rawFrom);
-      const scheduledTo = normalizeDate(rawTo || rawFrom);
 
       const orderEntity = {
         order_no: orderNo,
