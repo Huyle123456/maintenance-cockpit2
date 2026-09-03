@@ -1,2 +1,0 @@
-sap.ui.define([],()=>{"use strict";let r=[];return{setOrders(e){r=e||[]},getOrders(){return r},getOrderById(e){return r.find(r=>r.order===e||r.order_no===e)},addOrder(e){r.unshift(e)}}});
-//# sourceMappingURL=OrderRepository.js.map

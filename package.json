@@ -10,7 +10,9 @@
     "@cap-js/sqlite": "^3.0.2",
     "@sap/cds": "^10.0.6",
     "@sap/xssec": "^4.15.0",
+    "exceljs": "^4.4.0",
     "express": "^4.22.2",
+    "multer": "^1.4.5-lts.1",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
