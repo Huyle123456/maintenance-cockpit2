@@ -1,7 +1,13 @@
 sap.ui.define([], function () {
   "use strict";
 
-  const BASE_URL = "/odata/v4/maintenance";
+  function _getBackendPrefix() {
+    const host = window.location.hostname || "";
+    return host.includes("launchpad.") ? "/destinations/srv-api" : "";
+  }
+
+  const BACKEND_PREFIX = _getBackendPrefix();
+  const BASE_URL = `${BACKEND_PREFIX}/odata/v4/maintenance`;
 
   async function _fetchJson(url, options = {}) {
     const defaultHeaders = {

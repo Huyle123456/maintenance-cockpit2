@@ -3,6 +3,8 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
 
   const STORAGE_KEY = "zpm_maintenance_current_account";
   const LOGGED_IN_KEY = "zpm_maintenance_is_logged_in";
+  const BACKEND_PREFIX = (window.location.hostname || "").includes("launchpad.") ? "/destinations/srv-api" : "";
+  const CAP_USERINFO_URL = `${BACKEND_PREFIX}/odata/v4/maintenance/getUserInfo()`;
 
   const DEFAULT_ACCOUNTS = [
     {
@@ -246,7 +248,7 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
       } catch (e) {}
 
       try {
-        const resCap = await fetch("/odata/v4/maintenance/getUserInfo()", {
+        const resCap = await fetch(CAP_USERINFO_URL, {
           headers: { Accept: "application/json" }
         });
         if (resCap.ok) {

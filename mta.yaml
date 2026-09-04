@@ -24,8 +24,6 @@ modules:
       buildpack: nodejs_buildpack
       instances: 1
       memory: 256M
-    build-parameters:
-      builder: npm-ci
     provides:
       - name: srv-api
         properties:
@@ -87,6 +85,8 @@ modules:
             - Name: srv-api
               URL: ~{srv-api/srv-url}
               Authentication: OAuth2UserTokenExchange
+              HTML5.DynamicDestination: true
+              HTML5.ForwardAuthToken: true
               TokenServiceInstanceName: ZPM_MAINTENANCE_COCKPIT-auth
               TokenServiceKeyName: ZPM_MAINTENANCE_COCKPIT-auth-key
               sap.cloud.service: com.fsoft.zpmmaintenancecockpit

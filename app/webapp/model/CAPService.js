@@ -1,7 +1,14 @@
 sap.ui.define([], function () {
   "use strict";
 
-  const BASE_URL = "/odata/v4/maintenance";
+  function _getBackendPrefix() {
+    const host = window.location.hostname || "";
+    return host.includes("launchpad.") ? "/destinations/srv-api" : "";
+  }
+
+  const BACKEND_PREFIX = _getBackendPrefix();
+  const BASE_URL = `${BACKEND_PREFIX}/odata/v4/maintenance`;
+  const API_BASE_URL = `${BACKEND_PREFIX}/api/maintenance`;
 
   async function _fetchJson(url, options = {}) {
     const defaultHeaders = {
@@ -222,7 +229,7 @@ sap.ui.define([], function () {
       const formData = new FormData();
       formData.append("file", oFile, oFile.name);
 
-      const res = await fetch("/api/maintenance/import-excel", {
+      const res = await fetch(`${API_BASE_URL}/import-excel`, {
         method: "POST",
         body: formData
       });
