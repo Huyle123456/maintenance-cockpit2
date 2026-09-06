@@ -1,7 +1,38 @@
 sap.ui.define([], function () {
   "use strict";
 
-  const BASE_URL = "/odata/v4/maintenance";
+  const DIRECT_SRV_URL = "https://3b342f32trial-dev-zpm-maintenance-cockpit-srv.cfapps.us10-001.hana.ondemand.com";
+
+  function getBaseUrl() {
+    const sPath = sap.ui.require.toUrl("com/fsoft/zpmmaintenancecockpit");
+    if (!sPath || sPath === "." || sPath === "./") {
+      return "";
+    }
+    return sPath.replace(/\/$/, "");
+  }
+
+  function getODataUrl() {
+    return getBaseUrl() + "/odata/v4/maintenance";
+  }
+
+  function getApiUrl() {
+    return getBaseUrl() + "/api/maintenance";
+  }
+
+  function _getDirectUrl(url) {
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      return url;
+    }
+    const idx = url.indexOf("/odata/v4/maintenance");
+    if (idx !== -1) {
+      return DIRECT_SRV_URL + url.substring(idx);
+    }
+    const apiIdx = url.indexOf("/api/maintenance");
+    if (apiIdx !== -1) {
+      return DIRECT_SRV_URL + url.substring(apiIdx);
+    }
+    return url;
+  }
 
   async function _fetchJson(url, options = {}) {
     const defaultHeaders = {
@@ -9,21 +40,53 @@ sap.ui.define([], function () {
       "Content-Type": "application/json"
     };
     options.headers = Object.assign(defaultHeaders, options.headers || {});
-    const res = await fetch(url, options);
-    if (!res.ok) {
+    
+    // First try the standard relative route
+    try {
+      const res = await fetch(url, options);
+      if (res.ok) {
+        if (res.status === 204) return null;
+        return await res.json();
+      }
+      // If relative route returns error (e.g. 500 from Launchpad proxy), fallback to direct backend
+      if (!url.startsWith("http://") && !url.startsWith("https://")) {
+        const directUrl = _getDirectUrl(url);
+        console.warn(`[CAPService] Relative request returned ${res.status}. Falling back to direct URL: ${directUrl}`);
+        const fallbackRes = await fetch(directUrl, options);
+        if (fallbackRes.ok) {
+          if (fallbackRes.status === 204) return null;
+          return await fallbackRes.json();
+        }
+      }
       const errText = await res.text();
       throw new Error(`CAP Service error [${res.status}]: ${errText}`);
+    } catch (err) {
+      // If network error on relative URL, try direct URL
+      if (!url.startsWith("http://") && !url.startsWith("https://")) {
+        const directUrl = _getDirectUrl(url);
+        try {
+          const fallbackRes = await fetch(directUrl, options);
+          if (fallbackRes.ok) {
+            if (fallbackRes.status === 204) return null;
+            return await fallbackRes.json();
+          }
+        } catch (fbErr) {}
+      }
+      throw err;
     }
-    if (res.status === 204) return null;
-    return await res.json();
   }
 
   return {
+    getBaseUrl,
+    getODataUrl,
+    getApiUrl,
+    getDirectUrl: _getDirectUrl,
+
     /**
      * Get all maintenance orders with operations
      */
     async getMaintenanceOrders() {
-      const data = await _fetchJson(`${BASE_URL}/MaintenanceOrders?$expand=operations,equipment&$orderby=order_no desc`);
+      const data = await _fetchJson(`${getODataUrl()}/MaintenanceOrders?$expand=operations,equipment&$orderby=order_no desc`);
       return data.value || [];
     },
 
@@ -31,7 +94,7 @@ sap.ui.define([], function () {
      * Get a single maintenance order by ID
      */
     async getOrderById(orderId) {
-      const data = await _fetchJson(`${BASE_URL}/MaintenanceOrders('${orderId}')?$expand=operations,equipment,history`);
+      const data = await _fetchJson(`${getODataUrl()}/MaintenanceOrders('${orderId}')?$expand=operations,materials,equipment,history`);
       return data;
     },
 
@@ -39,7 +102,7 @@ sap.ui.define([], function () {
      * Create a new maintenance order
      */
     async createOrder(payload) {
-      return await _fetchJson(`${BASE_URL}/MaintenanceOrders`, {
+      return await _fetchJson(`${getODataUrl()}/MaintenanceOrders`, {
         method: "POST",
         body: JSON.stringify(payload)
       });
@@ -49,7 +112,7 @@ sap.ui.define([], function () {
      * Update an existing maintenance order
      */
     async updateOrder(orderId, payload) {
-      return await _fetchJson(`${BASE_URL}/MaintenanceOrders('${orderId}')`, {
+      return await _fetchJson(`${getODataUrl()}/MaintenanceOrders('${orderId}')`, {
         method: "PATCH",
         body: JSON.stringify(payload)
       });
@@ -74,7 +137,7 @@ sap.ui.define([], function () {
       };
 
       try {
-        const result = await _fetchJson(`${BASE_URL}/$batch`, {
+        const result = await _fetchJson(`${getODataUrl()}/$batch`, {
           method: "POST",
           body: JSON.stringify(batchPayload)
         });
@@ -91,7 +154,7 @@ sap.ui.define([], function () {
      * Cancel an order action
      */
     async cancelOrder(orderNo, reason) {
-      return await _fetchJson(`${BASE_URL}/cancelOrder`, {
+      return await _fetchJson(`${getODataUrl()}/cancelOrder`, {
         method: "POST",
         body: JSON.stringify({ order_no: orderNo, reason: reason })
       });
@@ -101,7 +164,7 @@ sap.ui.define([], function () {
      * Complete an order action
      */
     async completeOrder(orderNo) {
-      return await _fetchJson(`${BASE_URL}/completeOrder`, {
+      return await _fetchJson(`${getODataUrl()}/completeOrder`, {
         method: "POST",
         body: JSON.stringify({ order_no: orderNo })
       });
@@ -111,7 +174,7 @@ sap.ui.define([], function () {
      * Get equipment list
      */
     async getEquipments() {
-      const data = await _fetchJson(`${BASE_URL}/Equipments?$expand=orders`);
+      const data = await _fetchJson(`${getODataUrl()}/Equipments?$expand=orders`);
       return data.value || [];
     },
 
@@ -119,7 +182,15 @@ sap.ui.define([], function () {
      * Get operations for order
      */
     async getOperations(orderNo) {
-      const data = await _fetchJson(`${BASE_URL}/MaintenanceOperations?$filter=order_no eq '${orderNo}'`);
+      const data = await _fetchJson(`${getODataUrl()}/MaintenanceOperations?$filter=order_no eq '${orderNo}'`);
+      return data.value || [];
+    },
+
+    /**
+     * Get materials for order
+     */
+    async getOrderMaterials(orderNo) {
+      const data = await _fetchJson(`${getODataUrl()}/OrderMaterials?$filter=order_no eq '${orderNo}'`);
       return data.value || [];
     },
 
@@ -128,8 +199,8 @@ sap.ui.define([], function () {
      */
     async getTechnicians() {
       const [techs, catalog] = await Promise.all([
-        _fetchJson(`${BASE_URL}/Technicians`),
-        _fetchJson(`${BASE_URL}/TechnicianCatalog`)
+        _fetchJson(`${getODataUrl()}/Technicians`),
+        _fetchJson(`${getODataUrl()}/TechnicianCatalog`)
       ]);
       return {
         technicians: techs.value || [],
@@ -142,8 +213,8 @@ sap.ui.define([], function () {
      */
     async getMaterials() {
       const [mats, catalog] = await Promise.all([
-        _fetchJson(`${BASE_URL}/Materials`),
-        _fetchJson(`${BASE_URL}/MaterialCatalog`)
+        _fetchJson(`${getODataUrl()}/Materials`),
+        _fetchJson(`${getODataUrl()}/MaterialCatalog`)
       ]);
       return {
         materials: mats.value || [],
@@ -156,12 +227,12 @@ sap.ui.define([], function () {
      */
     async getMasterData() {
       const [plants, types, priorities, planners, workCenters, statuses] = await Promise.all([
-        _fetchJson(`${BASE_URL}/Plants`),
-        _fetchJson(`${BASE_URL}/MaintenanceTypes`),
-        _fetchJson(`${BASE_URL}/Priorities`),
-        _fetchJson(`${BASE_URL}/Planners`),
-        _fetchJson(`${BASE_URL}/WorkCenters`),
-        _fetchJson(`${BASE_URL}/Statuses`)
+        _fetchJson(`${getODataUrl()}/Plants`),
+        _fetchJson(`${getODataUrl()}/MaintenanceTypes`),
+        _fetchJson(`${getODataUrl()}/Priorities`),
+        _fetchJson(`${getODataUrl()}/Planners`),
+        _fetchJson(`${getODataUrl()}/WorkCenters`),
+        _fetchJson(`${getODataUrl()}/Statuses`)
       ]);
 
       return {
@@ -178,7 +249,7 @@ sap.ui.define([], function () {
      * Get audit history entries
      */
     async getAuditHistory() {
-      const data = await _fetchJson(`${BASE_URL}/AuditHistory?$orderby=timestamp desc`);
+      const data = await _fetchJson(`${getODataUrl()}/AuditHistory?$orderby=timestamp desc`);
       return data.value || [];
     },
 
@@ -186,7 +257,7 @@ sap.ui.define([], function () {
      * Add new audit history entry
      */
     async addAuditEntry(entry) {
-      return await _fetchJson(`${BASE_URL}/AuditHistory`, {
+      return await _fetchJson(`${getODataUrl()}/AuditHistory`, {
         method: "POST",
         body: JSON.stringify(entry)
       });
@@ -202,7 +273,7 @@ sap.ui.define([], function () {
       } else {
         filter = `?$orderby=dateTime desc`;
       }
-      const data = await _fetchJson(`${BASE_URL}/OrderHistory${filter}`);
+      const data = await _fetchJson(`${getODataUrl()}/OrderHistory${filter}`);
       return data.value || [];
     },
 
@@ -210,7 +281,7 @@ sap.ui.define([], function () {
      * Get authenticated user profile and roles from CAP/XSUAA service
      */
     async getUserInfo() {
-      return await _fetchJson(`${BASE_URL}/getUserInfo()`);
+      return await _fetchJson(`${getODataUrl()}/getUserInfo()`);
     },
 
     /**
@@ -222,10 +293,20 @@ sap.ui.define([], function () {
       const formData = new FormData();
       formData.append("file", oFile, oFile.name);
 
-      const res = await fetch("/api/maintenance/import-excel", {
-        method: "POST",
-        body: formData
-      });
+      let res;
+      try {
+        res = await fetch(`${getApiUrl()}/import-excel`, {
+          method: "POST",
+          body: formData
+        });
+        if (!res.ok && res.status >= 500) {
+          const directUrl = _getDirectUrl(`${getApiUrl()}/import-excel`);
+          res = await fetch(directUrl, { method: "POST", body: formData });
+        }
+      } catch (e) {
+        const directUrl = _getDirectUrl(`${getApiUrl()}/import-excel`);
+        res = await fetch(directUrl, { method: "POST", body: formData });
+      }
 
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({ error: res.statusText }));

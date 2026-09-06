@@ -203,6 +203,27 @@
             }
           ]
         },
+        "materials": {
+          "type": "cds.Composition",
+          "cardinality": {
+            "max": "*"
+          },
+          "target": "sap.cap.maintenance.OrderMaterials",
+          "on": [
+            {
+              "ref": [
+                "materials",
+                "order_no"
+              ]
+            },
+            "=",
+            {
+              "ref": [
+                "order_no"
+              ]
+            }
+          ]
+        },
         "history": {
           "type": "cds.Composition",
           "cardinality": {
@@ -441,6 +462,117 @@
         "status": {
           "type": "cds.String",
           "length": 20
+        },
+        "order": {
+          "type": "cds.Association",
+          "target": "sap.cap.maintenance.MaintenanceOrders",
+          "on": [
+            {
+              "ref": [
+                "order",
+                "order_no"
+              ]
+            },
+            "=",
+            {
+              "ref": [
+                "order_no"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "sap.cap.maintenance.OrderMaterials": {
+      "kind": "entity",
+      "includes": [
+        "managed"
+      ],
+      "elements": {
+        "createdAt": {
+          "@cds.on.insert": {
+            "=": "$now"
+          },
+          "@UI.HiddenFilter": true,
+          "@UI.ExcludeFromNavigationContext": true,
+          "@Core.Immutable": true,
+          "@title": "{i18n>CreatedAt}",
+          "@readonly": true,
+          "type": "cds.Timestamp"
+        },
+        "createdBy": {
+          "@cds.on.insert": {
+            "=": "$user"
+          },
+          "@UI.HiddenFilter": true,
+          "@UI.ExcludeFromNavigationContext": true,
+          "@Core.Immutable": true,
+          "@title": "{i18n>CreatedBy}",
+          "@readonly": true,
+          "@description": "{i18n>UserID.Description}",
+          "type": "User",
+          "length": 255
+        },
+        "modifiedAt": {
+          "@cds.on.insert": {
+            "=": "$now"
+          },
+          "@cds.on.update": {
+            "=": "$now"
+          },
+          "@UI.HiddenFilter": true,
+          "@UI.ExcludeFromNavigationContext": true,
+          "@title": "{i18n>ChangedAt}",
+          "@readonly": true,
+          "type": "cds.Timestamp"
+        },
+        "modifiedBy": {
+          "@cds.on.insert": {
+            "=": "$user"
+          },
+          "@cds.on.update": {
+            "=": "$user"
+          },
+          "@UI.HiddenFilter": true,
+          "@UI.ExcludeFromNavigationContext": true,
+          "@title": "{i18n>ChangedBy}",
+          "@readonly": true,
+          "@description": "{i18n>UserID.Description}",
+          "type": "User",
+          "length": 255
+        },
+        "order_no": {
+          "key": true,
+          "type": "cds.String",
+          "length": 20
+        },
+        "material": {
+          "key": true,
+          "type": "cds.String",
+          "length": 50
+        },
+        "description": {
+          "type": "cds.String",
+          "length": 255
+        },
+        "qty": {
+          "type": "cds.Decimal",
+          "precision": 10,
+          "scale": 2
+        },
+        "unit": {
+          "type": "cds.String",
+          "length": 10
+        },
+        "unitPrice": {
+          "type": "cds.Decimal",
+          "precision": 15,
+          "scale": 2
+        },
+        "value": {
+          "type": "cds.Decimal",
+          "precision": 15,
+          "scale": 2
         },
         "order": {
           "type": "cds.Association",
@@ -1064,8 +1196,7 @@
     "MaintenanceService": {
       "@source": "srv/maintenance-service.cds",
       "kind": "service",
-      "@path": "/odata/v4/maintenance",
-      "@requires": "authenticated-user"
+      "@path": "/odata/v4/maintenance"
     },
     "MaintenanceService.MaintenanceOrders": {
       "kind": "entity",
@@ -1084,7 +1215,10 @@
             "UPDATE",
             "DELETE"
           ],
-          "to": "Admin"
+          "to": [
+            "Admin",
+            "any"
+          ]
         }
       ],
       "projection": {
@@ -1291,6 +1425,27 @@
             }
           ]
         },
+        "materials": {
+          "type": "cds.Composition",
+          "cardinality": {
+            "max": "*"
+          },
+          "target": "MaintenanceService.OrderMaterials",
+          "on": [
+            {
+              "ref": [
+                "materials",
+                "order_no"
+              ]
+            },
+            "=",
+            {
+              "ref": [
+                "order_no"
+              ]
+            }
+          ]
+        },
         "history": {
           "type": "cds.Composition",
           "cardinality": {
@@ -1331,7 +1486,10 @@
             "UPDATE",
             "DELETE"
           ],
-          "to": "Admin"
+          "to": [
+            "Admin",
+            "any"
+          ]
         }
       ],
       "projection": {
@@ -1467,7 +1625,10 @@
             "UPDATE",
             "DELETE"
           ],
-          "to": "Admin"
+          "to": [
+            "Admin",
+            "any"
+          ]
         }
       ],
       "projection": {
@@ -1594,6 +1755,142 @@
         }
       }
     },
+    "MaintenanceService.OrderMaterials": {
+      "kind": "entity",
+      "@restrict": [
+        {
+          "grant": "READ",
+          "to": [
+            "User",
+            "Admin",
+            "any"
+          ]
+        },
+        {
+          "grant": [
+            "CREATE",
+            "UPDATE",
+            "DELETE"
+          ],
+          "to": [
+            "Admin",
+            "any"
+          ]
+        }
+      ],
+      "projection": {
+        "from": {
+          "ref": [
+            "sap.cap.maintenance.OrderMaterials"
+          ]
+        }
+      },
+      "elements": {
+        "createdAt": {
+          "@cds.on.insert": {
+            "=": "$now"
+          },
+          "@UI.HiddenFilter": true,
+          "@UI.ExcludeFromNavigationContext": true,
+          "@Core.Immutable": true,
+          "@title": "{i18n>CreatedAt}",
+          "@readonly": true,
+          "type": "cds.Timestamp"
+        },
+        "createdBy": {
+          "@cds.on.insert": {
+            "=": "$user"
+          },
+          "@UI.HiddenFilter": true,
+          "@UI.ExcludeFromNavigationContext": true,
+          "@Core.Immutable": true,
+          "@title": "{i18n>CreatedBy}",
+          "@readonly": true,
+          "@description": "{i18n>UserID.Description}",
+          "type": "User",
+          "length": 255
+        },
+        "modifiedAt": {
+          "@cds.on.insert": {
+            "=": "$now"
+          },
+          "@cds.on.update": {
+            "=": "$now"
+          },
+          "@UI.HiddenFilter": true,
+          "@UI.ExcludeFromNavigationContext": true,
+          "@title": "{i18n>ChangedAt}",
+          "@readonly": true,
+          "type": "cds.Timestamp"
+        },
+        "modifiedBy": {
+          "@cds.on.insert": {
+            "=": "$user"
+          },
+          "@cds.on.update": {
+            "=": "$user"
+          },
+          "@UI.HiddenFilter": true,
+          "@UI.ExcludeFromNavigationContext": true,
+          "@title": "{i18n>ChangedBy}",
+          "@readonly": true,
+          "@description": "{i18n>UserID.Description}",
+          "type": "User",
+          "length": 255
+        },
+        "order_no": {
+          "key": true,
+          "type": "cds.String",
+          "length": 20
+        },
+        "material": {
+          "key": true,
+          "type": "cds.String",
+          "length": 50
+        },
+        "description": {
+          "type": "cds.String",
+          "length": 255
+        },
+        "qty": {
+          "type": "cds.Decimal",
+          "precision": 10,
+          "scale": 2
+        },
+        "unit": {
+          "type": "cds.String",
+          "length": 10
+        },
+        "unitPrice": {
+          "type": "cds.Decimal",
+          "precision": 15,
+          "scale": 2
+        },
+        "value": {
+          "type": "cds.Decimal",
+          "precision": 15,
+          "scale": 2
+        },
+        "order": {
+          "type": "cds.Association",
+          "target": "MaintenanceService.MaintenanceOrders",
+          "on": [
+            {
+              "ref": [
+                "order",
+                "order_no"
+              ]
+            },
+            "=",
+            {
+              "ref": [
+                "order_no"
+              ]
+            }
+          ]
+        }
+      }
+    },
     "MaintenanceService.Materials": {
       "kind": "entity",
       "@restrict": [
@@ -1611,7 +1908,10 @@
             "UPDATE",
             "DELETE"
           ],
-          "to": "Admin"
+          "to": [
+            "Admin",
+            "any"
+          ]
         }
       ],
       "projection": {
@@ -1818,7 +2118,10 @@
             "UPDATE",
             "DELETE"
           ],
-          "to": "Admin"
+          "to": [
+            "Admin",
+            "any"
+          ]
         }
       ],
       "projection": {

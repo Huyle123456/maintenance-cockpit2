@@ -43,7 +43,7 @@ sap.ui.define(
          *
          * @returns {void}
          */
-        async onInit() {
+        onInit() {
           // Step 1: Create page UI model
           this.getView().setModel(
             new JSONModel({
@@ -52,6 +52,10 @@ sap.ui.define(
             "ui",
           );
 
+          this._initControllerAsync();
+        },
+
+        async _initControllerAsync() {
           try {
             // Step 2: Load equipment master data from CAP
             const aEquipment = await CAPService.getEquipments();
@@ -1267,13 +1271,18 @@ sap.ui.define(
         },
 
         // Refresh KPI counters after data changes.
-        _refreshKpiCounts() {
-          const aRows = this.byId("ordersTable")
-            .getBinding("items")
-            .getContexts()
-            .map((oContext) => oContext.getObject());
+        _refreshKpiCounts(aExplicitRows) {
+          const aRows =
+            aExplicitRows ||
+            (this.getView().getModel("orders")
+              ? this.getView().getModel("orders").getProperty("/rows")
+              : []) ||
+            [];
 
           const oKpiModel = this.getView().getModel("kpi");
+          if (!oKpiModel) {
+            return;
+          }
 
           oKpiModel.setProperty(
             "/openCount",
@@ -1667,7 +1676,6 @@ sap.ui.define(
         },
 
         /**
-        /**
          * Reload orders list from backend CAP service
          */
         async _reloadOrdersFromBackend() {
@@ -1699,9 +1707,18 @@ sap.ui.define(
             }));
 
             OrderRepository.setOrders(aOrderRows);
-            this.getView().getModel("orders").setProperty("/rows", aOrderRows);
-            this._refreshKpiCounts();
+            const oOrdersModel = this.getView().getModel("orders");
+            if (oOrdersModel) {
+              oOrdersModel.setProperty("/rows", aOrderRows);
+              oOrdersModel.refresh(true);
+            }
+            this._refreshKpiCounts(aOrderRows);
             this._initFilterData(aOrderRows);
+
+            const oTable = this.byId("ordersTable");
+            if (oTable && oTable.getBinding("items")) {
+              oTable.getBinding("items").refresh(true);
+            }
           } catch (err) {
             console.error("Failed to reload orders from backend:", err);
           }
@@ -1745,13 +1762,26 @@ sap.ui.define(
         /**
          * Download Excel Template (.xlsx) for Import from Backend
          */
-        onDownloadImportTemplate() {
-          const oLink = document.createElement("a");
-          oLink.href = "/api/maintenance/download-template";
-          oLink.download = "MaintenanceOrders_Template.xlsx";
-          document.body.appendChild(oLink);
-          oLink.click();
-          document.body.removeChild(oLink);
+        async onDownloadImportTemplate() {
+          try {
+            const sUrl = CAPService.getDirectUrl(CAPService.getApiUrl() + "/download-template");
+            const res = await fetch(sUrl);
+            if (!res.ok) {
+              throw new Error(`Failed to download template [${res.status}]`);
+            }
+            const blob = await res.blob();
+            const blobUrl = window.URL.createObjectURL(blob);
+            const oLink = document.createElement("a");
+            oLink.href = blobUrl;
+            oLink.download = "MaintenanceOrders_Template.xlsx";
+            document.body.appendChild(oLink);
+            oLink.click();
+            document.body.removeChild(oLink);
+            setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
+          } catch (err) {
+            console.error("Error downloading template:", err);
+            window.open("https://3b342f32trial-dev-zpm-maintenance-cockpit-srv.cfapps.us10-001.hana.ondemand.com/api/maintenance/download-template", "_blank");
+          }
         },
 
         /**
@@ -1811,11 +1841,20 @@ sap.ui.define(
           try {
             const result = await CAPService.importOrdersExcel(this._oSelectedImportFile);
 
+            // Automatically close the import dialog immediately after upload
+            this.onCancelImportOrders();
+
+            // Automatically reload the orders list & refresh KPIs
             await this._reloadOrdersFromBackend();
 
+            // Clear any active search filters to show the fresh imported list
+            this.onFilterClear();
+
             let sMsg = `Import completed in ${result.durationSec || '1s'}!\n\n` +
-              `• Total Rows: ${result.totalRows}\n` +
-              `• Successfully Imported: ${result.importedCount} orders\n`;
+              `• Total Orders Processed: ${result.totalRows}\n` +
+              `• Successfully Imported: ${result.importedCount} maintenance order(s)\n` +
+              `• Operations Created: ${result.operationsCount || result.importedCount} operation(s)\n` +
+              `• Materials Linked: ${result.materialsCount || 0} item(s)\n`;
 
             if (result.failedCount > 0) {
               sMsg += `• Failed / Invalid Rows: ${result.failedCount}\n\nRow-by-Row Error Details:\n`;
@@ -1858,6 +1897,10 @@ sap.ui.define(
          */
         onCancelImportOrders() {
           this._oSelectedImportFile = null;
+          const oUploader = this.byId("orderFileUploader");
+          if (oUploader) {
+            oUploader.clear();
+          }
           if (this._pImportOrdersDialog) {
             this._pImportOrdersDialog.then((oDialog) => oDialog.close());
           }

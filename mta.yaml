@@ -23,7 +23,7 @@ modules:
     parameters:
       buildpack: nodejs_buildpack
       instances: 1
-      memory: 256M
+      memory: 512M
     build-parameters:
       builder: npm-ci
     provides:
@@ -36,11 +36,13 @@ modules:
 
   # ---------------- HANA CLOUD DB DEPLOYER ----------------
   - name: ZPM_MAINTENANCE_COCKPIT-db-deployer
-    type: hdb
+    type: nodejs
     path: gen/db
     parameters:
       buildpack: nodejs_buildpack
-      memory: 256M
+      no-route: true
+      health-check-type: none
+      memory: 512M
     requires:
       - name: ZPM_MAINTENANCE_COCKPIT-db
 
@@ -70,10 +72,10 @@ modules:
         parameters:
           service-key:
             name: ZPM_MAINTENANCE_COCKPIT-auth-key
-      - name: srv-api
     parameters:
       content:
         instance:
+          existing_destinations_policy: update
           destinations:
             - Name: ZPM_MAINTENANCE_COCKPIT_HTML5_REPO
               ServiceInstanceName: ZPM_MAINTENANCE_COCKPIT-html5-repo-host
@@ -84,13 +86,6 @@ modules:
               ServiceInstanceName: ZPM_MAINTENANCE_COCKPIT-auth
               ServiceKeyName: ZPM_MAINTENANCE_COCKPIT-auth-key
               sap.cloud.service: com.fsoft.zpmmaintenancecockpit
-            - Name: srv-api
-              URL: ~{srv-api/srv-url}
-              Authentication: OAuth2UserTokenExchange
-              TokenServiceInstanceName: ZPM_MAINTENANCE_COCKPIT-auth
-              TokenServiceKeyName: ZPM_MAINTENANCE_COCKPIT-auth-key
-              sap.cloud.service: com.fsoft.zpmmaintenancecockpit
-          existing_destinations_policy: update
 
 resources:
   # ---------------- XSUAA SECURITY SERVICE ----------------
@@ -101,7 +96,7 @@ resources:
       service-plan: application
       path: ./xs-security.json
       config:
-        xsappname: ZPM_MAINTENANCE_COCKPIT-${org}-${space}
+        xsappname: zpm-maintenance-cockpit
         tenant-mode: dedicated
         oauth2-configuration:
           credential-types:
@@ -131,3 +126,18 @@ resources:
       config:
         HTML5Runtime_enabled: true
         version: 1.0.0
+        init_data:
+          instance:
+            existing_destinations_policy: update
+            destinations:
+              - Name: srv-api
+                Description: CAP Maintenance Backend Service
+                URL: ~{srv-api/srv-url}
+                Authentication: NoAuthentication
+                Type: HTTP
+                ProxyType: Internet
+                HTML5.ForwardAuthToken: false
+                HTML5.DynamicDestination: true
+                sap.cloud.service: com.fsoft.zpmmaintenancecockpit
+    requires:
+      - name: srv-api

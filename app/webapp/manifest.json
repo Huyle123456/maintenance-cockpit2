@@ -37,6 +37,16 @@
                     }
                 }
             }
+        },
+        "dataSources": {
+            "mainService": {
+                "uri": "/odata/v4/maintenance/",
+                "type": "OData",
+                "settings": {
+                    "annotations": [],
+                    "odataVersion": "4.0"
+                }
+            }
         }
     },
     "sap.cloud": {

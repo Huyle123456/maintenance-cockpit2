@@ -1,0 +1,8 @@
+order_no;material;description;qty;unit;unitPrice;value
+MO-1001;MAT-001;Bearing;2;EA;25.00;50.00
+MO-1001;MAT-003;Lubricant;5;L;25.00;125.00
+MO-1002;MAT-002;Seal Kit;1;EA;40.00;40.00
+MO-1002;MAT-003;Lubricant;2;L;25.00;50.00
+MO-1003;MAT-004;Motor Coupling;1;EA;150.00;150.00
+MO-1004;MAT-005;Bolts & Nuts;10;SET;10.00;100.00
+MO-1005;MAT-001;Bearing;1;EA;25.00;25.00

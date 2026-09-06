@@ -66,6 +66,14 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
   let _oAuthModel = null;
   let _oLoginModel = null;
 
+  function _getBaseUrl() {
+    const sPath = sap.ui.require.toUrl("com/fsoft/zpmmaintenancecockpit");
+    if (!sPath || sPath === "." || sPath === "./") {
+      return "";
+    }
+    return sPath.replace(/\/$/, "");
+  }
+
   function _generateInitials(name) {
     if (!name) return "US";
     const parts = name.trim().split(/\s+/);
@@ -232,8 +240,9 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
      * Fetch authenticated user info from SAP Approuter or CAP service
      */
     async fetchSapUser() {
+      const baseUrl = _getBaseUrl();
       try {
-        const res = await fetch("/user-api/currentUser", {
+        const res = await fetch(`${baseUrl}/user-api/currentUser`, {
           headers: { Accept: "application/json" }
         });
         if (res.ok) {
@@ -246,9 +255,14 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
       } catch (e) {}
 
       try {
-        const resCap = await fetch("/odata/v4/maintenance/getUserInfo()", {
+        let resCap = await fetch(`${baseUrl}/odata/v4/maintenance/getUserInfo()`, {
           headers: { Accept: "application/json" }
         });
+        if (!resCap.ok && resCap.status >= 500) {
+          resCap = await fetch("https://3b342f32trial-dev-zpm-maintenance-cockpit-srv.cfapps.us10-001.hana.ondemand.com/odata/v4/maintenance/getUserInfo()", {
+            headers: { Accept: "application/json" }
+          });
+        }
         if (resCap.ok) {
           const capUser = await resCap.json();
           if (capUser && capUser.name && capUser.name !== "anonymous") {
@@ -256,7 +270,20 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
             return;
           }
         }
-      } catch (e) {}
+      } catch (e) {
+        try {
+          const resDirect = await fetch("https://3b342f32trial-dev-zpm-maintenance-cockpit-srv.cfapps.us10-001.hana.ondemand.com/odata/v4/maintenance/getUserInfo()", {
+            headers: { Accept: "application/json" }
+          });
+          if (resDirect.ok) {
+            const capUser = await resDirect.json();
+            if (capUser && capUser.name && capUser.name !== "anonymous") {
+              this._applyCapUser(capUser);
+              return;
+            }
+          }
+        } catch (dirErr) {}
+      }
     },
 
     _applySapUser(sapUser) {

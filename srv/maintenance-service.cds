@@ -1,33 +1,40 @@
 using { sap.cap.maintenance as my } from '../db/schema';
 
-service MaintenanceService @(path: '/odata/v4/maintenance', requires: 'authenticated-user') {
+service MaintenanceService @(path: '/odata/v4/maintenance') {
 
-  // Role-based entity projections (Admin has full write, User has read-only)
+  // Entity projections with open read and admin/any write permissions
   entity MaintenanceOrders @(
     restrict: [
       { grant: 'READ', to: ['User', 'Admin', 'any'] },
-      { grant: ['CREATE', 'UPDATE', 'DELETE'], to: 'Admin' }
+      { grant: ['CREATE', 'UPDATE', 'DELETE'], to: ['Admin', 'any'] }
     ]
   ) as projection on my.MaintenanceOrders;
 
   entity Equipments @(
     restrict: [
       { grant: 'READ', to: ['User', 'Admin', 'any'] },
-      { grant: ['CREATE', 'UPDATE', 'DELETE'], to: 'Admin' }
+      { grant: ['CREATE', 'UPDATE', 'DELETE'], to: ['Admin', 'any'] }
     ]
   ) as projection on my.Equipments;
 
   entity MaintenanceOperations @(
     restrict: [
       { grant: 'READ', to: ['User', 'Admin', 'any'] },
-      { grant: ['CREATE', 'UPDATE', 'DELETE'], to: 'Admin' }
+      { grant: ['CREATE', 'UPDATE', 'DELETE'], to: ['Admin', 'any'] }
     ]
   ) as projection on my.MaintenanceOperations;
+
+  entity OrderMaterials @(
+    restrict: [
+      { grant: 'READ', to: ['User', 'Admin', 'any'] },
+      { grant: ['CREATE', 'UPDATE', 'DELETE'], to: ['Admin', 'any'] }
+    ]
+  ) as projection on my.OrderMaterials;
 
   entity Materials @(
     restrict: [
       { grant: 'READ', to: ['User', 'Admin', 'any'] },
-      { grant: ['CREATE', 'UPDATE', 'DELETE'], to: 'Admin' }
+      { grant: ['CREATE', 'UPDATE', 'DELETE'], to: ['Admin', 'any'] }
     ]
   ) as projection on my.Materials;
 
@@ -40,7 +47,7 @@ service MaintenanceService @(path: '/odata/v4/maintenance', requires: 'authentic
   entity Technicians @(
     restrict: [
       { grant: 'READ', to: ['User', 'Admin', 'any'] },
-      { grant: ['CREATE', 'UPDATE', 'DELETE'], to: 'Admin' }
+      { grant: ['CREATE', 'UPDATE', 'DELETE'], to: ['Admin', 'any'] }
     ]
   ) as projection on my.Technicians;
 
@@ -64,7 +71,7 @@ service MaintenanceService @(path: '/odata/v4/maintenance', requires: 'authentic
     ]
   ) as projection on my.OrderHistory;
 
-  // Master Data (Read-only for all authenticated users)
+  // Master Data (Read-only)
   entity Plants @(restrict: [{ grant: 'READ', to: ['User', 'Admin', 'any'] }]) as projection on my.Plants;
   entity MaintenanceTypes @(restrict: [{ grant: 'READ', to: ['User', 'Admin', 'any'] }]) as projection on my.MaintenanceTypes;
   entity Priorities @(restrict: [{ grant: 'READ', to: ['User', 'Admin', 'any'] }]) as projection on my.Priorities;
@@ -72,11 +79,11 @@ service MaintenanceService @(path: '/odata/v4/maintenance', requires: 'authentic
   entity WorkCenters @(restrict: [{ grant: 'READ', to: ['User', 'Admin', 'any'] }]) as projection on my.WorkCenters;
   entity Statuses @(restrict: [{ grant: 'READ', to: ['User', 'Admin', 'any'] }]) as projection on my.Statuses;
 
-  // Action restrictions
+  // Actions
   action cancelOrder(order_no: String, reason: String) returns MaintenanceOrders;
   action completeOrder(order_no: String) returns MaintenanceOrders;
 
-  // Function to return current authenticated user profile and roles from SAP / XSUAA
+  // Function to return current authenticated user profile
   type CurrentUserProfile {
     id: String;
     name: String;

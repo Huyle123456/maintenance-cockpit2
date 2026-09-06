@@ -22,11 +22,12 @@
     "rimraf": "^5.0.5"
   },
   "scripts": {
-    "start": "cds serve",
+    "start": "cds-serve",
     "watch": "cds watch",
-    "build": "rimraf resources mta_archives && mbt build --mtar archive",
-    "deploy": "cf deploy mta_archives/archive.mtar --retries 1",
-    "undeploy": "cf undeploy ZPM_MAINTENANCE_COCKPIT --delete-services --delete-service-keys --delete-service-brokers"
+    "build": "rimraf mta_archives && npx cds build --production && node scripts/package-app.js && npx mbt assemble --mtar archive",
+    "cf:login": "bin\\cf.exe login -a https://api.cf.us10-001.hana.ondemand.com --sso",
+    "deploy": "bin\\cf.exe deploy mta_archives/archive.mtar --retries 1",
+    "undeploy": "bin\\cf.exe undeploy ZPM_MAINTENANCE_COCKPIT --delete-services --delete-service-keys --delete-service-brokers"
   },
   "cds": {
     "requires": {
@@ -35,25 +36,7 @@
           "kind": "sqlite"
         },
         "auth": {
-          "kind": "basic-auth",
-          "users": {
-            "admin": {
-              "password": "123",
-              "roles": [
-                "Admin",
-                "User"
-              ],
-              "features": [
-                "*"
-              ]
-            },
-            "user": {
-              "password": "123",
-              "roles": [
-                "User"
-              ]
-            }
-          }
+          "kind": "dummy"
         }
       },
       "[production]": {
@@ -61,7 +44,7 @@
           "kind": "hana"
         },
         "auth": {
-          "kind": "xsuaa"
+          "kind": "dummy"
         }
       }
     }

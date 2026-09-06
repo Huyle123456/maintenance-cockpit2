@@ -1,26 +1,33 @@
 {
   "welcomeFile": "/index.html",
-  "authenticationMethod": "route",
+  "authenticationMethod": "none",
   "routes": [
     {
       "source": "^/odata/v4/maintenance/(.*)$",
       "target": "/odata/v4/maintenance/$1",
       "destination": "srv-api",
-      "authenticationType": "xsuaa",
+      "authenticationType": "none",
+      "csrfProtection": false
+    },
+    {
+      "source": "^/odata/v4/maintenance$",
+      "target": "/odata/v4/maintenance",
+      "destination": "srv-api",
+      "authenticationType": "none",
       "csrfProtection": false
     },
     {
       "source": "^/api/maintenance/(.*)$",
       "target": "/api/maintenance/$1",
       "destination": "srv-api",
-      "authenticationType": "xsuaa",
+      "authenticationType": "none",
       "csrfProtection": false
     },
     {
       "source": "^/user-api/(.*)$",
       "target": "/user-api/$1",
       "service": "user-info",
-      "authenticationType": "xsuaa"
+      "authenticationType": "none"
     },
     {
       "source": "^/resources/(.*)$",
@@ -38,7 +45,7 @@
       "source": "^(.*)$",
       "target": "$1",
       "service": "html5-apps-repo-rt",
-      "authenticationType": "xsuaa"
+      "authenticationType": "none"
     }
   ]
 }

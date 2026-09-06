@@ -16,7 +16,7 @@
                 <!-- Instruction & Mode Banner -->
                 <MessageStrip
                     id="importOrdersBackendBanner"
-                    text="Files are processed directly on Backend using ExcelJS Streaming and Batch Database Transactions, optimized for large datasets."
+                    text="Supports Multi-Sheet Excel: Sheet 1 (Orders), Sheet 2 (Operations), Sheet 3 (Materials), and Sheet 4 (Master Data Lookup). Single-sheet inline syntax is also supported."
                     type="Information"
                     showIcon="true"
                     class="sapUiSmallMarginBottom"

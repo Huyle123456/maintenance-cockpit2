@@ -26,6 +26,7 @@ entity MaintenanceOrders : managed {
       etag                     : String(50);
       equipment                : Association to Equipments on equipment.equipment = equipment_no;
       operations               : Composition of many MaintenanceOperations on operations.order_no = order_no;
+      materials                : Composition of many OrderMaterials on materials.order_no = order_no;
       history                  : Composition of many OrderHistory on history.order_no = order_no;
 }
 
@@ -51,6 +52,17 @@ entity MaintenanceOperations : managed {
       actualHours  : Decimal(10, 2) default 0.0;
       status       : String(20);
       order        : Association to MaintenanceOrders on order.order_no = order_no;
+}
+
+entity OrderMaterials : managed {
+  key order_no       : String(20);
+  key material       : String(50);
+      description    : String(255);
+      qty            : Decimal(10, 2);
+      unit           : String(10);
+      unitPrice      : Decimal(15, 2);
+      value          : Decimal(15, 2);
+      order          : Association to MaintenanceOrders on order.order_no = order_no;
 }
 
 entity Materials : managed {

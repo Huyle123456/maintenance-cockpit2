@@ -232,7 +232,11 @@ for await (const worksheetReader of workbookReader) {
   ```
 
 ### 2. `GET /api/maintenance/download-template`
-* **Mô tả**: Tự động sinh file Excel mẫu `.xlsx` chuẩn với Header màu Fiori và 5 dòng dữ liệu mẫu trực tiếp từ backend.
+* **Mô tả**: Tự động sinh file Excel mẫu `.xlsx` chuẩn 4 Sheet (Chuẩn SAP ERP):
+  - **Sheet 1: `MaintenanceOrders`**: Thông tin header của lệnh bảo trì (`Order`, `Equipment`, `Description`, `Plant`, `Type`, `Priority`, `Planner`, `ScheduledFrom`, `ScheduledTo`, `Operations (Inline)`, `Materials (Inline)`).
+  - **Sheet 2: `Operations`**: Danh sách công việc (Step 3) gồm `Order`, `OperationNo`, `Description`, `WorkCenter`, `Technician`, `PlannedHours`.
+  - **Sheet 3: `Materials`**: Danh sách nguyên vật liệu / phụ tùng (Step 4) gồm `Order`, `Material`, `Quantity`, `Unit`.
+  - **Sheet 4: `MasterData_Reference`**: Bảng tra cứu toàn bộ danh mục mã chuẩn (Equipment, Plant, Type, Priority, Planner, Work Center, Materials Catalog với đơn giá & tồn kho).
 * **Response Header**: 
   - `Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
   - `Content-Disposition: attachment; filename="MaintenanceOrders_Template.xlsx"`
