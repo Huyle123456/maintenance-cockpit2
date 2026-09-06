@@ -23,9 +23,13 @@ modules:
     parameters:
       buildpack: nodejs_buildpack
       instances: 1
+<<<<<<< HEAD
       memory: 512M
     build-parameters:
       builder: npm-ci
+=======
+      memory: 256M
+>>>>>>> 62f11cfeb71b355b8548bd267f6da42210acb780
     provides:
       - name: srv-api
         properties:
@@ -86,6 +90,18 @@ modules:
               ServiceInstanceName: ZPM_MAINTENANCE_COCKPIT-auth
               ServiceKeyName: ZPM_MAINTENANCE_COCKPIT-auth-key
               sap.cloud.service: com.fsoft.zpmmaintenancecockpit
+<<<<<<< HEAD
+=======
+            - Name: srv-api
+              URL: ~{srv-api/srv-url}
+              Authentication: OAuth2UserTokenExchange
+              HTML5.DynamicDestination: true
+              HTML5.ForwardAuthToken: true
+              TokenServiceInstanceName: ZPM_MAINTENANCE_COCKPIT-auth
+              TokenServiceKeyName: ZPM_MAINTENANCE_COCKPIT-auth-key
+              sap.cloud.service: com.fsoft.zpmmaintenancecockpit
+          existing_destinations_policy: update
+>>>>>>> 62f11cfeb71b355b8548bd267f6da42210acb780
 
 resources:
   # ---------------- XSUAA SECURITY SERVICE ----------------

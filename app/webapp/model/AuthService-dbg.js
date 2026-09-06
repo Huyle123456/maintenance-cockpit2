@@ -2,7 +2,6 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
   "use strict";
 
   const STORAGE_KEY = "zpm_maintenance_current_account";
-  const LOGGED_IN_KEY = "zpm_maintenance_is_logged_in";
   const BACKEND_PREFIX = (window.location.hostname || "").includes("launchpad.") ? "/destinations/srv-api" : "";
   const CAP_USERINFO_URL = `${BACKEND_PREFIX}/odata/v4/maintenance/getUserInfo()`;
 
@@ -10,7 +9,6 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
     {
       id: "admin",
       username: "admin",
-      password: "123",
       name: "Administrator",
       role: "admin",
       roleText: "Admin",
@@ -38,7 +36,6 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
     {
       id: "user",
       username: "user",
-      password: "123",
       name: "Standard User",
       role: "user",
       roleText: "User",
@@ -66,15 +63,6 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
   ];
 
   let _oAuthModel = null;
-  let _oLoginModel = null;
-
-  function _getBaseUrl() {
-    const sPath = sap.ui.require.toUrl("com/fsoft/zpmmaintenancecockpit");
-    if (!sPath || sPath === "." || sPath === "./") {
-      return "";
-    }
-    return sPath.replace(/\/$/, "");
-  }
 
   function _generateInitials(name) {
     if (!name) return "US";
@@ -97,15 +85,6 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
     return "admin";
   }
 
-  function _getSavedLoggedIn() {
-    try {
-      const saved = localStorage.getItem(LOGGED_IN_KEY);
-      return saved === "true";
-    } catch (e) {
-      return false;
-    }
-  }
-
   function _findAccount(accountId) {
     return (
       DEFAULT_ACCOUNTS.find((acc) => acc.id === accountId) || DEFAULT_ACCOUNTS[0]
@@ -122,14 +101,6 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
     },
 
     /**
-     * Check if currently logged in
-     * @returns {boolean}
-     */
-    isLoggedIn: function () {
-      return _getSavedLoggedIn();
-    },
-
-    /**
      * Creates and initializes the reactive auth model
      * @returns {sap.ui.model.json.JSONModel}
      */
@@ -142,30 +113,14 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
           currentUser: initialUser,
           accounts: DEFAULT_ACCOUNTS,
           selectedAccountId: initialUser.id,
-          isLoggedIn: _getSavedLoggedIn(),
           isLoading: false,
           isSapXsuaa: false
         });
 
+        // Asynchronously check SAP Approuter or CAP User Info API
         this.fetchSapUser();
       }
       return _oAuthModel;
-    },
-
-    /**
-     * Creates or gets the login view model
-     * @returns {sap.ui.model.json.JSONModel}
-     */
-    getLoginModel: function () {
-      if (!_oLoginModel) {
-        _oLoginModel = new JSONModel({
-          username: "admin",
-          password: "123",
-          hasError: false,
-          errorMessage: ""
-        });
-      }
-      return _oLoginModel;
     },
 
     /**
@@ -180,71 +135,13 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
     },
 
     /**
-     * Perform login verification
-     * @param {string} username
-     * @param {string} password
-     * @returns {object|null} Logged-in user or null if failed
-     */
-    login: function (username, password) {
-      const sUser = (username || "").trim().toLowerCase();
-      const sPass = (password || "").trim();
-
-      const matched = DEFAULT_ACCOUNTS.find(
-        (acc) =>
-          acc.username.toLowerCase() === sUser &&
-          (acc.password === sPass || sPass === "123" || sPass === "")
-      );
-
-      if (matched) {
-        try {
-          localStorage.setItem(STORAGE_KEY, matched.id);
-          localStorage.setItem(LOGGED_IN_KEY, "true");
-        } catch (e) {}
-
-        if (_oAuthModel) {
-          _oAuthModel.setProperty("/currentUser", matched);
-          _oAuthModel.setProperty("/selectedAccountId", matched.id);
-          _oAuthModel.setProperty("/isLoggedIn", true);
-        }
-
-        if (_oLoginModel) {
-          _oLoginModel.setProperty("/hasError", false);
-          _oLoginModel.setProperty("/errorMessage", "");
-        }
-
-        return matched;
-      }
-
-      if (_oLoginModel) {
-        _oLoginModel.setProperty("/hasError", true);
-        _oLoginModel.setProperty(
-          "/errorMessage",
-          "Invalid credentials. Use admin / 123 or user / 123"
-        );
-      }
-      return null;
-    },
-
-    /**
-     * Log out current user
-     */
-    logout: function () {
-      try {
-        localStorage.setItem(LOGGED_IN_KEY, "false");
-      } catch (e) {}
-
-      if (_oAuthModel) {
-        _oAuthModel.setProperty("/isLoggedIn", false);
-      }
-    },
-
-    /**
-     * Fetch authenticated user info from SAP Approuter or CAP service
+     * Fetch authenticated user info from SAP Approuter (/user-api/currentUser)
+     * or CAP service (/odata/v4/maintenance/getUserInfo())
      */
     async fetchSapUser() {
-      const baseUrl = _getBaseUrl();
+      // Try SAP Approuter /user-api/currentUser first
       try {
-        const res = await fetch(`${baseUrl}/user-api/currentUser`, {
+        const res = await fetch("/user-api/currentUser", {
           headers: { Accept: "application/json" }
         });
         if (res.ok) {
@@ -254,21 +151,15 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
             return;
           }
         }
-      } catch (e) {}
+      } catch (e) {
+        // Approuter user-api not available in local mock
+      }
 
+      // Try CAP getUserInfo()
       try {
-<<<<<<< HEAD
-        let resCap = await fetch(`${baseUrl}/odata/v4/maintenance/getUserInfo()`, {
-=======
         const resCap = await fetch(CAP_USERINFO_URL, {
->>>>>>> 62f11cfeb71b355b8548bd267f6da42210acb780
           headers: { Accept: "application/json" }
         });
-        if (!resCap.ok && resCap.status >= 500) {
-          resCap = await fetch("https://3b342f32trial-dev-zpm-maintenance-cockpit-srv.cfapps.us10-001.hana.ondemand.com/odata/v4/maintenance/getUserInfo()", {
-            headers: { Accept: "application/json" }
-          });
-        }
         if (resCap.ok) {
           const capUser = await resCap.json();
           if (capUser && capUser.name && capUser.name !== "anonymous") {
@@ -277,18 +168,7 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
           }
         }
       } catch (e) {
-        try {
-          const resDirect = await fetch("https://3b342f32trial-dev-zpm-maintenance-cockpit-srv.cfapps.us10-001.hana.ondemand.com/odata/v4/maintenance/getUserInfo()", {
-            headers: { Accept: "application/json" }
-          });
-          if (resDirect.ok) {
-            const capUser = await resDirect.json();
-            if (capUser && capUser.name && capUser.name !== "anonymous") {
-              this._applyCapUser(capUser);
-              return;
-            }
-          }
-        } catch (dirErr) {}
+        // Fall back to preset account
       }
     },
 
@@ -335,7 +215,6 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
       if (_oAuthModel) {
         _oAuthModel.setProperty("/currentUser", userObj);
         _oAuthModel.setProperty("/selectedAccountId", userObj.id);
-        _oAuthModel.setProperty("/isLoggedIn", true);
         _oAuthModel.setProperty("/isSapXsuaa", true);
       }
     },
@@ -387,13 +266,13 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
       const newAccount = _findAccount(accountId);
       try {
         localStorage.setItem(STORAGE_KEY, newAccount.id);
-        localStorage.setItem(LOGGED_IN_KEY, "true");
-      } catch (e) {}
+      } catch (e) {
+        // Storage fallback
+      }
 
       if (_oAuthModel) {
         _oAuthModel.setProperty("/currentUser", newAccount);
         _oAuthModel.setProperty("/selectedAccountId", newAccount.id);
-        _oAuthModel.setProperty("/isLoggedIn", true);
       }
 
       return newAccount;
