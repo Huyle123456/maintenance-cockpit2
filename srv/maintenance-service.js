@@ -16,36 +16,45 @@ module.exports = cds.service.impl(async function () {
    */
   this.on("getUserInfo", async (req) => {
     const user = req.user;
-    const userId = user && user.id ? user.id : "admin";
-    const isAdmin =
-      user && typeof user.is === "function"
-        ? user.is("Admin")
-        : userId.toLowerCase().includes("admin");
-    const isUser =
-      user && typeof user.is === "function" ? user.is("User") : true;
+    const rawId = user && user.id ? user.id : "user";
+    const isInternalFallback = !user || !user.id || user.id === "privileged" || user.id === "anonymous";
+
+    let isAdmin = false;
+    let isUser = true;
+
+    if (!isInternalFallback) {
+      isAdmin = typeof user.is === "function" && user.is("Admin");
+      isUser = typeof user.is === "function" ? user.is("User") : true;
+    } else {
+      // Internal or unauthenticated caller: default to standard user
+      isAdmin = rawId.toLowerCase() === "admin";
+      isUser = true;
+    }
 
     const roles = [];
     if (isAdmin) roles.push("Admin");
     if (isUser) roles.push("User");
 
-    let displayName = userId;
+    let displayName = "Standard User";
     if (user && user.attr && user.attr.logon_name) {
       displayName = user.attr.logon_name;
-    } else if (userId === "admin") {
+    } else if (isAdmin) {
       displayName = "Administrator";
-    } else if (userId === "user") {
-      displayName = "Standard User";
+    } else if (!isInternalFallback && rawId) {
+      displayName = rawId;
     }
 
     const email =
       user && user.attr && user.attr.email
         ? user.attr.email
-        : userId.includes("@")
-          ? userId
-          : `${userId}@maintenance.sap`;
+        : rawId.includes("@")
+          ? rawId
+          : isAdmin
+            ? "admin@maintenance.sap"
+            : "user@maintenance.sap";
 
     return {
-      id: userId,
+      id: isInternalFallback ? (isAdmin ? "admin" : "user") : rawId,
       name: displayName,
       email: email,
       roles: roles,
