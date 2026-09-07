@@ -1,7 +1,0 @@
-key;name;skill;workCenter;available
-T-001;Nguyen An;Mechanical;WC-001;YES
-T-002;Tran Binh;Electrical;WC-002;YES
-T-003;Le Minh;Mechanical;WC-003;NO
-T-004;Pham Linh;Instrumentation;WC-001;YES
-T-005;Vo Duc;Electrical;WC-004;YES
-T-006;Hoang Nam;Mechanical;WC-002;NO

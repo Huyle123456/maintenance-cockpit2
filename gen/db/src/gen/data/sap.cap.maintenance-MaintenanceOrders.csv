@@ -1,6 +1,0 @@
-order_no;equipment_no;description;plant;maintenance_type;priority;priority_state;status;status_state;planner;scheduled_from;scheduled_to;location;work_center;operation_count;completed_operation_count;planned_hours;actual_hours;estimated_cost;currency;etag
-MO-1001;EQ-001;Pump A preventive maintenance #1;1000;PREVENTIVE;HIGH;Error;OPEN;Success;John;2026-08-04;2026-08-06;Plant 1000 - Area A;MECH-100;4;1;16;4;1250;USD;W/"17870722144751001"
-MO-1002;EQ-002;Compressor inspection #2;2000;INSPECTION;MEDIUM;Warning;IN_PROCESS;Warning;Anna;2026-08-07;2026-08-09;Plant 2000 - Area B;MECH-200;5;3;20;13;1800;USD;W/"17870722144751002"
-MO-1003;EQ-003;Critical motor repair #3;3000;CORRECTIVE;LOW;Success;OPEN;Success;Linh;2026-08-10;2026-08-12;Plant 3000 - Area C;MECH-300;3;0;12;0;2200;USD;W/"17870722144751003"
-MO-1004;EQ-004;Quarterly motor service #4;1000;PREVENTIVE;CRITICAL;Error;COMPLETED;Success;David;2026-08-13;2026-08-14;Plant 1000 - Area D;MECH-100;6;6;24;22;3200;USD;W/"17870722144751004"
-MO-1005;EQ-005;Emergency pump check #5;2000;INSPECTION;HIGH;Error;CANCELLED;Error;Maria;2026-08-16;2026-08-17;Plant 2000 - Area E;MECH-200;2;0;8;0;900;USD;W/"17870722144751005"

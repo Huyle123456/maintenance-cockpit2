@@ -1,4 +1,0 @@
-VIEW MaintenanceService_Statuses AS SELECT
-  Statuses_0.key,
-  Statuses_0."TEXT"
-FROM sap_cap_maintenance_Statuses AS Statuses_0

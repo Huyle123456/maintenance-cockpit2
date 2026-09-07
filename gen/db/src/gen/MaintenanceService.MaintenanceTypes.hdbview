@@ -1,4 +1,0 @@
-VIEW MaintenanceService_MaintenanceTypes AS SELECT
-  MaintenanceTypes_0.key,
-  MaintenanceTypes_0."TEXT"
-FROM sap_cap_maintenance_MaintenanceTypes AS MaintenanceTypes_0

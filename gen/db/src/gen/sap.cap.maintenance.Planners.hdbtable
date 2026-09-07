@@ -1,5 +1,0 @@
-COLUMN TABLE sap_cap_maintenance_Planners (
-  key NVARCHAR(50) NOT NULL,
-  "TEXT" NVARCHAR(100),
-  PRIMARY KEY(key)
-)

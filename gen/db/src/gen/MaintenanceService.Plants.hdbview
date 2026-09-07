@@ -1,4 +1,0 @@
-VIEW MaintenanceService_Plants AS SELECT
-  Plants_0.key,
-  Plants_0."TEXT"
-FROM sap_cap_maintenance_Plants AS Plants_0

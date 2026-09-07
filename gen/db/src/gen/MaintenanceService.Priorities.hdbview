@@ -1,4 +1,0 @@
-VIEW MaintenanceService_Priorities AS SELECT
-  Priorities_0.key,
-  Priorities_0."TEXT"
-FROM sap_cap_maintenance_Priorities AS Priorities_0

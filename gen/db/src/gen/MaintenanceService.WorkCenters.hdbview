@@ -1,4 +1,0 @@
-VIEW MaintenanceService_WorkCenters AS SELECT
-  WorkCenters_0.key,
-  WorkCenters_0."TEXT"
-FROM sap_cap_maintenance_WorkCenters AS WorkCenters_0

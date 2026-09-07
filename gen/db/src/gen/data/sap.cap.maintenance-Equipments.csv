@@ -1,6 +1,0 @@
-equipment;description;type;plant;location;status;criticality;manufacturer
-EQ-001;Pump A;PUMP;1000;Line A;ACTIVE;HIGH;Siemens
-EQ-002;Compressor B;COMPRESSOR;1000;Line B;ACTIVE;MEDIUM;Atlas Copco
-EQ-003;Motor C;MOTOR;2000;Line C;ACTIVE;CRITICAL;ABB
-EQ-004;Motor D;MOTOR;2000;Warehouse;INACTIVE;LOW;WEG
-EQ-005;Emergency Pump;PUMP;2000;Line E;ACTIVE;HIGH;Grundfos

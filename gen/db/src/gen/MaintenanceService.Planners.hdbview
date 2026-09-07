@@ -1,4 +1,0 @@
-VIEW MaintenanceService_Planners AS SELECT
-  Planners_0.key,
-  Planners_0."TEXT"
-FROM sap_cap_maintenance_Planners AS Planners_0
