@@ -120,6 +120,9 @@ sap.ui.define(
               etag: oOrderItem.etag,
             }));
 
+            this._aAllOrders = aOrderRows;
+            this._aFilteredOrders = aOrderRows.slice();
+
             OrderRepository.setOrders(aOrderRows);
 
             // Register Navigation model
@@ -136,6 +139,28 @@ sap.ui.define(
                 rows: aOrderRows,
               }),
               "orders",
+            );
+
+            // Register Pagination model
+            this.getView().setModel(
+              new JSONModel({
+                currentPage: 1,
+                pageSize: 10,
+                pageSizeOptions: [
+                  { key: "5", text: "5 / page" },
+                  { key: "10", text: "10 / page" },
+                  { key: "20", text: "20 / page" },
+                  { key: "50", text: "50 / page" },
+                ],
+                totalItems: aOrderRows.length,
+                totalPages: Math.ceil(aOrderRows.length / 10) || 1,
+                startIndex: aOrderRows.length > 0 ? 1 : 0,
+                endIndex: Math.min(10, aOrderRows.length),
+                hasPrevious: false,
+                hasNext: aOrderRows.length > 10,
+                pageButtons: [],
+              }),
+              "pagination",
             );
 
             // Create KPI dashboard model
@@ -160,6 +185,9 @@ sap.ui.define(
               }),
               "kpi",
             );
+
+            // Apply initial pagination
+            this._applyPagination();
 
             // Initialize Mass Change model
             this._initMassChangeModel();
@@ -261,6 +289,14 @@ sap.ui.define(
          * @returns {void}
          */
         onCreateOrderPress() {
+          const oUser = AuthService.getCurrentUser();
+          if (oUser && !oUser.permissions?.createOrder) {
+            MessageBox.warning(
+              this.getView().getModel("i18n").getResourceBundle().getText("roleAdminRequired") ||
+              "Action requires Administrator privileges."
+            );
+            return;
+          }
           this._openCreateOrderDialog();
         },
 
@@ -291,180 +327,116 @@ sap.ui.define(
          * @returns {void}
          */
         onFilterGo() {
-          const aFilters = [];
-
           // Step 1: Read filter values from the FilterBar
-          const sSearch = this.byId("inpSearch").getValue();
+          const sSearch = (this.byId("inpSearch")?.getValue() || "").trim().toLowerCase();
 
           const aSelectedEquipments =
             this.getView()
               .getModel("filters")
-              .getProperty("/selectedEquipments") || [];
+              ?.getProperty("/selectedEquipments") || [];
 
-          const sPlant = this.byId("selPlant").getSelectedKey();
+          const sPlant = this.byId("selPlant")?.getSelectedKey() || "All";
+          const sStatus = this.byId("selStatus")?.getSelectedKey() || "All";
+          const sPriority = this.byId("selPriority")?.getSelectedKey() || "All";
+          const sType = this.byId("selMaintenanceType")?.getSelectedKey() || "All";
+          const sPlanner = this.byId("selPlanner")?.getSelectedKey() || "All";
+          const oDate = this.byId("dpScheduledDateFrom")?.getDateValue();
+          const sDate = oDate ? oDate.toISOString().split("T")[0] : null;
 
-          const sStatus = this.byId("selStatus").getSelectedKey();
+          const sEquipmentType = (this.byId("inpEquipmentType")?.getValue() || "").trim().toLowerCase();
+          const sCriticality = this.byId("selCriticality")?.getSelectedKey() || "All";
+          const sLocation = (this.byId("inpLocation")?.getValue() || "").trim().toLowerCase();
+          const sCreatedBy = (this.byId("inpCreatedBy")?.getValue() || "").trim().toLowerCase();
+          const oActualStart = this.byId("dpActualStart")?.getDateValue();
+          const sActualStart = oActualStart ? oActualStart.toISOString().split("T")[0] : null;
+          const oActualEnd = this.byId("dpActualEnd")?.getDateValue();
+          const sActualEnd = oActualEnd ? oActualEnd.toISOString().split("T")[0] : null;
 
-          const sPriority = this.byId("selPriority").getSelectedKey();
+          // Step 2: Filter the full dataset
+          const aAll = this._aAllOrders || [];
+          this._aFilteredOrders = aAll.filter((o) => {
+            if (sSearch) {
+              const matchOrder = (o.order || "").toLowerCase().includes(sSearch);
+              const matchEq = (o.equipment || "").toLowerCase().includes(sSearch);
+              const matchDesc = (o.description || "").toLowerCase().includes(sSearch);
+              if (!matchOrder && !matchEq && !matchDesc) return false;
+            }
 
-          const sType = this.byId("selMaintenanceType").getSelectedKey();
+            if (aSelectedEquipments.length > 0 && !aSelectedEquipments.includes(o.equipment)) {
+              return false;
+            }
 
-          const sPlanner = this.byId("selPlanner").getSelectedKey();
+            if (sPlant !== "All" && o.plant !== sPlant) return false;
+            if (sStatus !== "All" && o.statusLabel !== sStatus && o.statusKey !== sStatus) return false;
+            if (sPriority !== "All" && o.priority !== sPriority) return false;
+            if (sType !== "All" && o.type !== sType) return false;
+            if (sPlanner !== "All" && o.planner !== sPlanner) return false;
+            if (sDate && o.scheduledFrom < sDate) return false;
 
-          const oDate = this.byId("dpScheduledDateFrom").getDateValue();
+            if (sCriticality !== "All" && o.priority !== sCriticality) return false;
+            if (sLocation && !(o.location || "").toLowerCase().includes(sLocation)) return false;
+            if (sCreatedBy && !(o.createdBy || "").toLowerCase().includes(sCreatedBy)) return false;
+            if (sActualStart && (o.actualStart || o.scheduledFrom) < sActualStart) return false;
+            if (sActualEnd && (o.actualEnd || o.scheduledTo) > sActualEnd) return false;
 
-          // Step 2: Build filter collection
+            return true;
+          });
 
-          // Filter by equipment
-          if (aSelectedEquipments.length > 0) {
-            const aEquipmentFilters = aSelectedEquipments.map(
-              (sEq) => new Filter("equipment", FilterOperator.EQ, sEq),
-            );
-
-            aFilters.push(
-              new Filter({
-                filters: aEquipmentFilters,
-                and: false,
-              }),
-            );
+          // Step 3: Reset to page 1 and recalculate pagination
+          const oPagination = this.getView().getModel("pagination");
+          if (oPagination) {
+            oPagination.setProperty("/currentPage", 1);
           }
 
-          // Filter by plant
-          if (sPlant !== "All") {
-            aFilters.push(new Filter("plant", FilterOperator.EQ, sPlant));
-          }
-
-          // Filter by status
-          if (sStatus !== "All") {
-            aFilters.push(
-              new Filter("statusLabel", FilterOperator.EQ, sStatus),
-            );
-          }
-
-          // Filter by priority
-          if (sPriority !== "All") {
-            aFilters.push(new Filter("priority", FilterOperator.EQ, sPriority));
-          }
-
-          // Filter by maintenance type
-          if (sType !== "All") {
-            aFilters.push(new Filter("type", FilterOperator.EQ, sType));
-          }
-
-          // Filter by planner
-          if (sPlanner !== "All") {
-            aFilters.push(new Filter("planner", FilterOperator.EQ, sPlanner));
-          }
-
-          // Search across multiple columns
-          if (sSearch) {
-            aFilters.push(
-              new Filter({
-                filters: [
-                  new Filter("order", FilterOperator.Contains, sSearch),
-                  new Filter("equipment", FilterOperator.Contains, sSearch),
-                  new Filter("description", FilterOperator.Contains, sSearch),
-                ],
-                and: false,
-              }),
-            );
-          }
-
-          // Filter by scheduled start date
-          if (oDate) {
-            const sDate = oDate.toISOString().split("T")[0];
-
-            aFilters.push(
-              new Filter("scheduledFrom", FilterOperator.GE, sDate),
-            );
-          }
-
-          // Step 3: Apply filters to the table binding
-          const oBinding = this.byId("ordersTable").getBinding("items");
-
-          oBinding.filter(aFilters);
-
-          // Step 4: Update KPI visible order count and estimated cost
-          const iLength = oBinding.getLength();
-          const oKpiModel = this.getView().getModel("kpi");
-
-          oKpiModel.setProperty("/visibleOrderCount", iLength);
-
-          const aFilteredContexts = oBinding.getContexts(0, iLength);
-          const aFilteredOrders = aFilteredContexts.map((oContext) =>
-            oContext.getObject(),
-          );
-
-          oKpiModel.setProperty(
-            "/estimatedCost",
-            formatter.calculateEstimatedCost(aFilteredOrders),
-          );
+          this._applyPagination();
         },
+
         /**
          * Clears all active filter conditions and restores
          * the full maintenance order dataset.
-         *
-         * Processing Flow:
-         * 1. Reset search field.
-         * 2. Reset all dropdown filters.
-         * 3. Reset date filter.
-         * 4. Remove table filters.
-         * 5. Update the visible order counter.
          *
          * @returns {void}
          */
         onFilterClear() {
           // Step 1: Reset search field
-          this.byId("inpSearch").setValue("");
+          this.byId("inpSearch")?.setValue("");
 
           // Step 2: Reset dropdown filters and value help selections
           this.getView()
             .getModel("filters")
-            .setProperty("/selectedEquipments", []);
+            ?.setProperty("/selectedEquipments", []);
           this.byId("tblEqValueHelp")?.removeSelections(true);
 
-          this.byId("selPlant").setSelectedKey("All");
-
-          this.byId("selStatus").setSelectedKey("All");
-
-          this.byId("selPriority").setSelectedKey("All");
-
-          this.byId("selMaintenanceType").setSelectedKey("All");
-
-          this.byId("selPlanner").setSelectedKey("All");
+          this.byId("selPlant")?.setSelectedKey("All");
+          this.byId("selStatus")?.setSelectedKey("All");
+          this.byId("selPriority")?.setSelectedKey("All");
+          this.byId("selMaintenanceType")?.setSelectedKey("All");
+          this.byId("selPlanner")?.setSelectedKey("All");
 
           // Step 3: Reset date and extra filter fields
-          this.byId("dpScheduledDateFrom").setValue("");
-          if (this.byId("inpEquipmentType"))
-            this.byId("inpEquipmentType").setValue("");
-          if (this.byId("selCriticality"))
-            this.byId("selCriticality").setSelectedKey("All");
-          if (this.byId("dpActualStart"))
-            this.byId("dpActualStart").setValue("");
+          this.byId("dpScheduledDateFrom")?.setValue("");
+          if (this.byId("inpEquipmentType")) this.byId("inpEquipmentType").setValue("");
+          if (this.byId("selCriticality")) this.byId("selCriticality").setSelectedKey("All");
+          if (this.byId("dpActualStart")) this.byId("dpActualStart").setValue("");
           if (this.byId("inpLocation")) this.byId("inpLocation").setValue("");
           if (this.byId("inpCreatedBy")) this.byId("inpCreatedBy").setValue("");
           if (this.byId("dpActualEnd")) this.byId("dpActualEnd").setValue("");
 
-          // Step 4: Remove all table filters
-          const oBinding = this.byId("ordersTable").getBinding("items");
+          // Step 4: Restore full dataset
+          this._aFilteredOrders = (this._aAllOrders || []).slice();
 
-          oBinding.filter([]);
+          const oPagination = this.getView().getModel("pagination");
+          if (oPagination) {
+            oPagination.setProperty("/currentPage", 1);
+          }
 
-          // Step 5: Update KPI visible order count and estimated cost
-          const iLength = oBinding.getLength();
           const oKpiModel = this.getView().getModel("kpi");
+          if (oKpiModel) {
+            oKpiModel.setProperty("/activeFilterKey", "");
+          }
 
-          oKpiModel.setProperty("/visibleOrderCount", iLength);
-
-          const aFilteredContexts = oBinding.getContexts(0, iLength);
-          const aFilteredOrders = aFilteredContexts.map((oContext) =>
-            oContext.getObject(),
-          );
-
-          oKpiModel.setProperty(
-            "/estimatedCost",
-            formatter.calculateEstimatedCost(aFilteredOrders),
-          );
+          // Step 5: Recalculate pagination
+          this._applyPagination();
         },
 
         // ==================================
@@ -787,20 +759,17 @@ sap.ui.define(
         // Public: Export action
         // ======================
         /**
-         * Exports the currently visible maintenance orders
-         * to a CSV file.
-         *
-         * Only rows remaining after filtering are exported.
+         * Exports all currently filtered maintenance orders (across all pages)
+         * to a CSV file with loading indicator.
          *
          * @returns {void}
          */
         onExportPress() {
-          // Step 1: Get visible rows from the table binding
-          const oBinding = this.byId("ordersTable").getBinding("items");
-
-          const aRows = oBinding
-            .getContexts()
-            .map((oContext) => oContext.getObject());
+          // Step 1: Get all filtered rows (all pages included)
+          const aRows =
+            this._aFilteredOrders && this._aFilteredOrders.length
+              ? this._aFilteredOrders
+              : [];
 
           // Step 2: Validate export data
           if (!aRows.length) {
@@ -808,80 +777,86 @@ sap.ui.define(
               this.getView()
                 .getModel("i18n")
                 .getResourceBundle()
-                .getText("maintenanceOrdersExportNoData"),
+                .getText("maintenanceOrdersExportNoData") || "No orders available to export.",
             );
 
             return;
           }
 
-          // Step 3: Create CSV header row
-          const aCsvRows = [
-            [
-              "Order",
-              "Equipment",
-              "Description",
-              "Plant",
-              "Type",
-              "Priority",
-              "Status",
-              "Planner",
-              "Scheduled From",
-              "Scheduled To",
-            ].join(","),
-          ];
+          sap.ui.core.BusyIndicator.show(0);
 
-          // Step 4: Populate CSV data rows
-          aRows.forEach((oRow) => {
-            aCsvRows.push(
-              [
-                oRow.order,
-                oRow.equipment,
-                `"${oRow.description}"`,
-                oRow.plant,
-                oRow.type,
-                oRow.priority,
-                oRow.statusLabel,
-                oRow.planner,
-                oRow.scheduledFrom,
-                oRow.scheduledTo,
-              ].join(","),
-            );
-          });
+          setTimeout(() => {
+            try {
+              // Step 3: Create CSV header row
+              const aCsvRows = [
+                [
+                  "Order",
+                  "Equipment",
+                  "Description",
+                  "Plant",
+                  "Type",
+                  "Priority",
+                  "Status",
+                  "Planner",
+                  "Scheduled From",
+                  "Scheduled To",
+                ].join(","),
+              ];
 
-          // Step 5: Generate CSV content
-          const sCsvContent = aCsvRows.join("\n");
+              // Step 4: Populate CSV data rows with escaped text
+              aRows.forEach((oRow) => {
+                const cleanDesc = (oRow.description || "").replace(/"/g, '""');
+                aCsvRows.push(
+                  [
+                    oRow.order || "",
+                    oRow.equipment || "",
+                    `"${cleanDesc}"`,
+                    oRow.plant || "",
+                    oRow.type || "",
+                    oRow.priority || "",
+                    oRow.statusLabel || oRow.status || "",
+                    oRow.planner || "",
+                    oRow.scheduledFrom || "",
+                    oRow.scheduledTo || "",
+                  ].join(","),
+                );
+              });
 
-          const oBlob = new Blob([sCsvContent], {
-            type: "text/csv;charset=utf-8;",
-          });
+              // Step 5: Generate CSV content with UTF-8 BOM for Microsoft Excel compatibility
+              const sCsvContent = "\uFEFF" + aCsvRows.join("\r\n");
 
-          // Step 6: Build export file name
-          const sFileName = `MaintenanceOrders_${new Date()
-            .toISOString()
-            .slice(0, 10)}.csv`;
+              const oBlob = new Blob([sCsvContent], {
+                type: "text/csv;charset=utf-8;",
+              });
 
-          // Step 7: Trigger browser download
-          const oLink = document.createElement("a");
+              // Step 6: Build export file name
+              const sFileName = `MaintenanceOrders_${new Date()
+                .toISOString()
+                .slice(0, 10)}.csv`;
 
-          oLink.href = URL.createObjectURL(oBlob);
+              // Step 7: Trigger browser download
+              const oLink = document.createElement("a");
+              oLink.href = URL.createObjectURL(oBlob);
+              oLink.download = sFileName;
+              document.body.appendChild(oLink);
+              oLink.click();
 
-          oLink.download = sFileName;
+              // Step 8: Clean up temporary resources
+              document.body.removeChild(oLink);
+              setTimeout(() => URL.revokeObjectURL(oLink.href), 1000);
 
-          document.body.appendChild(oLink);
-
-          oLink.click();
-
-          // Step 8: Clean up temporary resources
-          document.body.removeChild(oLink);
-
-          URL.revokeObjectURL(oLink.href);
+              MessageToast.show(`Exported ${aRows.length} order(s) successfully.`);
+            } finally {
+              sap.ui.core.BusyIndicator.hide();
+            }
+          }, 30);
         },
 
         // ============================
         // Public: Value help handling
         // ============================
         /**
-         * Opens the Equipment Value Help dialog.
+         * Opens the Equipment Value Help dialog with loading indicator.
          *
          * Loads the fragment lazily, initializes the
          * Equipment Value Help model and displays the dialog.
@@ -889,48 +864,55 @@ sap.ui.define(
          * @returns {Promise<void>}
          */
         async onEquipmentValueHelpPress() {
-          // Step 1: Load the dialog fragment if it has not been initialized
-          if (!this._pEquipmentValueHelp) {
-            this._pEquipmentValueHelp = Fragment.load({
-              id: this.getView().getId(),
-              name: "com.fsoft.zpmmaintenancecockpit.view.fragment.EquipmentValueHelp",
-              controller: this,
-            }).then((oDialog) => {
-              this.getView().addDependent(oDialog);
+          sap.ui.core.BusyIndicator.show(0);
+          try {
+            // Step 1: Load the dialog fragment if it has not been initialized
+            if (!this._pEquipmentValueHelp) {
+              this._pEquipmentValueHelp = Fragment.load({
+                id: this.getView().getId(),
+                name: "com.fsoft.zpmmaintenancecockpit.view.fragment.EquipmentValueHelp",
+                controller: this,
+              }).then((oDialog) => {
+                this.getView().addDependent(oDialog);
 
-              return oDialog;
-            });
+                return oDialog;
+              });
+            }
+
+            // Step 2: Initialize Equipment Value Help model
+            this._initEquipmentValueHelpModel();
+
+            // Step 3: Open the dialog
+            const oDialog = await this._pEquipmentValueHelp;
+
+            oDialog.open();
+
+            // Step 4: Restore previous selections
+            const oTable = this.byId("tblEqValueHelp");
+            const aSelectedEquipments =
+              this.getView()
+                .getModel("filters")
+                ?.getProperty("/selectedEquipments") || [];
+
+            if (oTable) {
+              oTable.removeSelections(true);
+
+              // Use setTimeout to ensure table items are rendered
+              setTimeout(() => {
+                oTable.getItems().forEach((oItem) => {
+                  const oContext = oItem.getBindingContext("equipmentVH");
+                  if (oContext) {
+                    const sEquipment = oContext.getProperty("equipment");
+                    if (aSelectedEquipments.includes(sEquipment)) {
+                      oItem.setSelected(true);
+                    }
+                  }
+                });
+              }, 0);
+            }
+          } finally {
+            sap.ui.core.BusyIndicator.hide();
           }
-
-          // Step 2: Initialize Equipment Value Help model
-          this._initEquipmentValueHelpModel();
-
-          // Step 3: Open the dialog
-          const oDialog = await this._pEquipmentValueHelp;
-
-          oDialog.open();
-
-          // Step 4: Restore previous selections
-          const oTable = this.byId("tblEqValueHelp");
-          const aSelectedEquipments =
-            this.getView()
-              .getModel("filters")
-              .getProperty("/selectedEquipments") || [];
-
-          oTable.removeSelections(true);
-
-          // Use setTimeout to ensure table items are rendered
-          setTimeout(() => {
-            oTable.getItems().forEach((oItem) => {
-              const oContext = oItem.getBindingContext("equipmentVH");
-              if (oContext) {
-                const sEquipment = oContext.getProperty("equipment");
-                if (aSelectedEquipments.includes(sEquipment)) {
-                  oItem.setSelected(true);
-                }
-              }
-            });
-          }, 0);
         },
 
         /**
@@ -1039,7 +1021,7 @@ sap.ui.define(
         },
 
         /**
-         * Opens the Adapt Filters dialog.
+         * Opens the Adapt Filters dialog with loading indicator.
          *
          * Loads the fragment lazily and displays
          * the filter visibility configuration.
@@ -1047,33 +1029,38 @@ sap.ui.define(
          * @returns {Promise<void>}
          */
         async onAdaptFiltersPress() {
-          // Step 1: Create draft config
-          const oCurrentConfig = this.getView()
-            .getModel("filterConfig")
-            .getData();
+          sap.ui.core.BusyIndicator.show(0);
+          try {
+            // Step 1: Create draft config
+            const oCurrentConfig = this.getView()
+              .getModel("filterConfig")
+              .getData();
 
-          this.getView().setModel(
-            new JSONModel(JSON.parse(JSON.stringify(oCurrentConfig))),
-            "filterConfigDraft",
-          );
+            this.getView().setModel(
+              new JSONModel(JSON.parse(JSON.stringify(oCurrentConfig))),
+              "filterConfigDraft",
+            );
 
-          // Step 2: Load dialog
-          if (!this._pAdaptFiltersDialog) {
-            this._pAdaptFiltersDialog = Fragment.load({
-              id: this.getView().getId(),
-              name: "com.fsoft.zpmmaintenancecockpit.view.fragment.AdaptFilters",
-              controller: this,
-            }).then((oDialog) => {
-              this.getView().addDependent(oDialog);
+            // Step 2: Load dialog
+            if (!this._pAdaptFiltersDialog) {
+              this._pAdaptFiltersDialog = Fragment.load({
+                id: this.getView().getId(),
+                name: "com.fsoft.zpmmaintenancecockpit.view.fragment.AdaptFilters",
+                controller: this,
+              }).then((oDialog) => {
+                this.getView().addDependent(oDialog);
 
-              return oDialog;
-            });
+                return oDialog;
+              });
+            }
+
+            // Step 3: Open dialog
+            const oDialog = await this._pAdaptFiltersDialog;
+
+            oDialog.open();
+          } finally {
+            sap.ui.core.BusyIndicator.hide();
           }
-
-          // Step 3: Open dialog
-          const oDialog = await this._pAdaptFiltersDialog;
-
-          oDialog.open();
         },
 
         /**
@@ -1087,7 +1074,7 @@ sap.ui.define(
         },
 
         /**
-         * Navigates to the Maintenance Order Detail page.
+         * Navigates to the Maintenance Order Detail page with loading indicator.
          *
          * @param {sap.ui.base.Event} oEvent Press event
          * @returns {void}
@@ -1109,10 +1096,15 @@ sap.ui.define(
             return;
           }
 
+          sap.ui.core.BusyIndicator.show(0);
+
           // Step 3: Navigate to the Order Detail page
-          this.getOwnerComponent().getRouter().navTo("RouteOrderDetail", {
-            orderId: sOrder,
-          });
+          setTimeout(() => {
+            this.getOwnerComponent().getRouter().navTo("RouteOrderDetail", {
+              orderId: sOrder,
+            });
+            sap.ui.core.BusyIndicator.hide();
+          }, 60);
         },
 
         // ======================================
@@ -1120,7 +1112,7 @@ sap.ui.define(
         // ======================================
 
         /**
-         * Loads and opens the Create Maintenance Order dialog.
+         * Loads and opens the Create Maintenance Order dialog with loading indicator.
          *
          * The dialog fragment is loaded lazily and reused
          * during the page lifecycle.
@@ -1128,30 +1120,35 @@ sap.ui.define(
          * @returns {Promise<void>}
          */
         async _openCreateOrderDialog() {
-          // Step 1: Ensure dialog controller exists
-          this._ensureDialogController();
+          sap.ui.core.BusyIndicator.show(0);
+          try {
+            // Step 1: Ensure dialog controller exists
+            this._ensureDialogController();
 
-          // Step 2: Load dialog fragment if not already loaded
-          if (!this._pCreateOrderDialog) {
-            this._pCreateOrderDialog = Fragment.load({
-              id: this.getView().getId(),
-              name: "com.fsoft.zpmmaintenancecockpit.view.fragment.CreateMaintenanceOrder",
-              controller: this._dialogController,
-            }).then((oDialog) => {
-              this.getView().addDependent(oDialog);
+            // Step 2: Load dialog fragment if not already loaded
+            if (!this._pCreateOrderDialog) {
+              this._pCreateOrderDialog = Fragment.load({
+                id: this.getView().getId(),
+                name: "com.fsoft.zpmmaintenancecockpit.view.fragment.CreateMaintenanceOrder",
+                controller: this._dialogController,
+              }).then((oDialog) => {
+                this.getView().addDependent(oDialog);
 
-              return oDialog;
-            });
+                return oDialog;
+              });
+            }
+
+            // Step 3: Get dialog instance
+            const oDialog = await this._pCreateOrderDialog;
+
+            // Step 4: Initialize dialog data
+            this._dialogController.initDialogState();
+
+            // Step 5: Open dialog
+            oDialog.open();
+          } finally {
+            sap.ui.core.BusyIndicator.hide();
           }
-
-          // Step 3: Get dialog instance
-          const oDialog = await this._pCreateOrderDialog;
-
-          // Step 4: Initialize dialog data
-          this._dialogController.initDialogState();
-
-          // Step 5: Open dialog
-          oDialog.open();
         },
 
         /**
@@ -1298,48 +1295,230 @@ sap.ui.define(
          * Applies or clears a KPI filter on the orders table.
          *
          * @param {string} sFilterKey Identifier for the active KPI filter.
-         * @param {sap.ui.model.Filter} oFilter Filter to apply to the order binding.
+         * @param {sap.ui.model.Filter} [oFilter] Deprecated filter param.
          * @returns {void}
          */
         _applyKpiFilter(sFilterKey, oFilter) {
-          const oTable = this.byId("ordersTable");
-
-          const oItemsBinding = oTable.getBinding("items");
-
           const oKpiModel = this.getView().getModel("kpi");
-
           const sActiveFilterKey = oKpiModel.getProperty("/activeFilterKey");
+          const aAll = this._aAllOrders || [];
 
-          if (!oItemsBinding || !oFilter || !sFilterKey) {
+          // Clicking the same KPI twice clears the filter
+          if (sActiveFilterKey === sFilterKey) {
+            this._aFilteredOrders = aAll.slice();
+            this.byId("selStatus")?.setSelectedKey("All");
+            this.byId("selPriority")?.setSelectedKey("All");
+            oKpiModel.setProperty("/activeFilterKey", "");
+          } else {
+            oKpiModel.setProperty("/activeFilterKey", sFilterKey);
+
+            if (sFilterKey === "STATUS_OPEN") {
+              this._aFilteredOrders = aAll.filter(
+                (r) =>
+                  r.statusKey === constants.STATUS.OPEN ||
+                  r.statusLabel === "OPEN",
+              );
+            } else if (sFilterKey === "STATUS_IN_PROCESS") {
+              this._aFilteredOrders = aAll.filter(
+                (r) =>
+                  r.statusKey === constants.STATUS.IN_PROCESS_DISPLAY ||
+                  r.statusLabel === "IN PROCESS",
+              );
+            } else if (sFilterKey === "PRIORITY_CRITICAL") {
+              this._aFilteredOrders = aAll.filter(
+                (r) => r.isCritical === true || r.priority === "CRITICAL",
+              );
+            } else if (sFilterKey === "OVERDUE") {
+              this._aFilteredOrders = aAll.filter((r) => r.isOverdue === true);
+            } else {
+              this._aFilteredOrders = aAll.slice();
+            }
+          }
+
+          const oPagination = this.getView().getModel("pagination");
+          if (oPagination) {
+            oPagination.setProperty("/currentPage", 1);
+          }
+
+          this._applyPagination();
+        },
+
+        /**
+         * Applies client-side pagination to the filtered orders list.
+         *
+         * Computes total pages, current page slice, start/end counters,
+         * navigation button states, and dynamic page buttons with smooth loading animation.
+         *
+         * @returns {void}
+         */
+        _applyPagination() {
+          const oPaginationModel = this.getView().getModel("pagination");
+          if (!oPaginationModel) {
             return;
           }
 
-          // Clicking the same KPI twice clears the filter.
-          if (sActiveFilterKey === sFilterKey) {
-            oItemsBinding.filter([]);
-
-            this.byId("selStatus")?.setSelectedKey("All");
-
-            this.byId("selPriority")?.setSelectedKey("All");
-
-            oKpiModel.setProperty("/activeFilterKey", "");
-          } else {
-            oItemsBinding.filter([oFilter]);
-            oKpiModel.setProperty("/activeFilterKey", sFilterKey);
+          const oTable = this.byId("ordersTable");
+          if (oTable) {
+            oTable.setBusyIndicatorDelay(0);
+            oTable.setBusy(true);
           }
 
-          const iLength = oItemsBinding.getLength();
-          oKpiModel.setProperty("/visibleOrderCount", iLength);
+          const iPageSize =
+            parseInt(oPaginationModel.getProperty("/pageSize"), 10) || 10;
+          const aFiltered = this._aFilteredOrders || [];
+          const iTotalItems = aFiltered.length;
+          const iTotalPages = Math.max(1, Math.ceil(iTotalItems / iPageSize));
+          let iCurrentPage =
+            parseInt(oPaginationModel.getProperty("/currentPage"), 10) || 1;
 
-          const aFilteredContexts = oItemsBinding.getContexts(0, iLength);
-          const aFilteredOrders = aFilteredContexts.map((oContext) =>
-            oContext.getObject(),
+          if (iCurrentPage > iTotalPages) {
+            iCurrentPage = iTotalPages;
+          }
+          if (iCurrentPage < 1) {
+            iCurrentPage = 1;
+          }
+
+          const iStartIndex =
+            iTotalItems === 0 ? 0 : (iCurrentPage - 1) * iPageSize + 1;
+          const iEndIndex = Math.min(iTotalItems, iCurrentPage * iPageSize);
+
+          const aPagedRows = aFiltered.slice(
+            (iCurrentPage - 1) * iPageSize,
+            iCurrentPage * iPageSize,
           );
 
-          oKpiModel.setProperty(
-            "/estimatedCost",
-            formatter.calculateEstimatedCost(aFilteredOrders),
-          );
+          // Build dynamic page buttons (up to 5 page window)
+          const aPageButtons = [];
+          let iStartP = Math.max(1, iCurrentPage - 2);
+          let iEndP = Math.min(iTotalPages, iStartP + 4);
+          if (iEndP - iStartP < 4) {
+            iStartP = Math.max(1, iEndP - 4);
+          }
+          for (let p = iStartP; p <= iEndP; p++) {
+            aPageButtons.push({
+              page: p,
+              text: String(p),
+              current: p === iCurrentPage,
+            });
+          }
+
+          oPaginationModel.setProperty("/currentPage", iCurrentPage);
+          oPaginationModel.setProperty("/totalPages", iTotalPages);
+          oPaginationModel.setProperty("/totalItems", iTotalItems);
+          oPaginationModel.setProperty("/startIndex", iStartIndex);
+          oPaginationModel.setProperty("/endIndex", iEndIndex);
+          oPaginationModel.setProperty("/hasPrevious", iCurrentPage > 1);
+          oPaginationModel.setProperty("/hasNext", iCurrentPage < iTotalPages);
+          oPaginationModel.setProperty("/pageButtons", aPageButtons);
+
+          const oOrdersModel = this.getView().getModel("orders");
+          if (oOrdersModel) {
+            oOrdersModel.setProperty("/rows", aPagedRows);
+            oOrdersModel.refresh(true);
+          }
+
+          const oKpiModel = this.getView().getModel("kpi");
+          if (oKpiModel) {
+            oKpiModel.setProperty("/visibleOrderCount", iTotalItems);
+            oKpiModel.setProperty(
+              "/estimatedCost",
+              formatter.calculateEstimatedCost(aFiltered),
+            );
+          }
+
+          setTimeout(() => {
+            if (oTable) {
+              oTable.setBusy(false);
+            }
+          }, 80);
+        },
+
+        /**
+         * Navigates to the first page.
+         *
+         * @returns {void}
+         */
+        onFirstPage() {
+          const oPagination = this.getView().getModel("pagination");
+          if (oPagination && oPagination.getProperty("/hasPrevious")) {
+            oPagination.setProperty("/currentPage", 1);
+            this._applyPagination();
+          }
+        },
+
+        /**
+         * Navigates to the previous page.
+         *
+         * @returns {void}
+         */
+        onPreviousPage() {
+          const oPagination = this.getView().getModel("pagination");
+          if (oPagination && oPagination.getProperty("/hasPrevious")) {
+            const cur = oPagination.getProperty("/currentPage");
+            oPagination.setProperty("/currentPage", cur - 1);
+            this._applyPagination();
+          }
+        },
+
+        /**
+         * Navigates to the next page.
+         *
+         * @returns {void}
+         */
+        onNextPage() {
+          const oPagination = this.getView().getModel("pagination");
+          if (oPagination && oPagination.getProperty("/hasNext")) {
+            const cur = oPagination.getProperty("/currentPage");
+            oPagination.setProperty("/currentPage", cur + 1);
+            this._applyPagination();
+          }
+        },
+
+        /**
+         * Navigates to the last page.
+         *
+         * @returns {void}
+         */
+        onLastPage() {
+          const oPagination = this.getView().getModel("pagination");
+          if (oPagination && oPagination.getProperty("/hasNext")) {
+            const total = oPagination.getProperty("/totalPages");
+            oPagination.setProperty("/currentPage", total);
+            this._applyPagination();
+          }
+        },
+
+        /**
+         * Navigates to a specific clicked page number.
+         *
+         * @param {sap.ui.base.Event} oEvent Button press event
+         * @returns {void}
+         */
+        onPagePress(oEvent) {
+          const oContext = oEvent.getSource().getBindingContext("pagination");
+          if (oContext) {
+            const iPage = oContext.getProperty("page");
+            this.getView()
+              .getModel("pagination")
+              .setProperty("/currentPage", iPage);
+            this._applyPagination();
+          }
+        },
+
+        /**
+         * Updates the page size and resets to page 1.
+         *
+         * @param {sap.ui.base.Event} oEvent Select change event
+         * @returns {void}
+         */
+        onPageSizeChange(oEvent) {
+          const sKey = oEvent.getParameter("selectedItem")
+            ? oEvent.getParameter("selectedItem").getKey()
+            : oEvent.getSource().getSelectedKey();
+          const oPagination = this.getView().getModel("pagination");
+          oPagination.setProperty("/pageSize", parseInt(sKey, 10) || 10);
+          oPagination.setProperty("/currentPage", 1);
+          this._applyPagination();
         },
 
         /**
@@ -1653,11 +1832,20 @@ sap.ui.define(
         },
 
         /**
-         * Opens the mass-change dialog for eligible selected orders.
+         * Opens the mass-change dialog for eligible selected orders with loading indicator.
          *
          * @returns {void}
          */
-        onMassChangePress() {
+        async onMassChangePress() {
+          const oUser = AuthService.getCurrentUser();
+          if (oUser && !oUser.permissions?.massChange) {
+            MessageBox.warning(
+              this.getView().getModel("i18n").getResourceBundle().getText("roleAdminRequired") ||
+              "Action requires Administrator privileges."
+            );
+            return;
+          }
+
           const aSelected =
             this.getView()
               .getModel("massChange")
@@ -1687,20 +1875,24 @@ sap.ui.define(
             return;
           }
 
-          if (!this._pMassChangeDialog) {
-            this._pMassChangeDialog = Fragment.load({
-              id: this.getView().getId(),
-              name: "com.fsoft.zpmmaintenancecockpit.view.fragment.MassChange",
-              controller: this,
-            }).then((oDialog) => {
-              this.getView().addDependent(oDialog);
-              return oDialog;
-            });
-          }
+          sap.ui.core.BusyIndicator.show(0);
+          try {
+            if (!this._pMassChangeDialog) {
+              this._pMassChangeDialog = Fragment.load({
+                id: this.getView().getId(),
+                name: "com.fsoft.zpmmaintenancecockpit.view.fragment.MassChange",
+                controller: this,
+              }).then((oDialog) => {
+                this.getView().addDependent(oDialog);
+                return oDialog;
+              });
+            }
 
-          this._pMassChangeDialog.then((oDialog) => {
+            const oDialog = await this._pMassChangeDialog;
             oDialog.open();
-          });
+          } finally {
+            sap.ui.core.BusyIndicator.hide();
+          }
         },
 
         /**
@@ -1746,6 +1938,7 @@ sap.ui.define(
                 ? "Warning"
                 : "Success";
 
+          sap.ui.core.BusyIndicator.show(0);
           try {
             // Send batch update request to CAP backend ($batch)
             await CAPService.massUpdateOrders(aOrderKeys, {
@@ -1784,6 +1977,8 @@ sap.ui.define(
             MessageBox.error(
               "Failed to update orders on server: " + err.message,
             );
+          } finally {
+            sap.ui.core.BusyIndicator.hide();
           }
         },
 
@@ -1821,59 +2016,67 @@ sap.ui.define(
             }));
 
             OrderRepository.setOrders(aOrderRows);
-            const oOrdersModel = this.getView().getModel("orders");
-            if (oOrdersModel) {
-              oOrdersModel.setProperty("/rows", aOrderRows);
-              oOrdersModel.refresh(true);
-            }
+            this._aAllOrders = aOrderRows;
+            this._aFilteredOrders = aOrderRows.slice();
+
             this._refreshKpiCounts(aOrderRows);
             this._initFilterData(aOrderRows);
-
-            const oTable = this.byId("ordersTable");
-            if (oTable && oTable.getBinding("items")) {
-              oTable.getBinding("items").refresh(true);
-            }
+            this._applyPagination();
           } catch (err) {
             console.error("Failed to reload orders from backend:", err);
           }
         },
 
         /**
-         * Opens the import-orders dialog.
+         * Opens the import-orders dialog with loading indicator.
          *
          * @returns {Promise<void>} Resolves after the dialog opens.
          */
         async onImportOrdersPress() {
-          this._oSelectedImportFile = null;
-          if (!this._pImportOrdersDialog) {
-            this._pImportOrdersDialog = Fragment.load({
-              id: this.getView().getId(),
-              name: "com.fsoft.zpmmaintenancecockpit.view.fragment.ImportOrdersDialog",
-              controller: this,
-            }).then((oDialog) => {
-              this.getView().addDependent(oDialog);
-              return oDialog;
+          const oUser = AuthService.getCurrentUser();
+          if (oUser && !oUser.permissions?.createOrder) {
+            MessageBox.warning(
+              this.getView().getModel("i18n").getResourceBundle().getText("roleAdminRequired") ||
+              "Action requires Administrator privileges."
+            );
+            return;
+          }
+
+          sap.ui.core.BusyIndicator.show(0);
+          try {
+            this._oSelectedImportFile = null;
+            if (!this._pImportOrdersDialog) {
+              this._pImportOrdersDialog = Fragment.load({
+                id: this.getView().getId(),
+                name: "com.fsoft.zpmmaintenancecockpit.view.fragment.ImportOrdersDialog",
+                controller: this,
+              }).then((oDialog) => {
+                this.getView().addDependent(oDialog);
+                return oDialog;
+              });
+            }
+
+            const oImportModel = new JSONModel({
+              fileName: "",
+              fileSize: "",
+              statusText: "Waiting for file",
+              statusState: "None",
+              canImport: false,
+              statusMessage:
+                "Please choose a .xlsx or .csv file to import to Backend.",
+              statusType: "Information",
             });
-          }
+            this.getView().setModel(oImportModel, "importModel");
 
-          const oImportModel = new JSONModel({
-            fileName: "",
-            fileSize: "",
-            statusText: "Waiting for file",
-            statusState: "None",
-            canImport: false,
-            statusMessage:
-              "Please choose a .xlsx or .csv file to import to Backend.",
-            statusType: "Information",
-          });
-          this.getView().setModel(oImportModel, "importModel");
-
-          const oDialog = await this._pImportOrdersDialog;
-          const oUploader = this.byId("orderFileUploader");
-          if (oUploader) {
-            oUploader.clear();
+            const oDialog = await this._pImportOrdersDialog;
+            const oUploader = this.byId("orderFileUploader");
+            if (oUploader) {
+              oUploader.clear();
+            }
+            oDialog.open();
+          } finally {
+            sap.ui.core.BusyIndicator.hide();
           }
-          oDialog.open();
         },
 
         /**
@@ -2000,12 +2203,31 @@ sap.ui.define(
             let sMsg =
               `Import completed in ${result.durationSec || "1s"}!\n\n` +
               `• Total Orders Processed: ${result.totalRows}\n` +
-              `• Successfully Imported: ${result.importedCount} maintenance order(s)\n` +
-              `• Operations Created: ${result.operationsCount || result.importedCount} operation(s)\n` +
+              `• Total Imported / Synced: ${result.importedCount} maintenance order(s)\n`;
+
+            if (result.createdCount !== undefined || result.updatedCount !== undefined) {
+              sMsg += `  - Newly Created Orders: ${result.createdCount || 0}\n` +
+                      `  - Updated (Upserted) Existing Orders: ${result.updatedCount || 0}\n`;
+            }
+
+            sMsg +=
+              `• Operations Synced: ${result.operationsCount || result.importedCount} operation(s)\n` +
               `• Materials Linked: ${result.materialsCount || 0} item(s)\n`;
 
+            if (result.warnings && result.warnings.length > 0) {
+              sMsg += `\nAuto-Correction Notices (${result.warnings.length}):\n`;
+              const maxDispWarn = Math.min(result.warnings.length, 5);
+              for (let i = 0; i < maxDispWarn; i++) {
+                const w = result.warnings[i];
+                sMsg += `  • Line ${w.row} (${w.order}): ${w.message}\n`;
+              }
+              if (result.warnings.length > 5) {
+                sMsg += `  ... and ${result.warnings.length - 5} more notice(s).\n`;
+              }
+            }
+
             if (result.failedCount > 0) {
-              sMsg += `• Failed / Invalid Rows: ${result.failedCount}\n\nRow-by-Row Error Details:\n`;
+              sMsg += `\n• Failed / Invalid Rows: ${result.failedCount}\n\nRow-by-Row Error Details:\n`;
               const maxDisplayErrors = Math.min(
                 (result.errors || []).length,
                 20,

@@ -92,35 +92,25 @@ sap.ui.define(
 
           const oRouter = this.getOwnerComponent().getRouter();
 
-          if (sKey === "orders") {
-            oRouter.navTo("RouteMaintenanceOrders");
-            return;
-          }
-
-          if (sKey === "equipment") {
-            oRouter.navTo("RouteEquipment");
-            return;
-          }
-
-          if (sKey === "operations") {
-            oRouter.navTo("RouteOperationsDashboard");
-            return;
-          }
-
-          if (sKey === "technicians") {
-            oRouter.navTo("RouteTechnicians");
-            return;
-          }
-
-          if (sKey === "auditHistory") {
-            oRouter.navTo("RouteAuditHistory");
-            return;
-          }
-
-          if (sKey === "processRules") {
-            this.onOpenProcessBusinessRules();
-            return;
-          }
+          sap.ui.core.BusyIndicator.show(0);
+          setTimeout(() => {
+            if (sKey === "orders") {
+              oRouter.navTo("RouteMaintenanceOrders");
+            } else if (sKey === "equipment") {
+              oRouter.navTo("RouteEquipment");
+            } else if (sKey === "operations") {
+              oRouter.navTo("RouteOperationsDashboard");
+            } else if (sKey === "technicians") {
+              oRouter.navTo("RouteTechnicians");
+            } else if (sKey === "auditHistory") {
+              oRouter.navTo("RouteAuditHistory");
+            } else if (sKey === "processRules") {
+              oRouter.navTo("RouteProcessRules");
+            }
+            setTimeout(() => {
+              sap.ui.core.BusyIndicator.hide();
+            }, 80);
+          }, 40);
         },
 
         /**

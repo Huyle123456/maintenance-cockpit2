@@ -59,7 +59,7 @@ sap.ui.define(
           }
         },
         /**
-         * Navigates to the selected critical order's detail page.
+         * Navigates to the selected critical order's detail page with loading indicator.
          *
          * @param {sap.ui.base.Event} e List item title press event.
          * @returns {void}
@@ -69,15 +69,23 @@ sap.ui.define(
             .getSource()
             .getBindingContext("dashboard")
             .getProperty("order_no");
+          sap.ui.core.BusyIndicator.show(0);
           t.getRouterFor(this).navTo("RouteOrderDetail", { orderId: o });
+          setTimeout(() => {
+            sap.ui.core.BusyIndicator.hide();
+          }, 80);
         },
         /**
-         * Navigates to the Maintenance Orders page.
+         * Navigates to the Maintenance Orders page with loading indicator.
          *
          * @returns {void}
          */
         onOpenOrderPress: function () {
+          sap.ui.core.BusyIndicator.show(0);
           t.getRouterFor(this).navTo("RouteMaintenanceOrders");
+          setTimeout(() => {
+            sap.ui.core.BusyIndicator.hide();
+          }, 80);
         },
       },
     );

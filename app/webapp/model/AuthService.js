@@ -137,9 +137,13 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
       if (!_oAuthModel) {
         const savedId = _getSavedAccountId();
         const initialUser = _findAccount(savedId);
+        // By default, if the saved/initial account is admin, allow switching for testing
+        const bIsAdminAccount = initialUser.isAdmin || savedId === "admin";
 
         _oAuthModel = new JSONModel({
           currentUser: initialUser,
+          originalUser: initialUser,
+          canSwitchRole: bIsAdminAccount,
           accounts: DEFAULT_ACCOUNTS,
           selectedAccountId: initialUser.id,
           isLoggedIn: _getSavedLoggedIn(),
@@ -201,8 +205,12 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
           localStorage.setItem(LOGGED_IN_KEY, "true");
         } catch (e) {}
 
+        const bIsAdmin = matched.isAdmin;
+
         if (_oAuthModel) {
           _oAuthModel.setProperty("/currentUser", matched);
+          _oAuthModel.setProperty("/originalUser", matched);
+          _oAuthModel.setProperty("/canSwitchRole", bIsAdmin);
           _oAuthModel.setProperty("/selectedAccountId", matched.id);
           _oAuthModel.setProperty("/isLoggedIn", true);
         }
@@ -329,8 +337,20 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
       };
 
       if (_oAuthModel) {
-        _oAuthModel.setProperty("/currentUser", userObj);
-        _oAuthModel.setProperty("/selectedAccountId", userObj.id);
+        const savedId = _getSavedAccountId();
+        // If the authenticated user is admin, allow switching to user for testing
+        _oAuthModel.setProperty("/originalUser", userObj);
+        _oAuthModel.setProperty("/canSwitchRole", isAdmin);
+
+        if (isAdmin && savedId === "user") {
+          // Admin chose to test as User
+          const testUser = _findAccount("user");
+          _oAuthModel.setProperty("/currentUser", testUser);
+          _oAuthModel.setProperty("/selectedAccountId", "user");
+        } else {
+          _oAuthModel.setProperty("/currentUser", userObj);
+          _oAuthModel.setProperty("/selectedAccountId", userObj.id);
+        }
         _oAuthModel.setProperty("/isLoggedIn", true);
         _oAuthModel.setProperty("/isSapXsuaa", true);
       }
@@ -369,17 +389,31 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
       };
 
       if (_oAuthModel) {
-        _oAuthModel.setProperty("/currentUser", userObj);
-        _oAuthModel.setProperty("/selectedAccountId", userObj.id);
+        const savedId = _getSavedAccountId();
+        _oAuthModel.setProperty("/originalUser", userObj);
+        _oAuthModel.setProperty("/canSwitchRole", isAdmin);
+
+        if (isAdmin && savedId === "user") {
+          const testUser = _findAccount("user");
+          _oAuthModel.setProperty("/currentUser", testUser);
+          _oAuthModel.setProperty("/selectedAccountId", "user");
+        } else {
+          _oAuthModel.setProperty("/currentUser", userObj);
+          _oAuthModel.setProperty("/selectedAccountId", userObj.id);
+        }
       }
     },
 
     /**
-     * Switch current logged-in account
+     * Switch current logged-in account (Admin test capability)
      * @param {string} accountId "admin" or "user"
      * @returns {object} The new user object
      */
     switchAccount: function (accountId) {
+      if (_oAuthModel && !_oAuthModel.getProperty("/canSwitchRole")) {
+        return _oAuthModel.getProperty("/currentUser");
+      }
+
       const newAccount = _findAccount(accountId);
       try {
         localStorage.setItem(STORAGE_KEY, newAccount.id);

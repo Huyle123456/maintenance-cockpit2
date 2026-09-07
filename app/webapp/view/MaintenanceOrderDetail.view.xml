@@ -16,6 +16,7 @@
         title="{i18n>maintenanceOrdersPageTitle}"
         showHeader="true"
         enableScrolling="false"
+        busyIndicatorDelay="0"
     >
         <m:content>
             <ObjectPageLayout
@@ -24,6 +25,7 @@
                 useIconTabBar="true"
                 showTitleInHeaderContent="true"
                 upperCaseAnchorBar="false"
+                busyIndicatorDelay="0"
             >
                 <!-- =========================================================
                                      HEADER

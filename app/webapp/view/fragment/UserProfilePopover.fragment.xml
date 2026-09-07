@@ -7,9 +7,7 @@
         id="userProfilePopover"
         title="{i18n>userProfileTitle}"
         placement="Bottom"
-        contentWidth="460px"
-        horizontalScrolling="false"
-        verticalScrolling="false"
+        contentWidth="420px"
         class="sapUiContentPadding"
     >
         <content>
@@ -51,8 +49,17 @@
                     </VBox>
                 </HBox>
 
-                <!-- Role Switcher Section -->
-                <VBox class="sapUiSmallMarginTop">
+                <!-- Admin Test Switcher Section (Active only when original user is Admin) -->
+                <VBox
+                    class="sapUiSmallMarginTop"
+                    visible="{auth>/canSwitchRole}"
+                >
+                    <MessageStrip
+                        text="{= ${auth>/currentUser/isAdmin} ? 'Tài khoản có quyền Admin. Bạn có thể chuyển sang User để kiểm tra giao diện phân quyền.' : 'Đang giả lập quyền User để test. Toàn bộ nút chức năng thêm/sửa/xóa/hủy đã bị khóa (disabled).' }"
+                        type="{= ${auth>/currentUser/isAdmin} ? 'Information' : 'Warning' }"
+                        showIcon="true"
+                        class="sapUiTinyMarginBottom"
+                    />
                     <Label
                         text="{i18n>userSwitchAccountLabel}"
                         design="Bold"
@@ -67,18 +74,31 @@
                         <items>
                             <SegmentedButtonItem
                                 key="admin"
-                                text="Admin (AD)"
+                                text="Admin (Toàn quyền)"
                                 icon="sap-icon://user-settings"
                                 width="50%"
                             />
                             <SegmentedButtonItem
                                 key="user"
-                                text="User (US)"
+                                text="User (Xem / Disabled)"
                                 icon="sap-icon://person-placeholder"
                                 width="50%"
                             />
                         </items>
                     </SegmentedButton>
+                </VBox>
+
+                <!-- Standard User Notification (When logged in as regular user) -->
+                <VBox
+                    class="sapUiSmallMarginTop"
+                    visible="{= !${auth>/canSwitchRole} }"
+                >
+                    <MessageStrip
+                        text="Tài khoản Standard User: Chỉ có quyền xem và xuất dữ liệu. Không thể chuyển đổi quyền sang Admin."
+                        type="Information"
+                        showIcon="true"
+                        class="sapUiTinyMarginBottom"
+                    />
                 </VBox>
 
                 <!-- Permissions Info Card -->
@@ -127,11 +147,14 @@
                 </VBox>
             </VBox>
         </content>
-        <beginButton>
-            <Button
-                text="{i18n>commonClose}"
-                press=".onCloseUserPopover"
-            />
-        </beginButton>
+        <footer>
+            <OverflowToolbar>
+                <ToolbarSpacer />
+                <Button
+                    text="{i18n>commonClose}"
+                    press=".onCloseUserPopover"
+                />
+            </OverflowToolbar>
+        </footer>
     </Popover>
 </core:FragmentDefinition>

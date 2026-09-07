@@ -11,8 +11,9 @@ sap.ui.define(
     "com/fsoft/zpmmaintenancecockpit/model/OrderRepository",
     "com/fsoft/zpmmaintenancecockpit/model/constants",
     "com/fsoft/zpmmaintenancecockpit/model/CAPService",
+    "com/fsoft/zpmmaintenancecockpit/model/AuthService",
   ],
-  (e, t, o, r, i, n, a, s, d, c, l) => {
+  (e, t, o, r, i, n, a, s, d, c, l, u) => {
     "use strict";
     return e.extend(
       "com.fsoft.zpmmaintenancecockpit.controller.MaintenanceOrderDetail",
@@ -77,33 +78,51 @@ sap.ui.define(
           }
         },
         /**
-         * Navigates back to the maintenance orders page.
+         * Navigates back to the maintenance orders page with loading indicator.
          *
          * @returns {void}
          */
         onBack() {
+          sap.ui.core.BusyIndicator.show(0);
           this.getOwnerComponent().getRouter().navTo("RouteMaintenanceOrders");
+          setTimeout(() => {
+            sap.ui.core.BusyIndicator.hide();
+          }, 80);
         },
         /**
-         * Opens the edit dialog for the current maintenance order.
+         * Opens the edit dialog for the current maintenance order with loading indicator.
          *
          * @returns {void}
          */
-        onEdit() {
-          const e = this.getView();
-          if (!this._pEditOrderDialog) {
-            this._pEditOrderDialog = i
-              .load({
-                id: e.getId(),
-                name: "com.fsoft.zpmmaintenancecockpit.view.fragment.EditOrderDialog",
-                controller: this,
-              })
-              .then((t) => {
-                e.addDependent(t);
-                return t;
-              });
+        async onEdit() {
+          const oUser = u.getCurrentUser();
+          if (oUser && !oUser.permissions?.editOrder) {
+            n.show(
+              this.getView()
+                .getModel("i18n")
+                .getResourceBundle()
+                .getText("roleAdminRequired") ||
+                "Action requires Administrator privileges.",
+            );
+            return;
           }
-          this._pEditOrderDialog.then((e) => {
+
+          sap.ui.core.BusyIndicator.show(0);
+          try {
+            const e = this.getView();
+            if (!this._pEditOrderDialog) {
+              this._pEditOrderDialog = i
+                .load({
+                  id: e.getId(),
+                  name: "com.fsoft.zpmmaintenancecockpit.view.fragment.EditOrderDialog",
+                  controller: this,
+                })
+                .then((t) => {
+                  e.addDependent(t);
+                  return t;
+                });
+            }
+            const oDialog = await this._pEditOrderDialog;
             const o = this.getView().getModel("orderDetail").getData();
             const r = new t({
               planner: o.planner,
@@ -112,8 +131,10 @@ sap.ui.define(
               scheduledTo: o.scheduledTo || "",
             });
             this.getView().setModel(r, "editOrder");
-            e.open();
-          });
+            oDialog.open();
+          } finally {
+            sap.ui.core.BusyIndicator.hide();
+          }
         },
         /**
          * Closes the edit-order dialog without saving changes.
@@ -191,6 +212,18 @@ sap.ui.define(
          * @returns {Promise<void>} Resolves after submission is processed.
          */
         async onSubmit() {
+          const oUser = u.getCurrentUser();
+          if (oUser && !oUser.permissions?.editOrder) {
+            n.show(
+              this.getView()
+                .getModel("i18n")
+                .getResourceBundle()
+                .getText("roleAdminRequired") ||
+                "Action requires Administrator privileges.",
+            );
+            return;
+          }
+
           const e = this.getView().getModel("orderDetail");
           const t = e.getProperty("/order");
           if (e.getProperty("/status") !== c.STATUS.OPEN) {
@@ -244,6 +277,18 @@ sap.ui.define(
          * @returns {Promise<void>} Resolves after completion is processed.
          */
         async onComplete() {
+          const oUser = u.getCurrentUser();
+          if (oUser && !oUser.permissions?.completeOrder) {
+            n.show(
+              this.getView()
+                .getModel("i18n")
+                .getResourceBundle()
+                .getText("roleAdminRequired") ||
+                "Action requires Administrator privileges.",
+            );
+            return;
+          }
+
           const e = this.getView().getModel("orderDetail");
           const t = e.getProperty("/operations") || [];
           const o =
@@ -328,29 +373,45 @@ sap.ui.define(
           });
         },
         /**
-         * Opens the cancellation dialog for the current maintenance order.
+         * Opens the cancellation dialog for the current maintenance order with loading indicator.
          *
          * @returns {void}
          */
-        onCancel() {
-          const e = this.getView();
-          if (!this._pCancelOrderDialog) {
-            this._pCancelOrderDialog = i
-              .load({
-                id: e.getId(),
-                name: "com.fsoft.zpmmaintenancecockpit.view.fragment.CancelOrderDialog",
-                controller: this,
-              })
-              .then((t) => {
-                e.addDependent(t);
-                return t;
-              });
+        async onCancel() {
+          const oUser = u.getCurrentUser();
+          if (oUser && !oUser.permissions?.cancelOrder) {
+            n.show(
+              this.getView()
+                .getModel("i18n")
+                .getResourceBundle()
+                .getText("roleAdminRequired") ||
+                "Action requires Administrator privileges.",
+            );
+            return;
           }
-          this._pCancelOrderDialog.then((e) => {
+
+          sap.ui.core.BusyIndicator.show(0);
+          try {
+            const e = this.getView();
+            if (!this._pCancelOrderDialog) {
+              this._pCancelOrderDialog = i
+                .load({
+                  id: e.getId(),
+                  name: "com.fsoft.zpmmaintenancecockpit.view.fragment.CancelOrderDialog",
+                  controller: this,
+                })
+                .then((t) => {
+                  e.addDependent(t);
+                  return t;
+                });
+            }
+            const oDialog = await this._pCancelOrderDialog;
             const o = new t({ reason: "" });
             this.getView().setModel(o, "cancelOrder");
-            e.open();
-          });
+            oDialog.open();
+          } finally {
+            sap.ui.core.BusyIndicator.hide();
+          }
         },
         /**
          * Closes the order-cancellation dialog without applying changes.
@@ -410,25 +471,39 @@ sap.ui.define(
           });
         },
         /**
-         * Opens the dialog for adding an order operation.
+         * Opens the dialog for adding an order operation with loading indicator.
          *
          * @returns {void}
          */
-        onAddOperation() {
-          const e = this.getView();
-          if (!this._pAddOperationDialog) {
-            this._pAddOperationDialog = i
-              .load({
-                id: e.getId(),
-                name: "com.fsoft.zpmmaintenancecockpit.view.fragment.AddOperationDialog",
-                controller: this,
-              })
-              .then((t) => {
-                e.addDependent(t);
-                return t;
-              });
+        async onAddOperation() {
+          const oUser = u.getCurrentUser();
+          if (oUser && !oUser.permissions?.addOperation) {
+            n.show(
+              this.getView()
+                .getModel("i18n")
+                .getResourceBundle()
+                .getText("roleAdminRequired") ||
+                "Action requires Administrator privileges.",
+            );
+            return;
           }
-          this._pAddOperationDialog.then((e) => {
+
+          sap.ui.core.BusyIndicator.show(0);
+          try {
+            const e = this.getView();
+            if (!this._pAddOperationDialog) {
+              this._pAddOperationDialog = i
+                .load({
+                  id: e.getId(),
+                  name: "com.fsoft.zpmmaintenancecockpit.view.fragment.AddOperationDialog",
+                  controller: this,
+                })
+                .then((t) => {
+                  e.addDependent(t);
+                  return t;
+                });
+            }
+            const oDialog = await this._pAddOperationDialog;
             const o =
               this.getView()
                 .getModel("masterData")
@@ -437,19 +512,21 @@ sap.ui.define(
               this.getView()
                 .getModel("technicianData")
                 ?.getProperty("/technicians") || [];
-            const i = o.length > 0 ? o[0].key : "";
-            const n = r.length > 0 ? r[0].key : "";
+            const iKey = o.length > 0 ? o[0].key : "";
+            const nKey = r.length > 0 ? r[0].key : "";
             const a = new t({
               no: "",
               description: "",
-              workCenter: i,
-              technician: n,
+              workCenter: iKey,
+              technician: nKey,
               plannedHours: 1,
               status: c.STATUS.OPEN,
             });
             this.getView().setModel(a, "newOperation");
-            e.open();
-          });
+            oDialog.open();
+          } finally {
+            sap.ui.core.BusyIndicator.hide();
+          }
         },
         /**
          * Closes the add-operation dialog without saving.
@@ -504,6 +581,18 @@ sap.ui.define(
          * @returns {void}
          */
         onDeleteOperation(e) {
+          const oUser = u.getCurrentUser();
+          if (oUser && !oUser.permissions?.deleteOperation) {
+            n.show(
+              this.getView()
+                .getModel("i18n")
+                .getResourceBundle()
+                .getText("roleAdminRequired") ||
+                "Action requires Administrator privileges.",
+            );
+            return;
+          }
+
           const t = e.getSource().getBindingContext("orderDetail");
           const o = t.getPath();
           const r = parseInt(o.split("/").pop(), 10);
@@ -527,34 +616,50 @@ sap.ui.define(
           );
         },
         /**
-         * Opens the selected operation in the edit dialog.
+         * Opens the selected operation in the edit dialog with loading indicator.
          *
          * @param {sap.ui.base.Event} e Edit action event.
          * @returns {void}
          */
-        onEditOperation(e) {
+        async onEditOperation(e) {
+          const oUser = u.getCurrentUser();
+          if (oUser && !oUser.permissions?.editOrder) {
+            n.show(
+              this.getView()
+                .getModel("i18n")
+                .getResourceBundle()
+                .getText("roleAdminRequired") ||
+                "Action requires Administrator privileges.",
+            );
+            return;
+          }
+
           const o = e.getSource().getBindingContext("orderDetail");
           const r = o.getPath();
-          const n = Object.assign({}, o.getObject());
+          const nObj = Object.assign({}, o.getObject());
           const a = this.getView();
-          if (!this._pEditOperationDialog) {
-            this._pEditOperationDialog = i
-              .load({
-                id: a.getId(),
-                name: "com.fsoft.zpmmaintenancecockpit.view.fragment.EditOperationDialog",
-                controller: this,
-              })
-              .then((e) => {
-                a.addDependent(e);
-                return e;
-              });
-          }
-          this._pEditOperationDialog.then((e) => {
-            const o = new t(n);
-            this.getView().setModel(o, "editOperation");
+          sap.ui.core.BusyIndicator.show(0);
+          try {
+            if (!this._pEditOperationDialog) {
+              this._pEditOperationDialog = i
+                .load({
+                  id: a.getId(),
+                  name: "com.fsoft.zpmmaintenancecockpit.view.fragment.EditOperationDialog",
+                  controller: this,
+                })
+                .then((e) => {
+                  a.addDependent(e);
+                  return e;
+                });
+            }
+            const oDialog = await this._pEditOperationDialog;
+            const oModel = new t(nObj);
+            this.getView().setModel(oModel, "editOperation");
             this._sEditOperationPath = r;
-            e.open();
-          });
+            oDialog.open();
+          } finally {
+            sap.ui.core.BusyIndicator.hide();
+          }
         },
         /**
          * Closes the edit-operation dialog without saving.
@@ -604,11 +709,23 @@ sap.ui.define(
           });
         },
         /**
-         * Opens the batch operation editing dialog.
+         * Opens the batch operation editing dialog with loading indicator.
          *
          * @returns {void}
          */
-        onBatchEditOperations() {
+        async onBatchEditOperations() {
+          const oUser = u.getCurrentUser();
+          if (oUser && !oUser.permissions?.batchEditOperations) {
+            n.show(
+              this.getView()
+                .getModel("i18n")
+                .getResourceBundle()
+                .getText("roleAdminRequired") ||
+                "Action requires Administrator privileges.",
+            );
+            return;
+          }
+
           const e = this.byId("mod_operationsTable");
           const o = e.getSelectedItems();
           if (o.length === 0) {
@@ -635,23 +752,27 @@ sap.ui.define(
             return;
           }
           const a = this.getView();
-          if (!this._pBatchEditDialog) {
-            this._pBatchEditDialog = i
-              .load({
-                id: a.getId(),
-                name: "com.fsoft.zpmmaintenancecockpit.view.fragment.BatchEditOperationsDialog",
-                controller: this,
-              })
-              .then((e) => {
-                a.addDependent(e);
-                return e;
-              });
+          sap.ui.core.BusyIndicator.show(0);
+          try {
+            if (!this._pBatchEditDialog) {
+              this._pBatchEditDialog = i
+                .load({
+                  id: a.getId(),
+                  name: "com.fsoft.zpmmaintenancecockpit.view.fragment.BatchEditOperationsDialog",
+                  controller: this,
+                })
+                .then((e) => {
+                  a.addDependent(e);
+                  return e;
+                });
+            }
+            const oDialog = await this._pBatchEditDialog;
+            const oModel = new t({ status: c.STATUS.OPEN });
+            this.getView().setModel(oModel, "batchEdit");
+            oDialog.open();
+          } finally {
+            sap.ui.core.BusyIndicator.hide();
           }
-          this._pBatchEditDialog.then((e) => {
-            const o = new t({ status: c.STATUS.OPEN });
-            this.getView().setModel(o, "batchEdit");
-            e.open();
-          });
         },
         /**
          * Closes the batch editing dialog without saving.
@@ -701,32 +822,48 @@ sap.ui.define(
           });
         },
         /**
-         * Opens the dialog for adding an order material.
+         * Opens the dialog for adding an order material with loading indicator.
          *
          * @returns {void}
          */
-        onAddMaterial() {
-          const e = this.getView();
-          if (!this._pAddMaterialDialog) {
-            this._pAddMaterialDialog = i
-              .load({
-                id: e.getId(),
-                name: "com.fsoft.zpmmaintenancecockpit.view.fragment.AddMaterialDialog",
-                controller: this,
-              })
-              .then((t) => {
-                e.addDependent(t);
-                return t;
-              });
+        async onAddMaterial() {
+          const oUser = u.getCurrentUser();
+          if (oUser && !oUser.permissions?.addMaterial) {
+            n.show(
+              this.getView()
+                .getModel("i18n")
+                .getResourceBundle()
+                .getText("roleAdminRequired") ||
+                "Action requires Administrator privileges.",
+            );
+            return;
           }
-          this._pAddMaterialDialog.then((e) => {
+
+          const e = this.getView();
+          sap.ui.core.BusyIndicator.show(0);
+          try {
+            if (!this._pAddMaterialDialog) {
+              this._pAddMaterialDialog = i
+                .load({
+                  id: e.getId(),
+                  name: "com.fsoft.zpmmaintenancecockpit.view.fragment.AddMaterialDialog",
+                  controller: this,
+                })
+                .then((t) => {
+                  e.addDependent(t);
+                  return t;
+                });
+            }
+            const oDialog = await this._pAddMaterialDialog;
             const o =
               this.getView().getModel("materialCatalog").getData() || [];
             const r = o.length > 0 ? o[0].key : "";
-            const i = new t({ material: r, qty: 1 });
-            this.getView().setModel(i, "newMaterial");
-            e.open();
-          });
+            const iMat = new t({ material: r, qty: 1 });
+            this.getView().setModel(iMat, "newMaterial");
+            oDialog.open();
+          } finally {
+            sap.ui.core.BusyIndicator.hide();
+          }
         },
         /**
          * Handles a material selection change in the add-material dialog.
@@ -820,11 +957,23 @@ sap.ui.define(
           });
         },
         /**
-         * Opens the dialog for assigning a technician to an operation.
+         * Opens the dialog for assigning a technician to an operation with loading indicator.
          *
          * @returns {void}
          */
-        onAssignTechnician() {
+        async onAssignTechnician() {
+          const oUser = u.getCurrentUser();
+          if (oUser && !oUser.permissions?.assignTechnician) {
+            n.show(
+              this.getView()
+                .getModel("i18n")
+                .getResourceBundle()
+                .getText("roleAdminRequired") ||
+                "Action requires Administrator privileges.",
+            );
+            return;
+          }
+
           const e = this.getView();
           const o =
             e.getModel("orderDetail").getProperty("/assignedTechnicians") || [];
@@ -842,21 +991,26 @@ sap.ui.define(
           }
           const d = new t(s);
           e.setModel(d, "techCatalog");
-          if (!this._pAssignTechDialog) {
-            this._pAssignTechDialog = i
-              .load({
-                id: e.getId(),
-                name: "com.fsoft.zpmmaintenancecockpit.view.fragment.AssignTechnicianDialog",
-                controller: this,
-              })
-              .then((t) => {
-                e.addDependent(t);
-                return t;
-              });
+
+          sap.ui.core.BusyIndicator.show(0);
+          try {
+            if (!this._pAssignTechDialog) {
+              this._pAssignTechDialog = i
+                .load({
+                  id: e.getId(),
+                  name: "com.fsoft.zpmmaintenancecockpit.view.fragment.AssignTechnicianDialog",
+                  controller: this,
+                })
+                .then((t) => {
+                  e.addDependent(t);
+                  return t;
+                });
+            }
+            const oDialog = await this._pAssignTechDialog;
+            oDialog.open();
+          } finally {
+            sap.ui.core.BusyIndicator.hide();
           }
-          this._pAssignTechDialog.then((e) => {
-            e.open();
-          });
         },
         /**
          * Filters available technicians by the entered search value.
@@ -954,6 +1108,7 @@ sap.ui.define(
          * @returns {Promise<void>} Resolves after the detail model is populated.
          */
         async _loadOrder(e) {
+          sap.ui.core.BusyIndicator.show(0);
           const o = d.getOrderById(e);
           try {
             let r = o;
@@ -1116,6 +1271,8 @@ sap.ui.define(
             this.getView().getModel("orderDetail").setProperty("/history", u);
           } catch (e) {
             console.error("Failed to load order from CAP:", e);
+          } finally {
+            sap.ui.core.BusyIndicator.hide();
           }
         },
         /**

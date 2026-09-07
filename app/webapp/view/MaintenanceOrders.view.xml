@@ -724,13 +724,12 @@
                                                         horizontal="true"
                                                         vertical="false"
                                                     >
-                                                        <!-- Orders Table with Pagination (max 10 items per page) -->
+                                                        <!-- Orders Table with Pagination -->
                                                         <Table
                                                             id="ordersTable"
                                                             inset="false"
-                                                            growing="true"
-                                                            growingThreshold="10"
-                                                            growingScrollToLoad="false"
+                                                            growing="false"
+                                                            busyIndicatorDelay="0"
                                                             items="{orders>/rows}"
                                                             class="ordersTable"
                                                         >
@@ -901,6 +900,85 @@
                                                             </items>
                                                         </Table>
                                                     </ScrollContainer>
+
+                                                    <!-- Pagination Toolbar -->
+                                                    <OverflowToolbar
+                                                        id="ordersPaginationToolbar"
+                                                        class="sapUiTinyMarginTop sapUiTinyMarginBottom ordersPaginationToolbar"
+                                                        style="Clear"
+                                                    >
+                                                        <Text
+                                                            id="txtPaginationInfo"
+                                                            text="{= ${pagination>/totalItems} === 0 ? 'No orders found' : 'Showing ' + ${pagination>/startIndex} + ' - ' + ${pagination>/endIndex} + ' of ' + ${pagination>/totalItems} + ' orders (Page ' + ${pagination>/currentPage} + '/' + ${pagination>/totalPages} + ')' }"
+                                                            class="sapUiTinyMarginBegin textMuted"
+                                                        />
+                                                        <ToolbarSpacer id="spcPagination" />
+                                                        <Label
+                                                            id="lblPageSize"
+                                                            text="Rows per page:"
+                                                            labelFor="selPageSize"
+                                                            class="sapUiTinyMarginEnd"
+                                                        />
+                                                        <Select
+                                                            id="selPageSize"
+                                                            width="105px"
+                                                            selectedKey="{pagination>/pageSize}"
+                                                            change="onPageSizeChange"
+                                                            items="{pagination>/pageSizeOptions}"
+                                                        >
+                                                            <core:Item
+                                                                id="itemPageSize"
+                                                                key="{pagination>key}"
+                                                                text="{pagination>text}"
+                                                            />
+                                                        </Select>
+                                                        <ToolbarSeparator id="sepPagination" />
+                                                        <Button
+                                                            id="btnFirstPage"
+                                                            icon="sap-icon://navigation-first-arrow"
+                                                            tooltip="First Page"
+                                                            type="Transparent"
+                                                            enabled="{pagination>/hasPrevious}"
+                                                            press="onFirstPage"
+                                                        />
+                                                        <Button
+                                                            id="btnPrevPage"
+                                                            icon="sap-icon://navigation-left-arrow"
+                                                            tooltip="Previous Page"
+                                                            type="Transparent"
+                                                            enabled="{pagination>/hasPrevious}"
+                                                            press="onPreviousPage"
+                                                        />
+                                                        <HBox
+                                                            id="pageButtonsContainer"
+                                                            items="{pagination>/pageButtons}"
+                                                            class="sapUiTinyMarginBeginEnd"
+                                                        >
+                                                            <Button
+                                                                id="btnPageNumber"
+                                                                text="{pagination>text}"
+                                                                type="{= ${pagination>current} ? 'Emphasized' : 'Transparent' }"
+                                                                press="onPagePress"
+                                                                class="sapUiTinyMarginBeginEnd"
+                                                            />
+                                                        </HBox>
+                                                        <Button
+                                                            id="btnNextPage"
+                                                            icon="sap-icon://navigation-right-arrow"
+                                                            tooltip="Next Page"
+                                                            type="Transparent"
+                                                            enabled="{pagination>/hasNext}"
+                                                            press="onNextPage"
+                                                        />
+                                                        <Button
+                                                            id="btnLastPage"
+                                                            icon="sap-icon://navigation-last-arrow"
+                                                            tooltip="Last Page"
+                                                            type="Transparent"
+                                                            enabled="{pagination>/hasNext}"
+                                                            press="onLastPage"
+                                                        />
+                                                    </OverflowToolbar>
                                                 </VBox>
                                             </f:content>
                                         </f:Card>

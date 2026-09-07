@@ -20,7 +20,7 @@ sap.ui.define([], function () {
   }
 
   function _getDirectUrl(url) {
-    if (url.startsWith("http://") || url.startsWith("https://")) {
+    if (url.startsWith(DIRECT_SRV_URL)) {
       return url;
     }
     const idx = url.indexOf("/odata/v4/maintenance");
@@ -48,10 +48,10 @@ sap.ui.define([], function () {
         if (res.status === 204) return null;
         return await res.json();
       }
-      // If relative route returns error (e.g. 500 from Launchpad proxy), fallback to direct backend
-      if (!url.startsWith("http://") && !url.startsWith("https://")) {
-        const directUrl = _getDirectUrl(url);
-        console.warn(`[CAPService] Relative request returned ${res.status}. Falling back to direct URL: ${directUrl}`);
+      // If relative route returns error (404, 500 etc.), fallback to direct backend
+      const directUrl = _getDirectUrl(url);
+      if (directUrl && directUrl !== url) {
+        console.warn(`[CAPService] Request ${url} returned ${res.status}. Falling back to direct URL: ${directUrl}`);
         const fallbackRes = await fetch(directUrl, options);
         if (fallbackRes.ok) {
           if (fallbackRes.status === 204) return null;
@@ -62,8 +62,8 @@ sap.ui.define([], function () {
       throw new Error(`CAP Service error [${res.status}]: ${errText}`);
     } catch (err) {
       // If network error on relative URL, try direct URL
-      if (!url.startsWith("http://") && !url.startsWith("https://")) {
-        const directUrl = _getDirectUrl(url);
+      const directUrl = _getDirectUrl(url);
+      if (directUrl && directUrl !== url) {
         try {
           const fallbackRes = await fetch(directUrl, options);
           if (fallbackRes.ok) {

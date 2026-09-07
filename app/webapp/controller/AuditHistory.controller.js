@@ -32,8 +32,11 @@ sap.ui.define(
         const e = t.getSource();
         const o = e.getText();
         if (o && o.startsWith("MO-")) {
-          const t = this.getOwnerComponent().getRouter();
-          t.navTo("RouteOrderDetail", { orderId: o });
+          sap.ui.core.BusyIndicator.show(0);
+          const r = this.getOwnerComponent().getRouter();
+          setTimeout(() => {
+            r.navTo("RouteOrderDetail", { orderId: o });
+          }, 60);
         }
       },
     });
