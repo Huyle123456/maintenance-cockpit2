@@ -7,6 +7,11 @@ sap.ui.define(
   function (e, n, c) {
     "use strict";
     return e.extend("com.fsoft.zpmmaintenancecockpit.controller.Technicians", {
+      /**
+       * Loads technician catalog data and calculates assigned operation counts.
+       *
+       * @returns {Promise<void>} Resolves after the technicians model is populated.
+       */
       onInit: async function () {
         try {
           const e = await c.getTechnicians();

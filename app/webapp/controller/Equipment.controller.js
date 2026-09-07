@@ -31,41 +31,6 @@ sap.ui.define(
           this._initControllerAsync();
         },
 
-        async _initControllerAsync() {
-          try {
-            const aEquipment = await CAPService.getEquipments();
-            // Process recent orders for each equipment if present
-            aEquipment.forEach((eq) => {
-              if (eq.orders && Array.isArray(eq.orders)) {
-                eq.recentOrders = eq.orders.map((o) => ({
-                  order: o.order_no,
-                  description: o.description,
-                  status: o.status,
-                }));
-              } else if (!eq.recentOrders) {
-                eq.recentOrders = [];
-              }
-            });
-
-            this.getView().setModel(
-              new JSONModel({
-                equipment: aEquipment,
-                selected: null,
-              }),
-              "equipment",
-            );
-          } catch (err) {
-            console.error("Failed to load equipment from CAP:", err);
-            this.getView().setModel(
-              new JSONModel({
-                equipment: [],
-                selected: null,
-              }),
-              "equipment",
-            );
-          }
-        },
-
         /**
          * Handles table row selection to display equipment details
          * in the side panel.
@@ -137,6 +102,46 @@ sap.ui.define(
               .getResourceBundle()
               .getText("equipmentAddNotImplemented"),
           );
+        },
+
+        /**
+         * Loads and normalizes equipment data for the equipment model.
+         *
+         * @returns {Promise<void>} Resolves after the equipment model is populated.
+         */
+        async _initControllerAsync() {
+          try {
+            const aEquipment = await CAPService.getEquipments();
+            // Process recent orders for each equipment if present
+            aEquipment.forEach((eq) => {
+              if (eq.orders && Array.isArray(eq.orders)) {
+                eq.recentOrders = eq.orders.map((o) => ({
+                  order: o.order_no,
+                  description: o.description,
+                  status: o.status,
+                }));
+              } else if (!eq.recentOrders) {
+                eq.recentOrders = [];
+              }
+            });
+
+            this.getView().setModel(
+              new JSONModel({
+                equipment: aEquipment,
+                selected: null,
+              }),
+              "equipment",
+            );
+          } catch (err) {
+            console.error("Failed to load equipment from CAP:", err);
+            this.getView().setModel(
+              new JSONModel({
+                equipment: [],
+                selected: null,
+              }),
+              "equipment",
+            );
+          }
         },
       },
     );

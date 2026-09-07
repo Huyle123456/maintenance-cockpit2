@@ -18,6 +18,11 @@ sap.ui.define(
       "com.fsoft.zpmmaintenancecockpit.controller.MaintenanceOrderDetail",
       {
         formatter: s,
+        /**
+         * Initializes route handling for the maintenance order detail page.
+         *
+         * @returns {void}
+         */
         onInit() {
           const e = new t({
             order: "",
@@ -71,9 +76,19 @@ sap.ui.define(
             r.attachPatternMatched(this._onOrderMatched, this);
           }
         },
+        /**
+         * Navigates back to the maintenance orders page.
+         *
+         * @returns {void}
+         */
         onBack() {
           this.getOwnerComponent().getRouter().navTo("RouteMaintenanceOrders");
         },
+        /**
+         * Opens the edit dialog for the current maintenance order.
+         *
+         * @returns {void}
+         */
         onEdit() {
           const e = this.getView();
           if (!this._pEditOrderDialog) {
@@ -100,11 +115,21 @@ sap.ui.define(
             e.open();
           });
         },
+        /**
+         * Closes the edit-order dialog without saving changes.
+         *
+         * @returns {void}
+         */
         onCancelEditOrder() {
           this._pEditOrderDialog.then((e) => {
             e.close();
           });
         },
+        /**
+         * Saves edits to the current maintenance order.
+         *
+         * @returns {Promise<void>} Resolves after the order changes are saved.
+         */
         async onConfirmEditOrder() {
           this._pEditOrderDialog.then(async (e) => {
             const t = this.getView().getModel("editOrder").getData();
@@ -160,6 +185,11 @@ sap.ui.define(
             }
           });
         },
+        /**
+         * Submits the current maintenance order for processing.
+         *
+         * @returns {Promise<void>} Resolves after submission is processed.
+         */
         async onSubmit() {
           const e = this.getView().getModel("orderDetail");
           const t = e.getProperty("/order");
@@ -208,6 +238,11 @@ sap.ui.define(
             n.show("Submit failed: " + e.message);
           }
         },
+        /**
+         * Completes the current maintenance order when business rules allow it.
+         *
+         * @returns {Promise<void>} Resolves after completion is processed.
+         */
         async onComplete() {
           const e = this.getView().getModel("orderDetail");
           const t = e.getProperty("/operations") || [];
@@ -282,11 +317,21 @@ sap.ui.define(
             n.show("Complete order failed: " + e.message);
           }
         },
+        /**
+         * Closes the message explaining why the order cannot be completed.
+         *
+         * @returns {void}
+         */
         onCloseCannotComplete() {
           this._pCannotCompleteDialog.then((e) => {
             e.close();
           });
         },
+        /**
+         * Opens the cancellation dialog for the current maintenance order.
+         *
+         * @returns {void}
+         */
         onCancel() {
           const e = this.getView();
           if (!this._pCancelOrderDialog) {
@@ -307,11 +352,21 @@ sap.ui.define(
             e.open();
           });
         },
+        /**
+         * Closes the order-cancellation dialog without applying changes.
+         *
+         * @returns {void}
+         */
         onCancelCancelOrder() {
           this._pCancelOrderDialog.then((e) => {
             e.close();
           });
         },
+        /**
+         * Cancels the current order and persists its cancellation reason.
+         *
+         * @returns {Promise<void>} Resolves after cancellation is processed.
+         */
         async onConfirmCancelOrder() {
           this._pCancelOrderDialog.then(async (e) => {
             const t = this.getView().getModel("orderDetail");
@@ -354,6 +409,11 @@ sap.ui.define(
             }
           });
         },
+        /**
+         * Opens the dialog for adding an order operation.
+         *
+         * @returns {void}
+         */
         onAddOperation() {
           const e = this.getView();
           if (!this._pAddOperationDialog) {
@@ -391,11 +451,21 @@ sap.ui.define(
             e.open();
           });
         },
+        /**
+         * Closes the add-operation dialog without saving.
+         *
+         * @returns {void}
+         */
         onCancelAddOperation() {
           this._pAddOperationDialog.then((e) => {
             e.close();
           });
         },
+        /**
+         * Adds the entered operation to the maintenance order.
+         *
+         * @returns {void}
+         */
         onConfirmAddOperation() {
           this._pAddOperationDialog.then((e) => {
             const t = this.getView().getModel("newOperation").getData();
@@ -427,6 +497,12 @@ sap.ui.define(
             e.close();
           });
         },
+        /**
+         * Deletes the operation selected in the order detail page.
+         *
+         * @param {sap.ui.base.Event} e Delete action event.
+         * @returns {void}
+         */
         onDeleteOperation(e) {
           const t = e.getSource().getBindingContext("orderDetail");
           const o = t.getPath();
@@ -450,6 +526,12 @@ sap.ui.define(
               .getText("orderDetailOperationDeleteSuccess"),
           );
         },
+        /**
+         * Opens the selected operation in the edit dialog.
+         *
+         * @param {sap.ui.base.Event} e Edit action event.
+         * @returns {void}
+         */
         onEditOperation(e) {
           const o = e.getSource().getBindingContext("orderDetail");
           const r = o.getPath();
@@ -474,11 +556,21 @@ sap.ui.define(
             e.open();
           });
         },
+        /**
+         * Closes the edit-operation dialog without saving.
+         *
+         * @returns {void}
+         */
         onCancelEditOperation() {
           this._pEditOperationDialog.then((e) => {
             e.close();
           });
         },
+        /**
+         * Saves changes to the selected operation.
+         *
+         * @returns {void}
+         */
         onConfirmEditOperation() {
           this._pEditOperationDialog.then((e) => {
             const t = this.getView().getModel("editOperation").getData();
@@ -511,6 +603,11 @@ sap.ui.define(
             e.close();
           });
         },
+        /**
+         * Opens the batch operation editing dialog.
+         *
+         * @returns {void}
+         */
         onBatchEditOperations() {
           const e = this.byId("mod_operationsTable");
           const o = e.getSelectedItems();
@@ -556,11 +653,21 @@ sap.ui.define(
             e.open();
           });
         },
+        /**
+         * Closes the batch editing dialog without saving.
+         *
+         * @returns {void}
+         */
         onCancelBatchEdit() {
           this._pBatchEditDialog.then((e) => {
             e.close();
           });
         },
+        /**
+         * Applies the selected batch changes to order operations.
+         *
+         * @returns {void}
+         */
         onConfirmBatchEdit() {
           this._pBatchEditDialog.then((e) => {
             const t = this.getView()
@@ -593,6 +700,11 @@ sap.ui.define(
             e.close();
           });
         },
+        /**
+         * Opens the dialog for adding an order material.
+         *
+         * @returns {void}
+         */
         onAddMaterial() {
           const e = this.getView();
           if (!this._pAddMaterialDialog) {
@@ -616,12 +728,27 @@ sap.ui.define(
             e.open();
           });
         },
+        /**
+         * Handles a material selection change in the add-material dialog.
+         *
+         * @returns {void}
+         */
         onMaterialSelectChange() {},
+        /**
+         * Closes the add-material dialog without saving.
+         *
+         * @returns {void}
+         */
         onCancelAddMaterial() {
           this._pAddMaterialDialog.then((e) => {
             e.close();
           });
         },
+        /**
+         * Adds the selected material to the maintenance order.
+         *
+         * @returns {void}
+         */
         onConfirmAddMaterial() {
           this._pAddMaterialDialog.then((e) => {
             const t = this.getView().getModel("newMaterial").getData();
@@ -692,6 +819,11 @@ sap.ui.define(
             e.close();
           });
         },
+        /**
+         * Opens the dialog for assigning a technician to an operation.
+         *
+         * @returns {void}
+         */
         onAssignTechnician() {
           const e = this.getView();
           const o =
@@ -726,6 +858,12 @@ sap.ui.define(
             e.open();
           });
         },
+        /**
+         * Filters available technicians by the entered search value.
+         *
+         * @param {sap.ui.base.Event} e Search event.
+         * @returns {void}
+         */
         onSearchAssignTechnician(e) {
           const t = e.getParameter("value");
           const i = new o({
@@ -738,6 +876,12 @@ sap.ui.define(
           });
           e.getSource().getBinding("items").filter([i]);
         },
+        /**
+         * Assigns the technician selected in the value-help dialog.
+         *
+         * @param {sap.ui.base.Event} e Selection confirmation event.
+         * @returns {void}
+         */
         onConfirmAssignTechnician(e) {
           const t = e.getParameter("selectedItem");
           if (!t) {
@@ -787,11 +931,28 @@ sap.ui.define(
               .getText("orderDetailTechnicianAssignSuccess", [r.name]),
           );
         },
+        /**
+         * Closes the technician assignment dialog without saving.
+         *
+         * @returns {void}
+         */
         onCancelAssignTechnician() {},
+        /**
+         * Loads an order after its detail route is matched.
+         *
+         * @param {sap.ui.base.Event} e Route matched event.
+         * @returns {void}
+         */
         _onOrderMatched(e) {
           const t = e.getParameter("arguments").orderId;
           this._loadOrder(t);
         },
+        /**
+         * Loads the specified maintenance order and its related data.
+         *
+         * @param {string} e Maintenance order identifier.
+         * @returns {Promise<void>} Resolves after the detail model is populated.
+         */
         async _loadOrder(e) {
           const o = d.getOrderById(e);
           try {
@@ -957,6 +1118,11 @@ sap.ui.define(
             console.error("Failed to load order from CAP:", e);
           }
         },
+        /**
+         * Updates the order status based on operation completion state.
+         *
+         * @returns {void}
+         */
         _checkAndUpdateOrderStatus() {
           const e = this.getView().getModel("orderDetail");
           const t = e.getProperty("/operations") || [];
@@ -984,6 +1150,11 @@ sap.ui.define(
           }
           this._updateOrderSummary();
         },
+        /**
+         * Recalculates summary values for the current order.
+         *
+         * @returns {void}
+         */
         _updateOrderSummary() {
           const e = this.getView().getModel("orderDetail");
           const t = e.getProperty("/operations") || [];
@@ -1005,6 +1176,15 @@ sap.ui.define(
           e.setProperty("/plannedHours", o);
           e.setProperty("/actualHours", r);
         },
+        /**
+         * Adds an activity entry to the current order history.
+         *
+         * @param {string} e Activity title.
+         * @param {string} t Activity text.
+         * @param {string} o Activity icon URI.
+         * @param {string} r User name for the entry.
+         * @returns {void}
+         */
         _addHistoryLog(e, t, o, r) {
           const i = this.getView().getModel("orderDetail");
           const n = i.getProperty("/history") || [];

@@ -1,31 +1,48 @@
-const cds = global.cds || require('@sap/cds');
+const cds = global.cds || require("@sap/cds");
 
 module.exports = cds.service.impl(async function () {
-  const { MaintenanceOrders, AuditHistory, OrderHistory, MaintenanceOperations } = this.entities;
+  const {
+    MaintenanceOrders,
+    AuditHistory,
+    OrderHistory,
+    MaintenanceOperations,
+  } = this.entities;
 
-  // Retrieve current user profile and roles from SAP XSUAA or mock auth
-  this.on('getUserInfo', async (req) => {
+  /**
+   * Returns the current user's profile and assigned roles.
+   *
+   * @param {import('@sap/cds').Request} req CAP request containing the authenticated user.
+   * @returns {Promise<{id: string, name: string, email: string, roles: string[], isAdmin: boolean, isUser: boolean}>} Current user details.
+   */
+  this.on("getUserInfo", async (req) => {
     const user = req.user;
-    const userId = (user && user.id) ? user.id : 'admin';
-    const isAdmin = (user && typeof user.is === 'function') ? user.is('Admin') : (userId.toLowerCase().includes('admin'));
-    const isUser = (user && typeof user.is === 'function') ? user.is('User') : true;
+    const userId = user && user.id ? user.id : "admin";
+    const isAdmin =
+      user && typeof user.is === "function"
+        ? user.is("Admin")
+        : userId.toLowerCase().includes("admin");
+    const isUser =
+      user && typeof user.is === "function" ? user.is("User") : true;
 
     const roles = [];
-    if (isAdmin) roles.push('Admin');
-    if (isUser) roles.push('User');
+    if (isAdmin) roles.push("Admin");
+    if (isUser) roles.push("User");
 
     let displayName = userId;
     if (user && user.attr && user.attr.logon_name) {
       displayName = user.attr.logon_name;
-    } else if (userId === 'admin') {
-      displayName = 'Administrator';
-    } else if (userId === 'user') {
-      displayName = 'Standard User';
+    } else if (userId === "admin") {
+      displayName = "Administrator";
+    } else if (userId === "user") {
+      displayName = "Standard User";
     }
 
-    const email = (user && user.attr && user.attr.email)
-      ? user.attr.email
-      : (userId.includes('@') ? userId : `${userId}@maintenance.sap`);
+    const email =
+      user && user.attr && user.attr.email
+        ? user.attr.email
+        : userId.includes("@")
+          ? userId
+          : `${userId}@maintenance.sap`;
 
     return {
       id: userId,
@@ -33,14 +50,23 @@ module.exports = cds.service.impl(async function () {
       email: email,
       roles: roles,
       isAdmin: isAdmin,
-      isUser: isUser
+      isUser: isUser,
     };
   });
 
-  this.before('CREATE', 'MaintenanceOrders', async (req) => {
+  /**
+   * Applies default values before a maintenance order is created.
+   *
+   * @param {import('@sap/cds').Request} req Create request containing order data.
+   * @returns {Promise<void>} Resolves after the order defaults are populated.
+   */
+  this.before("CREATE", "MaintenanceOrders", async (req) => {
     const data = req.data;
     if (!data.order_no) {
-      const highest = await SELECT.one.from(MaintenanceOrders).columns('order_no').orderBy('order_no desc');
+      const highest = await SELECT.one
+        .from(MaintenanceOrders)
+        .columns("order_no")
+        .orderBy("order_no desc");
       let nextNum = 1001;
       if (highest && highest.order_no) {
         const match = highest.order_no.match(/MO-(\d+)/);
@@ -48,84 +74,103 @@ module.exports = cds.service.impl(async function () {
       }
       data.order_no = `MO-${nextNum}`;
     }
-    if (!data.status) data.status = 'OPEN';
-    if (!data.status_state) data.status_state = 'Success';
+    if (!data.status) data.status = "OPEN";
+    if (!data.status_state) data.status_state = "Success";
     if (!data.etag) data.etag = `W/"${Date.now()}"`;
   });
 
-  this.after('CREATE', 'MaintenanceOrders', async (data, req) => {
-    const currentUser = req.user?.id || 'Current User';
+  /**
+   * Creates audit and order-history records after an order is created.
+   *
+   * @param {object} data Newly created maintenance order.
+   * @param {import('@sap/cds').Request} req Create request containing the current user.
+   * @returns {Promise<void>} Resolves after history entries are persisted.
+   */
+  this.after("CREATE", "MaintenanceOrders", async (data, req) => {
+    const currentUser = req.user?.id || "Current User";
     await INSERT.into(AuditHistory).entries({
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      timestamp: new Date().toISOString().replace("T", " ").substring(0, 16),
       user: currentUser,
       object: data.order_no,
-      action: 'CREATE',
-      details: 'Maintenance order created'
+      action: "CREATE",
+      details: "Maintenance order created",
     });
 
     await INSERT.into(OrderHistory).entries({
       order_no: data.order_no,
-      title: 'Order created',
-      dateTime: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      title: "Order created",
+      dateTime: new Date().toISOString().replace("T", " ").substring(0, 16),
       userName: currentUser,
-      text: 'Order initialized in system',
-      icon: 'sap-icon://create'
+      text: "Order initialized in system",
+      icon: "sap-icon://create",
     });
   });
 
-  this.on('cancelOrder', async (req) => {
+  /**
+   * Cancels an order and records the reason in its audit history.
+   *
+   * @param {import('@sap/cds').Request} req Action request containing the order number and reason.
+   * @returns {Promise<object|void>} Updated order, or a CAP validation error.
+   */
+  this.on("cancelOrder", async (req) => {
     const { order_no, reason } = req.data;
-    if (!order_no) return req.error(400, 'Order number is required');
+    if (!order_no) return req.error(400, "Order number is required");
 
     await UPDATE(MaintenanceOrders)
-      .set({ status: 'CANCELLED', status_state: 'Error' })
+      .set({ status: "CANCELLED", status_state: "Error" })
       .where({ order_no });
 
-    const currentUser = req.user?.id || 'Current User';
+    const currentUser = req.user?.id || "Current User";
     await INSERT.into(AuditHistory).entries({
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      timestamp: new Date().toISOString().replace("T", " ").substring(0, 16),
       user: currentUser,
       object: order_no,
-      action: 'CANCEL',
-      details: reason || 'Order cancelled by user'
+      action: "CANCEL",
+      details: reason || "Order cancelled by user",
     });
 
     await INSERT.into(OrderHistory).entries({
       order_no: order_no,
-      title: 'Status changed to CANCELLED',
-      dateTime: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      title: "Status changed to CANCELLED",
+      dateTime: new Date().toISOString().replace("T", " ").substring(0, 16),
       userName: currentUser,
-      text: reason || 'Order cancelled',
-      icon: 'sap-icon://cancel'
+      text: reason || "Order cancelled",
+      icon: "sap-icon://cancel",
     });
 
     return await SELECT.one.from(MaintenanceOrders).where({ order_no });
   });
 
-  this.on('completeOrder', async (req) => {
+  /**
+   * Completes an order and records the status change in its history.
+   *
+   * @param {import('@sap/cds').Request} req Action request containing the order number.
+   * @returns {Promise<object|void>} Updated order, or a CAP validation error.
+   */
+  this.on("completeOrder", async (req) => {
     const { order_no } = req.data;
-    if (!order_no) return req.error(400, 'Order number is required');
+    if (!order_no) return req.error(400, "Order number is required");
 
     await UPDATE(MaintenanceOrders)
-      .set({ status: 'COMPLETED', status_state: 'Success' })
+      .set({ status: "COMPLETED", status_state: "Success" })
       .where({ order_no });
 
-    const currentUser = req.user?.id || 'Current User';
+    const currentUser = req.user?.id || "Current User";
     await INSERT.into(AuditHistory).entries({
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      timestamp: new Date().toISOString().replace("T", " ").substring(0, 16),
       user: currentUser,
       object: order_no,
-      action: 'COMPLETE',
-      details: 'Order marked as completed'
+      action: "COMPLETE",
+      details: "Order marked as completed",
     });
 
     await INSERT.into(OrderHistory).entries({
       order_no: order_no,
-      title: 'Status changed to COMPLETED',
-      dateTime: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      title: "Status changed to COMPLETED",
+      dateTime: new Date().toISOString().replace("T", " ").substring(0, 16),
       userName: currentUser,
-      text: 'Maintenance work finished',
-      icon: 'sap-icon://complete'
+      text: "Maintenance work finished",
+      icon: "sap-icon://complete",
     });
 
     return await SELECT.one.from(MaintenanceOrders).where({ order_no });

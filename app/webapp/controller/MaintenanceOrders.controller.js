@@ -55,6 +55,11 @@ sap.ui.define(
           this._initControllerAsync();
         },
 
+        /**
+         * Loads page data and initializes dependent view models.
+         *
+         * @returns {Promise<void>} Resolves after controller data is initialized.
+         */
         async _initControllerAsync() {
           try {
             // Step 2: Load equipment master data from CAP
@@ -72,9 +77,21 @@ sap.ui.define(
             // Default navigation items
             const aNavItems = [
               { text: "Orders", icon: "sap-icon://wrench", selected: true },
-              { text: "Operations", icon: "sap-icon://action-settings", selected: false },
-              { text: "Equipment", icon: "sap-icon://machine", selected: false },
-              { text: "Technicians", icon: "sap-icon://group", selected: false }
+              {
+                text: "Operations",
+                icon: "sap-icon://action-settings",
+                selected: false,
+              },
+              {
+                text: "Equipment",
+                icon: "sap-icon://machine",
+                selected: false,
+              },
+              {
+                text: "Technicians",
+                icon: "sap-icon://group",
+                selected: false,
+              },
             ];
 
             // Transform maintenance order records
@@ -153,7 +170,10 @@ sap.ui.define(
             // Initialize Adapt Filters settings
             this._initFilterConfigModel();
           } catch (err) {
-            console.error("Failed to initialize MaintenanceOrders from CAP:", err);
+            console.error(
+              "Failed to initialize MaintenanceOrders from CAP:",
+              err,
+            );
             this.getView().setModel(new JSONModel({ rows: [] }), "orders");
           }
         },
@@ -367,13 +387,18 @@ sap.ui.define(
           // Step 4: Update KPI visible order count and estimated cost
           const iLength = oBinding.getLength();
           const oKpiModel = this.getView().getModel("kpi");
-          
+
           oKpiModel.setProperty("/visibleOrderCount", iLength);
 
           const aFilteredContexts = oBinding.getContexts(0, iLength);
-          const aFilteredOrders = aFilteredContexts.map((oContext) => oContext.getObject());
-          
-          oKpiModel.setProperty("/estimatedCost", formatter.calculateEstimatedCost(aFilteredOrders));
+          const aFilteredOrders = aFilteredContexts.map((oContext) =>
+            oContext.getObject(),
+          );
+
+          oKpiModel.setProperty(
+            "/estimatedCost",
+            formatter.calculateEstimatedCost(aFilteredOrders),
+          );
         },
         /**
          * Clears all active filter conditions and restores
@@ -393,7 +418,9 @@ sap.ui.define(
           this.byId("inpSearch").setValue("");
 
           // Step 2: Reset dropdown filters and value help selections
-          this.getView().getModel("filters").setProperty("/selectedEquipments", []);
+          this.getView()
+            .getModel("filters")
+            .setProperty("/selectedEquipments", []);
           this.byId("tblEqValueHelp")?.removeSelections(true);
 
           this.byId("selPlant").setSelectedKey("All");
@@ -408,9 +435,12 @@ sap.ui.define(
 
           // Step 3: Reset date and extra filter fields
           this.byId("dpScheduledDateFrom").setValue("");
-          if (this.byId("inpEquipmentType")) this.byId("inpEquipmentType").setValue("");
-          if (this.byId("selCriticality")) this.byId("selCriticality").setSelectedKey("All");
-          if (this.byId("dpActualStart")) this.byId("dpActualStart").setValue("");
+          if (this.byId("inpEquipmentType"))
+            this.byId("inpEquipmentType").setValue("");
+          if (this.byId("selCriticality"))
+            this.byId("selCriticality").setSelectedKey("All");
+          if (this.byId("dpActualStart"))
+            this.byId("dpActualStart").setValue("");
           if (this.byId("inpLocation")) this.byId("inpLocation").setValue("");
           if (this.byId("inpCreatedBy")) this.byId("inpCreatedBy").setValue("");
           if (this.byId("dpActualEnd")) this.byId("dpActualEnd").setValue("");
@@ -425,11 +455,16 @@ sap.ui.define(
           const oKpiModel = this.getView().getModel("kpi");
 
           oKpiModel.setProperty("/visibleOrderCount", iLength);
-          
+
           const aFilteredContexts = oBinding.getContexts(0, iLength);
-          const aFilteredOrders = aFilteredContexts.map((oContext) => oContext.getObject());
-          
-          oKpiModel.setProperty("/estimatedCost", formatter.calculateEstimatedCost(aFilteredOrders));
+          const aFilteredOrders = aFilteredContexts.map((oContext) =>
+            oContext.getObject(),
+          );
+
+          oKpiModel.setProperty(
+            "/estimatedCost",
+            formatter.calculateEstimatedCost(aFilteredOrders),
+          );
         },
 
         // ==================================
@@ -566,7 +601,9 @@ sap.ui.define(
                 this.getView()
                   .getModel("i18n")
                   .getResourceBundle()
-                  .getText("massChangeCancelledWillBeSkipped", [sCancelledList]),
+                  .getText("massChangeCancelledWillBeSkipped", [
+                    sCancelledList,
+                  ]),
                 {
                   onClose: (sAction) => {
                     if (sAction !== MessageBox.Action.OK) {
@@ -594,9 +631,10 @@ sap.ui.define(
             }
 
             // Step 6: Re-check remaining orders after confirmation
-            const aValidAfterFilter = this.getView()
-              .getModel("massChange")
-              .getProperty("/selectedOrders") || [];
+            const aValidAfterFilter =
+              this.getView()
+                .getModel("massChange")
+                .getProperty("/selectedOrders") || [];
 
             if (!aValidAfterFilter.length) {
               return;
@@ -653,9 +691,10 @@ sap.ui.define(
 
           const sPriority = this.byId("massChangePrioritySelect")
             ? this.byId("massChangePrioritySelect").getSelectedKey()
-            : (oMassChangeModel.getProperty("/priority") || "LOW");
+            : oMassChangeModel.getProperty("/priority") || "LOW";
 
-          const aRows = this.getView().getModel("orders").getProperty("/rows") || [];
+          const aRows =
+            this.getView().getModel("orders").getProperty("/rows") || [];
 
           // Step 2: Update selected orders (excluding CANCELLED and COMPLETED)
           aRows.forEach((oRow) => {
@@ -873,10 +912,13 @@ sap.ui.define(
 
           // Step 4: Restore previous selections
           const oTable = this.byId("tblEqValueHelp");
-          const aSelectedEquipments = this.getView().getModel("filters").getProperty("/selectedEquipments") || [];
-          
+          const aSelectedEquipments =
+            this.getView()
+              .getModel("filters")
+              .getProperty("/selectedEquipments") || [];
+
           oTable.removeSelections(true);
-          
+
           // Use setTimeout to ensure table items are rendered
           setTimeout(() => {
             oTable.getItems().forEach((oItem) => {
@@ -1156,9 +1198,14 @@ sap.ui.define(
             (item) => item.equipment === oOrder.equipment,
           );
 
-          const sTargetEquipmentKey = oEquipment ? oEquipment.equipment : oOrder.equipment;
-          const aAllOrders = this.getView().getModel("orders")?.getProperty("/rows") || [];
-          const aMatchingOrders = aAllOrders.filter(row => row.equipment === sTargetEquipmentKey);
+          const sTargetEquipmentKey = oEquipment
+            ? oEquipment.equipment
+            : oOrder.equipment;
+          const aAllOrders =
+            this.getView().getModel("orders")?.getProperty("/rows") || [];
+          const aMatchingOrders = aAllOrders.filter(
+            (row) => row.equipment === sTargetEquipmentKey,
+          );
 
           let aRecentOrdersList = [];
           if (aMatchingOrders.length > 0) {
@@ -1166,16 +1213,28 @@ sap.ui.define(
               order: row.order,
               description: row.description,
               status: row.statusLabel || row.status,
-              statusState: formatter.formatStatusState(row.statusLabel || row.status),
+              statusState: formatter.formatStatusState(
+                row.statusLabel || row.status,
+              ),
             }));
-          } else if (oEquipment && oEquipment.orders && Array.isArray(oEquipment.orders) && oEquipment.orders.length > 0) {
+          } else if (
+            oEquipment &&
+            oEquipment.orders &&
+            Array.isArray(oEquipment.orders) &&
+            oEquipment.orders.length > 0
+          ) {
             aRecentOrdersList = oEquipment.orders.map((oRecentOrder) => ({
               order: oRecentOrder.order_no || oRecentOrder.order,
               description: oRecentOrder.description,
               status: oRecentOrder.status,
               statusState: formatter.formatStatusState(oRecentOrder.status),
             }));
-          } else if (oEquipment && oEquipment.recentOrders && Array.isArray(oEquipment.recentOrders) && oEquipment.recentOrders.length > 0) {
+          } else if (
+            oEquipment &&
+            oEquipment.recentOrders &&
+            Array.isArray(oEquipment.recentOrders) &&
+            oEquipment.recentOrders.length > 0
+          ) {
             aRecentOrdersList = oEquipment.recentOrders.map((oRecentOrder) => ({
               order: oRecentOrder.order,
               description: oRecentOrder.description,
@@ -1188,7 +1247,9 @@ sap.ui.define(
                 order: oOrder.order,
                 description: oOrder.description,
                 status: oOrder.statusLabel || oOrder.status,
-                statusState: formatter.formatStatusState(oOrder.statusLabel || oOrder.status),
+                statusState: formatter.formatStatusState(
+                  oOrder.statusLabel || oOrder.status,
+                ),
               },
             ];
           }
@@ -1233,7 +1294,13 @@ sap.ui.define(
         // Private: KPI and filter application
         // ===================================
 
-        // Apply or clear a KPI filter on the orders table.
+        /**
+         * Applies or clears a KPI filter on the orders table.
+         *
+         * @param {string} sFilterKey Identifier for the active KPI filter.
+         * @param {sap.ui.model.Filter} oFilter Filter to apply to the order binding.
+         * @returns {void}
+         */
         _applyKpiFilter(sFilterKey, oFilter) {
           const oTable = this.byId("ordersTable");
 
@@ -1265,12 +1332,22 @@ sap.ui.define(
           oKpiModel.setProperty("/visibleOrderCount", iLength);
 
           const aFilteredContexts = oItemsBinding.getContexts(0, iLength);
-          const aFilteredOrders = aFilteredContexts.map((oContext) => oContext.getObject());
-          
-          oKpiModel.setProperty("/estimatedCost", formatter.calculateEstimatedCost(aFilteredOrders));
+          const aFilteredOrders = aFilteredContexts.map((oContext) =>
+            oContext.getObject(),
+          );
+
+          oKpiModel.setProperty(
+            "/estimatedCost",
+            formatter.calculateEstimatedCost(aFilteredOrders),
+          );
         },
 
-        // Refresh KPI counters after data changes.
+        /**
+         * Refreshes KPI counters after order data changes.
+         *
+         * @param {object[]} [aExplicitRows] Optional order collection to calculate.
+         * @returns {void}
+         */
         _refreshKpiCounts(aExplicitRows) {
           const aRows =
             aExplicitRows ||
@@ -1291,7 +1368,10 @@ sap.ui.define(
 
           oKpiModel.setProperty(
             "/inProcessCount",
-            this._countOrdersByStatus(aRows, constants.STATUS.IN_PROCESS_DISPLAY),
+            this._countOrdersByStatus(
+              aRows,
+              constants.STATUS.IN_PROCESS_DISPLAY,
+            ),
           );
 
           oKpiModel.setProperty(
@@ -1344,7 +1424,7 @@ sap.ui.define(
 
             planners: ["All", ...unique(aRows.map((oRow) => oRow.planner))],
 
-            selectedEquipments: []
+            selectedEquipments: [],
           });
 
           // Step 3: Register FilterBar model
@@ -1356,6 +1436,11 @@ sap.ui.define(
          *
          * Stores selected maintenance orders and
          * target update values.
+         *
+         * @returns {void}
+         */
+        /**
+         * Initializes the mass-change model with default values.
          *
          * @returns {void}
          */
@@ -1518,6 +1603,12 @@ sap.ui.define(
           );
         },
 
+        /**
+         * Updates the mass-change selection after an order is selected.
+         *
+         * @param {sap.ui.base.Event} oEvent Order selection event.
+         * @returns {void}
+         */
         onOrderSelect(oEvent) {
           const oContext = oEvent.getSource().getBindingContext("orders");
           if (!oContext) return;
@@ -1540,6 +1631,12 @@ sap.ui.define(
           }
         },
 
+        /**
+         * Selects or deselects all orders for mass change.
+         *
+         * @param {sap.ui.base.Event} oEvent Select-all event.
+         * @returns {void}
+         */
         onSelectAllOrders(oEvent) {
           const bSelected = oEvent.getParameter("selected");
           const aRows =
@@ -1555,6 +1652,11 @@ sap.ui.define(
             .setProperty("/selectedOrders", aSelected);
         },
 
+        /**
+         * Opens the mass-change dialog for eligible selected orders.
+         *
+         * @returns {void}
+         */
         onMassChangePress() {
           const aSelected =
             this.getView()
@@ -1601,12 +1703,22 @@ sap.ui.define(
           });
         },
 
+        /**
+         * Closes the mass-change dialog without applying changes.
+         *
+         * @returns {void}
+         */
         onMassChangeCancel() {
           if (this._pMassChangeDialog) {
             this._pMassChangeDialog.then((oDialog) => oDialog.close());
           }
         },
 
+        /**
+         * Applies the selected priority to eligible orders.
+         *
+         * @returns {Promise<void>} Resolves after the order updates complete.
+         */
         async onMassChangeApply() {
           const oMassModel = this.getView().getModel("massChange");
           const aSelected = oMassModel.getProperty("/selectedOrders") || [];
@@ -1676,7 +1788,9 @@ sap.ui.define(
         },
 
         /**
-         * Reload orders list from backend CAP service
+         * Reloads the order list from the CAP service.
+         *
+         * @returns {Promise<void>} Resolves after orders and KPIs are refreshed.
          */
         async _reloadOrdersFromBackend() {
           try {
@@ -1725,7 +1839,9 @@ sap.ui.define(
         },
 
         /**
-         * Open Import Orders Dialog
+         * Opens the import-orders dialog.
+         *
+         * @returns {Promise<void>} Resolves after the dialog opens.
          */
         async onImportOrdersPress() {
           this._oSelectedImportFile = null;
@@ -1746,8 +1862,9 @@ sap.ui.define(
             statusText: "Waiting for file",
             statusState: "None",
             canImport: false,
-            statusMessage: "Please choose a .xlsx or .csv file to import to Backend.",
-            statusType: "Information"
+            statusMessage:
+              "Please choose a .xlsx or .csv file to import to Backend.",
+            statusType: "Information",
           });
           this.getView().setModel(oImportModel, "importModel");
 
@@ -1760,11 +1877,15 @@ sap.ui.define(
         },
 
         /**
-         * Download Excel Template (.xlsx) for Import from Backend
+         * Downloads the Excel import template from the backend.
+         *
+         * @returns {Promise<void>} Resolves after the download is triggered.
          */
         async onDownloadImportTemplate() {
           try {
-            const sUrl = CAPService.getDirectUrl(CAPService.getApiUrl() + "/download-template");
+            const sUrl = CAPService.getDirectUrl(
+              CAPService.getApiUrl() + "/download-template",
+            );
             const res = await fetch(sUrl);
             if (!res.ok) {
               throw new Error(`Failed to download template [${res.status}]`);
@@ -1780,15 +1901,22 @@ sap.ui.define(
             setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
           } catch (err) {
             console.error("Error downloading template:", err);
-            window.open("https://3b342f32trial-dev-zpm-maintenance-cockpit-srv.cfapps.us10-001.hana.ondemand.com/api/maintenance/download-template", "_blank");
+            window.open(
+              "https://3b342f32trial-dev-zpm-maintenance-cockpit-srv.cfapps.us10-001.hana.ondemand.com/api/maintenance/download-template",
+              "_blank",
+            );
           }
         },
 
         /**
-         * Handle file selection for Backend ExcelJS import
+         * Validates and stores the selected import file.
+         *
+         * @param {sap.ui.base.Event} oEvent File selection change event.
+         * @returns {void}
          */
         onImportFileChange(oEvent) {
-          const oFile = oEvent.getParameter("files") && oEvent.getParameter("files")[0];
+          const oFile =
+            oEvent.getParameter("files") && oEvent.getParameter("files")[0];
           const oImportModel = this.getView().getModel("importModel");
 
           if (!oFile) {
@@ -1797,15 +1925,24 @@ sap.ui.define(
           }
 
           const sFileName = oFile.name.toLowerCase();
-          const bIsExcel = sFileName.endsWith(".xlsx") || sFileName.endsWith(".xls") || sFileName.endsWith(".csv");
+          const bIsExcel =
+            sFileName.endsWith(".xlsx") ||
+            sFileName.endsWith(".xls") ||
+            sFileName.endsWith(".csv");
 
           if (!bIsExcel) {
             this._oSelectedImportFile = null;
             oImportModel.setProperty("/fileName", oFile.name);
-            oImportModel.setProperty("/fileSize", (oFile.size / 1024).toFixed(1) + " KB");
+            oImportModel.setProperty(
+              "/fileSize",
+              (oFile.size / 1024).toFixed(1) + " KB",
+            );
             oImportModel.setProperty("/statusText", "Unsupported format");
             oImportModel.setProperty("/statusState", "Error");
-            oImportModel.setProperty("/statusMessage", "Please select a valid .xlsx or .csv Excel file.");
+            oImportModel.setProperty(
+              "/statusMessage",
+              "Please select a valid .xlsx or .csv Excel file.",
+            );
             oImportModel.setProperty("/statusType", "Error");
             oImportModel.setProperty("/canImport", false);
             return;
@@ -1817,13 +1954,18 @@ sap.ui.define(
           oImportModel.setProperty("/fileSize", sSize);
           oImportModel.setProperty("/statusText", "Ready to process");
           oImportModel.setProperty("/statusState", "Success");
-          oImportModel.setProperty("/statusMessage", `File selected (${sSize}). Click "Upload & Process on Backend" to stream data.`);
+          oImportModel.setProperty(
+            "/statusMessage",
+            `File selected (${sSize}). Click "Upload & Process on Backend" to stream data.`,
+          );
           oImportModel.setProperty("/statusType", "Information");
           oImportModel.setProperty("/canImport", true);
         },
 
         /**
-         * Confirm and stream import to Backend ExcelJS service
+         * Uploads the selected workbook and refreshes imported orders.
+         *
+         * @returns {Promise<void>} Resolves after import processing completes.
          */
         async onConfirmImportOrders() {
           if (!this._oSelectedImportFile) {
@@ -1833,13 +1975,18 @@ sap.ui.define(
 
           const oImportModel = this.getView().getModel("importModel");
           oImportModel.setProperty("/canImport", false);
-          oImportModel.setProperty("/statusMessage", "Uploading file and streaming data to Backend via ExcelJS...");
+          oImportModel.setProperty(
+            "/statusMessage",
+            "Uploading file and streaming data to Backend via ExcelJS...",
+          );
           oImportModel.setProperty("/statusType", "Information");
 
           sap.ui.core.BusyIndicator.show(0);
 
           try {
-            const result = await CAPService.importOrdersExcel(this._oSelectedImportFile);
+            const result = await CAPService.importOrdersExcel(
+              this._oSelectedImportFile,
+            );
 
             // Automatically close the import dialog immediately after upload
             this.onCancelImportOrders();
@@ -1850,7 +1997,8 @@ sap.ui.define(
             // Clear any active search filters to show the fresh imported list
             this.onFilterClear();
 
-            let sMsg = `Import completed in ${result.durationSec || '1s'}!\n\n` +
+            let sMsg =
+              `Import completed in ${result.durationSec || "1s"}!\n\n` +
               `• Total Orders Processed: ${result.totalRows}\n` +
               `• Successfully Imported: ${result.importedCount} maintenance order(s)\n` +
               `• Operations Created: ${result.operationsCount || result.importedCount} operation(s)\n` +
@@ -1858,7 +2006,10 @@ sap.ui.define(
 
             if (result.failedCount > 0) {
               sMsg += `• Failed / Invalid Rows: ${result.failedCount}\n\nRow-by-Row Error Details:\n`;
-              const maxDisplayErrors = Math.min((result.errors || []).length, 20);
+              const maxDisplayErrors = Math.min(
+                (result.errors || []).length,
+                20,
+              );
               for (let i = 0; i < maxDisplayErrors; i++) {
                 const errItem = result.errors[i];
                 sMsg += `  - Line ${errItem.row} (${errItem.order}): ${errItem.details || errItem.error}\n`;
@@ -1869,21 +2020,24 @@ sap.ui.define(
 
               if (result.importedCount > 0) {
                 MessageBox.warning(sMsg, {
-                  title: "Import Summary (Partial Success with Warnings)"
+                  title: "Import Summary (Partial Success with Warnings)",
                 });
               } else {
                 MessageBox.error(sMsg, {
-                  title: "Import Failed (Validation Errors)"
+                  title: "Import Failed (Validation Errors)",
                 });
               }
             } else {
               MessageBox.success(sMsg, {
-                title: "Backend Excel Import Summary"
+                title: "Backend Excel Import Summary",
               });
             }
           } catch (err) {
             console.error("Backend Excel import error:", err);
-            oImportModel.setProperty("/statusMessage", "Import failed: " + err.message);
+            oImportModel.setProperty(
+              "/statusMessage",
+              "Import failed: " + err.message,
+            );
             oImportModel.setProperty("/statusType", "Error");
             oImportModel.setProperty("/canImport", true);
             MessageBox.error("Backend Excel import failed: " + err.message);
@@ -1893,7 +2047,9 @@ sap.ui.define(
         },
 
         /**
-         * Cancel / Close import dialog
+         * Clears the selected file and closes the import dialog.
+         *
+         * @returns {void}
          */
         onCancelImportOrders() {
           this._oSelectedImportFile = null;
@@ -1904,7 +2060,7 @@ sap.ui.define(
           if (this._pImportOrdersDialog) {
             this._pImportOrdersDialog.then((oDialog) => oDialog.close());
           }
-        }
+        },
       },
     );
   },

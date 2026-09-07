@@ -7,6 +7,11 @@ sap.ui.define(
   function (t, e, o) {
     "use strict";
     return t.extend("com.fsoft.zpmmaintenancecockpit.controller.AuditHistory", {
+      /**
+       * Initializes the audit-history model and subscribes to its updates.
+       *
+       * @returns {void}
+       */
       onInit: function () {
         const t = new e({ history: o.getHistory() });
         this.getView().setModel(t, "auditHistory");
@@ -17,6 +22,12 @@ sap.ui.define(
           }
         });
       },
+      /**
+       * Navigates to an order detail page when an order reference is selected.
+       *
+       * @param {sap.ui.base.Event} t Object-link press event.
+       * @returns {void}
+       */
       onObjectPress: function (t) {
         const e = t.getSource();
         const o = e.getText();
