@@ -257,11 +257,7 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
       } catch (e) {}
 
       try {
-<<<<<<< HEAD
         let resCap = await fetch(`${baseUrl}/odata/v4/maintenance/getUserInfo()`, {
-=======
-        const resCap = await fetch(CAP_USERINFO_URL, {
->>>>>>> 62f11cfeb71b355b8548bd267f6da42210acb780
           headers: { Accept: "application/json" }
         });
         if (!resCap.ok && resCap.status >= 500) {

@@ -1,7 +1,6 @@
 sap.ui.define([], function () {
   "use strict";
 
-<<<<<<< HEAD
   const DIRECT_SRV_URL = "https://3b342f32trial-dev-zpm-maintenance-cockpit-srv.cfapps.us10-001.hana.ondemand.com";
 
   function getBaseUrl() {
@@ -34,16 +33,6 @@ sap.ui.define([], function () {
     }
     return url;
   }
-=======
-  function _getBackendPrefix() {
-    const host = window.location.hostname || "";
-    return host.includes("launchpad.") ? "/destinations/srv-api" : "";
-  }
-
-  const BACKEND_PREFIX = _getBackendPrefix();
-  const BASE_URL = `${BACKEND_PREFIX}/odata/v4/maintenance`;
-  const API_BASE_URL = `${BACKEND_PREFIX}/api/maintenance`;
->>>>>>> 62f11cfeb71b355b8548bd267f6da42210acb780
 
   async function _fetchJson(url, options = {}) {
     const defaultHeaders = {
@@ -304,7 +293,6 @@ sap.ui.define([], function () {
       const formData = new FormData();
       formData.append("file", oFile, oFile.name);
 
-<<<<<<< HEAD
       let res;
       try {
         res = await fetch(`${getApiUrl()}/import-excel`, {
@@ -319,12 +307,6 @@ sap.ui.define([], function () {
         const directUrl = _getDirectUrl(`${getApiUrl()}/import-excel`);
         res = await fetch(directUrl, { method: "POST", body: formData });
       }
-=======
-      const res = await fetch(`${API_BASE_URL}/import-excel`, {
-        method: "POST",
-        body: formData
-      });
->>>>>>> 62f11cfeb71b355b8548bd267f6da42210acb780
 
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({ error: res.statusText }));
