@@ -38,6 +38,10 @@ sap.ui.define(
       {
         formatter: formatter,
 
+        /* =========================================================== */
+        /* Lifecycle Methods                                           */
+        /* =========================================================== */
+
         /**
          * Initializes the Maintenance Orders page with CAP backend data.
          *
@@ -55,160 +59,9 @@ sap.ui.define(
           this._initControllerAsync();
         },
 
-        /**
-         * Loads page data and initializes dependent view models.
-         *
-         * @returns {Promise<void>} Resolves after controller data is initialized.
-         */
-        async _initControllerAsync() {
-          try {
-            // Step 2: Load equipment master data from CAP
-            const aEquipment = await CAPService.getEquipments();
-            this.getView().setModel(
-              new JSONModel({
-                equipment: aEquipment || [],
-              }),
-              "equipmentData",
-            );
-
-            // Step 3: Load maintenance orders from CAP
-            const aRawOrders = await CAPService.getMaintenanceOrders();
-
-            // Default navigation items
-            const aNavItems = [
-              { text: "Orders", icon: "sap-icon://wrench", selected: true },
-              {
-                text: "Operations",
-                icon: "sap-icon://action-settings",
-                selected: false,
-              },
-              {
-                text: "Equipment",
-                icon: "sap-icon://machine",
-                selected: false,
-              },
-              {
-                text: "Technicians",
-                icon: "sap-icon://group",
-                selected: false,
-              },
-            ];
-
-            // Transform maintenance order records
-            const aOrderRows = (aRawOrders || []).map((oOrderItem) => ({
-              order: oOrderItem.order_no,
-              equipment: oOrderItem.equipment_no,
-              description: oOrderItem.description,
-              plant: oOrderItem.plant,
-              type: oOrderItem.maintenance_type,
-              priority: oOrderItem.priority,
-              priorityState: oOrderItem.priority_state,
-              statusLabel: oOrderItem.status,
-              statusKey: formatter.normalizeStatus(oOrderItem.status),
-              statusState: formatter.formatStatusState(oOrderItem.status),
-              planner: oOrderItem.planner,
-              scheduledFrom: oOrderItem.scheduled_from,
-              scheduledTo: oOrderItem.scheduled_to,
-              scheduled: `${oOrderItem.scheduled_from} -> ${oOrderItem.scheduled_to}`,
-              isCritical:
-                formatter.normalizePriority(oOrderItem.priority) ===
-                constants.PRIORITY.CRITICAL,
-              isOverdue: formatter.isOverdue(
-                oOrderItem.scheduled_to,
-                oOrderItem.status,
-              ),
-              etag: oOrderItem.etag,
-            }));
-
-            this._aAllOrders = aOrderRows;
-            this._aFilteredOrders = aOrderRows.slice();
-
-            OrderRepository.setOrders(aOrderRows);
-
-            // Register Navigation model
-            this.getView().setModel(
-              new JSONModel({
-                items: aNavItems,
-              }),
-              "navModel",
-            );
-
-            // Register Orders model
-            this.getView().setModel(
-              new JSONModel({
-                rows: aOrderRows,
-              }),
-              "orders",
-            );
-
-            // Register Pagination model
-            this.getView().setModel(
-              new JSONModel({
-                currentPage: 1,
-                pageSize: 10,
-                pageSizeOptions: [
-                  { key: "5", text: "5 / page" },
-                  { key: "10", text: "10 / page" },
-                  { key: "20", text: "20 / page" },
-                  { key: "50", text: "50 / page" },
-                ],
-                totalItems: aOrderRows.length,
-                totalPages: Math.ceil(aOrderRows.length / 10) || 1,
-                startIndex: aOrderRows.length > 0 ? 1 : 0,
-                endIndex: Math.min(10, aOrderRows.length),
-                hasPrevious: false,
-                hasNext: aOrderRows.length > 10,
-                pageButtons: [],
-              }),
-              "pagination",
-            );
-
-            // Create KPI dashboard model
-            this.getView().setModel(
-              new JSONModel({
-                openCount: this._countOrdersByStatus(
-                  aOrderRows,
-                  constants.STATUS.OPEN,
-                ),
-                inProcessCount: this._countOrdersByStatus(
-                  aOrderRows,
-                  constants.STATUS.IN_PROCESS_DISPLAY,
-                ),
-                criticalCount: this._countOrdersByFlag(
-                  aOrderRows,
-                  "isCritical",
-                ),
-                overdueCount: this._countOrdersByFlag(aOrderRows, "isOverdue"),
-                estimatedCost: formatter.calculateEstimatedCost(aOrderRows),
-                activeFilterKey: "",
-                visibleOrderCount: aOrderRows.length,
-              }),
-              "kpi",
-            );
-
-            // Apply initial pagination
-            this._applyPagination();
-
-            // Initialize Mass Change model
-            this._initMassChangeModel();
-
-            // Build dropdown values for FilterBar
-            this._initFilterData(aOrderRows);
-
-            // Initialize Adapt Filters settings
-            this._initFilterConfigModel();
-          } catch (err) {
-            console.error(
-              "Failed to initialize MaintenanceOrders from CAP:",
-              err,
-            );
-            this.getView().setModel(new JSONModel({ rows: [] }), "orders");
-          }
-        },
-
-        // =========================
-        // Public: KPI card actions
-        // =========================
+        /* =========================================================== */
+        /* Public: KPI Card Actions                                    */
+        /* =========================================================== */
 
         /**
          * Applies the Open KPI filter.
@@ -300,9 +153,9 @@ sap.ui.define(
           this._openCreateOrderDialog();
         },
 
-        // ===========================
-        // Public: Filter bar actions
-        // ===========================
+        /* =========================================================== */
+        /* Public: Filter Bar Actions                                  */
+        /* =========================================================== */
 
         /**
          * Applies all filter bar conditions to the
@@ -317,12 +170,6 @@ sap.ui.define(
          * - Maintenance Type
          * - Planner
          * - Scheduled Date
-         *
-         * Processing Flow:
-         * 1. Read all filter values from the FilterBar.
-         * 2. Build SAPUI5 filter objects.
-         * 3. Apply filters to the table binding.
-         * 4. Update the visible order counter.
          *
          * @returns {void}
          */
@@ -439,9 +286,9 @@ sap.ui.define(
           this._applyPagination();
         },
 
-        // ==================================
-        // Public: View lifecycle and layout
-        // ==================================
+        /* =========================================================== */
+        /* Public: Equipment Detail Panel                              */
+        /* =========================================================== */
 
         /**
          * Opens the Equipment Detail panel for the
@@ -451,19 +298,14 @@ sap.ui.define(
          * @returns {void}
          */
         onEquipmentPress(oEvent) {
-          // Step 1: Get the selected order context
           const oSource = oEvent.getSource();
-
           const oContext = oSource.getBindingContext("orders");
 
           if (!oContext) {
             return;
           }
 
-          // Step 2: Retrieve the selected order
           const oOrder = oContext.getObject();
-
-          // Step 3: Open the equipment detail panel
           this._openEquipmentDetail(oOrder);
         },
 
@@ -477,1310 +319,9 @@ sap.ui.define(
           this.getView().getModel("ui").setProperty("/layout", "OneColumn");
         },
 
-        /**
-         * Handles maintenance order selection for
-         * Mass Change processing.
-         *
-         * Updates the selected orders collection in the
-         * Mass Change model.
-         *
-         * @param {sap.ui.base.Event} oEvent Selection event
-         * @returns {void}
-         */
-        onOrderSelect(oEvent) {
-          // Step 1: Read the current selection state
-          const bSelected = oEvent.getParameter("selected");
-
-          const oContext = oEvent.getSource().getBindingContext("orders");
-
-          const oOrder = oContext.getObject();
-
-          // Step 2: Get the current selected orders
-          const oModel = this.getView().getModel("massChange");
-
-          let aSelected = oModel.getProperty("/selectedOrders") || [];
-
-          // Step 3: Add or remove the selected order
-          if (bSelected) {
-            aSelected.push(oOrder.order);
-          } else {
-            aSelected = aSelected.filter((sOrder) => sOrder !== oOrder.order);
-          }
-
-          // Step 4: Update the Mass Change model
-          oModel.setProperty("/selectedOrders", aSelected);
-        },
-
-        // =============================
-        // Public: Selection and updates
-        // =============================
-        /**
-         * Opens the Mass Change dialog.
-         *
-         * Validation Rules:
-         * - At least one order must be selected.
-         * - CANCELLED orders cannot be modified.
-         * - Users may continue with valid orders only.
-         *
-         * @returns {Promise<void>}
-         */
-        async onMassChangePress() {
-          // Step 1: Get selected orders
-          const aSelected = this.getView()
-            .getModel("massChange")
-            .getProperty("/selectedOrders");
-
-          // Step 2: Validate selection
-          if (!aSelected.length) {
-            MessageBox.warning(
-              this.getView()
-                .getModel("i18n")
-                .getResourceBundle()
-                .getText("massChangeSelectAtLeastOne"),
-            );
-
-            return;
-          }
-
-          // Step 3: Check for CANCELLED orders
-          const aAllRows =
-            this.getView().getModel("orders").getProperty("/rows") || [];
-
-          const aCancelledSelected = aSelected.filter((sOrderId) => {
-            const oRow = aAllRows.find((r) => r.order === sOrderId);
-
-            return oRow && oRow.statusLabel === constants.STATUS.CANCELLED;
-          });
-
-          if (aCancelledSelected.length) {
-            const sCancelledList = aCancelledSelected.join(", ");
-
-            // Step 4: Block processing if all selected orders are CANCELLED
-            if (aCancelledSelected.length === aSelected.length) {
-              MessageBox.warning(
-                this.getView()
-                  .getModel("i18n")
-                  .getResourceBundle()
-                  .getText("massChangeCancelledCannotChange", [sCancelledList]),
-              );
-
-              return;
-            }
-
-            // Step 5: Ask for confirmation to continue with valid orders only
-            const bContinue = await new Promise((resolve) => {
-              MessageBox.confirm(
-                this.getView()
-                  .getModel("i18n")
-                  .getResourceBundle()
-                  .getText("massChangeCancelledWillBeSkipped", [
-                    sCancelledList,
-                  ]),
-                {
-                  onClose: (sAction) => {
-                    if (sAction !== MessageBox.Action.OK) {
-                      resolve(false);
-                      return;
-                    }
-
-                    // Remove CANCELLED orders from the selection
-                    const aValidOrders = aSelected.filter(
-                      (sId) => !aCancelledSelected.includes(sId),
-                    );
-
-                    this.getView()
-                      .getModel("massChange")
-                      .setProperty("/selectedOrders", aValidOrders);
-
-                    resolve(true);
-                  },
-                },
-              );
-            });
-
-            if (!bContinue) {
-              return;
-            }
-
-            // Step 6: Re-check remaining orders after confirmation
-            const aValidAfterFilter =
-              this.getView()
-                .getModel("massChange")
-                .getProperty("/selectedOrders") || [];
-
-            if (!aValidAfterFilter.length) {
-              return;
-            }
-          }
-
-          // Step 7: Lazy load the Mass Change dialog
-          if (!this._pMassChangeDialog) {
-            this._pMassChangeDialog = Fragment.load({
-              id: this.getView().getId(),
-              name: "com.fsoft.zpmmaintenancecockpit.view.fragment.MassChange",
-              controller: this,
-            }).then((oDialog) => {
-              this.getView().addDependent(oDialog);
-
-              return oDialog;
-            });
-          }
-
-          // Step 8: Open the dialog
-          const oDialog = await this._pMassChangeDialog;
-
-          oDialog.open();
-        },
-
-        /**
-         * Closes the Mass Change dialog without
-         * applying any changes.
-         *
-         * @returns {void}
-         */
-        onMassChangeCancel() {
-          this.byId("massChangeDialog").close();
-        },
-
-        /**
-         * Applies the selected priority value to all
-         * selected maintenance orders.
-         *
-         * Updates:
-         * - Priority
-         * - Priority state
-         * - Critical flag
-         * - KPI counters
-         *
-         * @returns {void}
-         */
-        onMassChangeApply() {
-          // Step 1: Read Mass Change values
-          const oMassChangeModel = this.getView().getModel("massChange");
-
-          const aSelectedOrders =
-            oMassChangeModel.getProperty("/selectedOrders") || [];
-
-          const sPriority = this.byId("massChangePrioritySelect")
-            ? this.byId("massChangePrioritySelect").getSelectedKey()
-            : oMassChangeModel.getProperty("/priority") || "LOW";
-
-          const aRows =
-            this.getView().getModel("orders").getProperty("/rows") || [];
-
-          // Step 2: Update selected orders (excluding CANCELLED and COMPLETED)
-          aRows.forEach((oRow) => {
-            if (
-              aSelectedOrders.includes(oRow.order) &&
-              oRow.statusLabel !== constants.STATUS.CANCELLED
-            ) {
-              oRow.priority = sPriority;
-
-              oRow.priorityState = formatter.formatPriorityState(sPriority);
-
-              oRow.isCritical = sPriority === constants.PRIORITY.CRITICAL;
-            }
-          });
-
-          // Sync with OrderRepository
-          OrderRepository.setOrders(aRows);
-
-          // Step 3: Refresh order model
-          this.getView().getModel("orders").refresh(true);
-
-          // Step 4: Refresh KPI counters
-          this._refreshKpiCounts();
-
-          // Step 5: Uncheck table header and row checkboxes
-          const oHeaderCheckbox = this.byId("chkSelectHeader");
-          if (oHeaderCheckbox) {
-            oHeaderCheckbox.setSelected(false);
-          }
-          const oTable = this.byId("ordersTable");
-          if (oTable) {
-            oTable.getItems().forEach((oItem) => {
-              const oCheckBox = oItem.getCells()[0];
-              if (oCheckBox && oCheckBox.setSelected) {
-                oCheckBox.setSelected(false);
-              }
-            });
-          }
-          oMassChangeModel.setProperty("/selectedOrders", []);
-
-          // Step 6: Close dialog
-          this.byId("massChangeDialog").close();
-
-          // Step 7: Show success message
-          MessageToast.show(
-            this.getView()
-              .getModel("i18n")
-              .getResourceBundle()
-              .getText("massChangeAppliedSuccess"),
-          );
-        },
-
-        /**
-         * Selects or deselects all visible
-         * maintenance orders in the table.
-         *
-         * @param {sap.ui.base.Event} oEvent Selection event
-         * @returns {void}
-         */
-        onSelectAllOrders(oEvent) {
-          // Step 1: Read select-all state
-          const bSelected = oEvent.getParameter("selected");
-
-          const oTable = this.byId("ordersTable");
-
-          const aItems = oTable.getItems();
-
-          const aSelectedOrders = [];
-
-          // Step 2: Update row selection state
-          aItems.forEach((oItem) => {
-            const oCheckBox = oItem.getCells()[0];
-
-            oCheckBox.setSelected(bSelected);
-
-            if (bSelected) {
-              const oOrder = oItem.getBindingContext("orders").getObject();
-
-              aSelectedOrders.push(oOrder.order);
-            }
-          });
-
-          // Step 3: Update selected orders model
-          this.getView()
-            .getModel("massChange")
-            .setProperty("/selectedOrders", aSelectedOrders);
-        },
-
-        // ======================
-        // Public: Export action
-        // ======================
-        /**
-         * Exports all currently filtered maintenance orders (across all pages)
-         * to a CSV file with loading indicator.
-         *
-         * @returns {void}
-         */
-        onExportPress() {
-          // Step 1: Get all filtered rows (all pages included)
-          const aRows =
-            this._aFilteredOrders && this._aFilteredOrders.length
-              ? this._aFilteredOrders
-              : [];
-
-          // Step 2: Validate export data
-          if (!aRows.length) {
-            MessageBox.information(
-              this.getView()
-                .getModel("i18n")
-                .getResourceBundle()
-                .getText("maintenanceOrdersExportNoData") || "No orders available to export.",
-            );
-
-            return;
-          }
-
-          sap.ui.core.BusyIndicator.show(0);
-
-          setTimeout(() => {
-            try {
-              // Step 3: Create CSV header row
-              const aCsvRows = [
-                [
-                  "Order",
-                  "Equipment",
-                  "Description",
-                  "Plant",
-                  "Type",
-                  "Priority",
-                  "Status",
-                  "Planner",
-                  "Scheduled From",
-                  "Scheduled To",
-                ].join(","),
-              ];
-
-              // Step 4: Populate CSV data rows with escaped text
-              aRows.forEach((oRow) => {
-                const cleanDesc = (oRow.description || "").replace(/"/g, '""');
-                aCsvRows.push(
-                  [
-                    oRow.order || "",
-                    oRow.equipment || "",
-                    `"${cleanDesc}"`,
-                    oRow.plant || "",
-                    oRow.type || "",
-                    oRow.priority || "",
-                    oRow.statusLabel || oRow.status || "",
-                    oRow.planner || "",
-                    oRow.scheduledFrom || "",
-                    oRow.scheduledTo || "",
-                  ].join(","),
-                );
-              });
-
-              // Step 5: Generate CSV content with UTF-8 BOM for Microsoft Excel compatibility
-              const sCsvContent = "\uFEFF" + aCsvRows.join("\r\n");
-
-              const oBlob = new Blob([sCsvContent], {
-                type: "text/csv;charset=utf-8;",
-              });
-
-              // Step 6: Build export file name
-              const sFileName = `MaintenanceOrders_${new Date()
-                .toISOString()
-                .slice(0, 10)}.csv`;
-
-              // Step 7: Trigger browser download
-              const oLink = document.createElement("a");
-              oLink.href = URL.createObjectURL(oBlob);
-              oLink.download = sFileName;
-              document.body.appendChild(oLink);
-              oLink.click();
-
-              // Step 8: Clean up temporary resources
-              document.body.removeChild(oLink);
-              setTimeout(() => URL.revokeObjectURL(oLink.href), 1000);
-
-              MessageToast.show(`Exported ${aRows.length} order(s) successfully.`);
-            } finally {
-              sap.ui.core.BusyIndicator.hide();
-            }
-          }, 30);
-        },
-
-        // ============================
-        // Public: Value help handling
-        // ============================
-        /**
-         * Opens the Equipment Value Help dialog with loading indicator.
-         *
-         * Loads the fragment lazily, initializes the
-         * Equipment Value Help model and displays the dialog.
-         *
-         * @returns {Promise<void>}
-         */
-        async onEquipmentValueHelpPress() {
-          sap.ui.core.BusyIndicator.show(0);
-          try {
-            // Step 1: Load the dialog fragment if it has not been initialized
-            if (!this._pEquipmentValueHelp) {
-              this._pEquipmentValueHelp = Fragment.load({
-                id: this.getView().getId(),
-                name: "com.fsoft.zpmmaintenancecockpit.view.fragment.EquipmentValueHelp",
-                controller: this,
-              }).then((oDialog) => {
-                this.getView().addDependent(oDialog);
-
-                return oDialog;
-              });
-            }
-
-            // Step 2: Initialize Equipment Value Help model
-            this._initEquipmentValueHelpModel();
-
-            // Step 3: Open the dialog
-            const oDialog = await this._pEquipmentValueHelp;
-
-            oDialog.open();
-
-            // Step 4: Restore previous selections
-            const oTable = this.byId("tblEqValueHelp");
-            const aSelectedEquipments =
-              this.getView()
-                .getModel("filters")
-                ?.getProperty("/selectedEquipments") || [];
-
-            if (oTable) {
-              oTable.removeSelections(true);
-
-              // Use setTimeout to ensure table items are rendered
-              setTimeout(() => {
-                oTable.getItems().forEach((oItem) => {
-                  const oContext = oItem.getBindingContext("equipmentVH");
-                  if (oContext) {
-                    const sEquipment = oContext.getProperty("equipment");
-                    if (aSelectedEquipments.includes(sEquipment)) {
-                      oItem.setSelected(true);
-                    }
-                  }
-                });
-              }, 0);
-            }
-          } finally {
-            sap.ui.core.BusyIndicator.hide();
-          }
-        },
-
-        /**
-         * Filters equipment records in the
-         * Equipment Value Help dialog.
-         *
-         * Search is performed against:
-         * - Equipment Number
-         * - Equipment Description
-         *
-         * @param {sap.ui.base.Event} oEvent Search event
-         * @returns {void}
-         */
-        onSearchEquipmentValueHelp(oEvent) {
-          // Step 1: Read the search keyword
-          const sValue = oEvent.getParameter("newValue");
-
-          // Step 2: Get table binding
-          const oTable = this.byId("tblEqValueHelp");
-
-          const oBinding = oTable.getBinding("items");
-
-          // Step 3: Create search filter
-          const oFilter = new Filter({
-            filters: [
-              new Filter("equipment", FilterOperator.Contains, sValue),
-
-              new Filter("description", FilterOperator.Contains, sValue),
-            ],
-
-            and: false,
-          });
-
-          // Step 4: Apply filter to the table
-          oBinding.filter(sValue ? [oFilter] : []);
-        },
-
-        /**
-         * Applies the selected equipment from
-         * the Value Help dialog to the FilterBar.
-         *
-         * Automatically triggers table filtering
-         * after the equipment is selected.
-         *
-         * @returns {void}
-         */
-        onConfirmEquipmentValueHelp() {
-          // Step 1: Get selected rows
-          const oTable = this.byId("tblEqValueHelp");
-
-          const aSelectedItems = oTable.getSelectedItems();
-
-          if (!aSelectedItems.length) {
-            return;
-          }
-
-          // Step 2: Extract selected equipment ids
-          const aSelectedEquipments = aSelectedItems.map(
-            (oItem) =>
-              oItem.getBindingContext("equipmentVH").getObject().equipment,
-          );
-
-          // Step 3: Save selected equipment list
-          this.getView()
-            .getModel("filters")
-            .setProperty("/selectedEquipments", aSelectedEquipments);
-
-          // Step 4: Apply filter
-          this.onFilterGo();
-
-          // Step 5: Close dialog
-          this.byId("dlgEqValueHelp").close();
-        },
-
-        /**
-         * Closes the Equipment Value Help dialog.
-         *
-         * @returns {void}
-         */
-        onCloseEquipmentValueHelp() {
-          this.byId("dlgEqValueHelp").close();
-        },
-
-        // ================================
-        // Public: Adapt filter visibility
-        // ================================
-        /**
-         * Applies the current Adapt Filters configuration
-         * and closes the dialog.
-         *
-         * @returns {void}
-         */
-        onAdaptFiltersApply() {
-          // Step 1: Read draft config
-          const oDraftData = this.getView()
-            .getModel("filterConfigDraft")
-            .getData();
-
-          // Step 2: Apply to actual config
-          this.getView()
-            .getModel("filterConfig")
-            .setData(JSON.parse(JSON.stringify(oDraftData)));
-
-          // Step 3: Close dialog
-          this.byId("adaptFiltersDialog").close();
-        },
-
-        /**
-         * Opens the Adapt Filters dialog with loading indicator.
-         *
-         * Loads the fragment lazily and displays
-         * the filter visibility configuration.
-         *
-         * @returns {Promise<void>}
-         */
-        async onAdaptFiltersPress() {
-          sap.ui.core.BusyIndicator.show(0);
-          try {
-            // Step 1: Create draft config
-            const oCurrentConfig = this.getView()
-              .getModel("filterConfig")
-              .getData();
-
-            this.getView().setModel(
-              new JSONModel(JSON.parse(JSON.stringify(oCurrentConfig))),
-              "filterConfigDraft",
-            );
-
-            // Step 2: Load dialog
-            if (!this._pAdaptFiltersDialog) {
-              this._pAdaptFiltersDialog = Fragment.load({
-                id: this.getView().getId(),
-                name: "com.fsoft.zpmmaintenancecockpit.view.fragment.AdaptFilters",
-                controller: this,
-              }).then((oDialog) => {
-                this.getView().addDependent(oDialog);
-
-                return oDialog;
-              });
-            }
-
-            // Step 3: Open dialog
-            const oDialog = await this._pAdaptFiltersDialog;
-
-            oDialog.open();
-          } finally {
-            sap.ui.core.BusyIndicator.hide();
-          }
-        },
-
-        /**
-         * Closes the Adapt Filters dialog without
-         * applying any changes.
-         *
-         * @returns {void}
-         */
-        onAdaptFiltersCancel() {
-          this.byId("adaptFiltersDialog").close();
-        },
-
-        /**
-         * Navigates to the Maintenance Order Detail page with loading indicator.
-         *
-         * @param {sap.ui.base.Event} oEvent Press event
-         * @returns {void}
-         */
-        onOrderPress(oEvent) {
-          // Step 1: Get the selected order context
-          const oObjectIdentifier = oEvent.getSource();
-
-          const oContext = oObjectIdentifier.getBindingContext("orders");
-
-          if (!oContext) {
-            return;
-          }
-
-          // Step 2: Read the order number
-          const sOrder = oContext.getProperty("order");
-
-          if (!sOrder) {
-            return;
-          }
-
-          sap.ui.core.BusyIndicator.show(0);
-
-          // Step 3: Navigate to the Order Detail page
-          setTimeout(() => {
-            this.getOwnerComponent().getRouter().navTo("RouteOrderDetail", {
-              orderId: sOrder,
-            });
-            sap.ui.core.BusyIndicator.hide();
-          }, 60);
-        },
-
-        // ======================================
-        // Private: Dialogs and fragment lifecycle
-        // ======================================
-
-        /**
-         * Loads and opens the Create Maintenance Order dialog with loading indicator.
-         *
-         * The dialog fragment is loaded lazily and reused
-         * during the page lifecycle.
-         *
-         * @returns {Promise<void>}
-         */
-        async _openCreateOrderDialog() {
-          sap.ui.core.BusyIndicator.show(0);
-          try {
-            // Step 1: Ensure dialog controller exists
-            this._ensureDialogController();
-
-            // Step 2: Load dialog fragment if not already loaded
-            if (!this._pCreateOrderDialog) {
-              this._pCreateOrderDialog = Fragment.load({
-                id: this.getView().getId(),
-                name: "com.fsoft.zpmmaintenancecockpit.view.fragment.CreateMaintenanceOrder",
-                controller: this._dialogController,
-              }).then((oDialog) => {
-                this.getView().addDependent(oDialog);
-
-                return oDialog;
-              });
-            }
-
-            // Step 3: Get dialog instance
-            const oDialog = await this._pCreateOrderDialog;
-
-            // Step 4: Initialize dialog data
-            this._dialogController.initDialogState();
-
-            // Step 5: Open dialog
-            oDialog.open();
-          } finally {
-            sap.ui.core.BusyIndicator.hide();
-          }
-        },
-
-        /**
-         * Creates the Create Maintenance Order dialog controller
-         * if it does not already exist.
-         *
-         * Ensures a single controller instance is reused.
-         *
-         * @returns {void}
-         */
-        _ensureDialogController() {
-          // Step 1: Create controller instance if required
-          if (!this._dialogController) {
-            this._dialogController = new CreateMaintenanceOrderDialog();
-
-            // Step 2: Register parent controller
-            this._dialogController.setParentController(this);
-          }
-        },
-
-        /**
-         * Builds the Equipment Detail model and displays
-         * the Equipment Detail panel.
-         *
-         * Updates the Flexible Column Layout to show
-         * the detail section.
-         *
-         * @param {object} oOrder Selected maintenance order
-         * @returns {void}
-         */
-        _openEquipmentDetail(oOrder) {
-          // Step 1: Validate selected order
-          if (!oOrder) {
-            return;
-          }
-
-          // Step 2: Load equipment master data and all orders
-          const aEquipment =
-            this.getView()
-              .getModel("equipmentData")
-              ?.getProperty("/equipment") || [];
-
-          const oEquipment = aEquipment.find(
-            (item) => item.equipment === oOrder.equipment,
-          );
-
-          const sTargetEquipmentKey = oEquipment
-            ? oEquipment.equipment
-            : oOrder.equipment;
-          const aAllOrders =
-            this.getView().getModel("orders")?.getProperty("/rows") || [];
-          const aMatchingOrders = aAllOrders.filter(
-            (row) => row.equipment === sTargetEquipmentKey,
-          );
-
-          let aRecentOrdersList = [];
-          if (aMatchingOrders.length > 0) {
-            aRecentOrdersList = aMatchingOrders.map((row) => ({
-              order: row.order,
-              description: row.description,
-              status: row.statusLabel || row.status,
-              statusState: formatter.formatStatusState(
-                row.statusLabel || row.status,
-              ),
-            }));
-          } else if (
-            oEquipment &&
-            oEquipment.orders &&
-            Array.isArray(oEquipment.orders) &&
-            oEquipment.orders.length > 0
-          ) {
-            aRecentOrdersList = oEquipment.orders.map((oRecentOrder) => ({
-              order: oRecentOrder.order_no || oRecentOrder.order,
-              description: oRecentOrder.description,
-              status: oRecentOrder.status,
-              statusState: formatter.formatStatusState(oRecentOrder.status),
-            }));
-          } else if (
-            oEquipment &&
-            oEquipment.recentOrders &&
-            Array.isArray(oEquipment.recentOrders) &&
-            oEquipment.recentOrders.length > 0
-          ) {
-            aRecentOrdersList = oEquipment.recentOrders.map((oRecentOrder) => ({
-              order: oRecentOrder.order,
-              description: oRecentOrder.description,
-              status: oRecentOrder.status,
-              statusState: formatter.formatStatusState(oRecentOrder.status),
-            }));
-          } else if (oOrder.order) {
-            aRecentOrdersList = [
-              {
-                order: oOrder.order,
-                description: oOrder.description,
-                status: oOrder.statusLabel || oOrder.status,
-                statusState: formatter.formatStatusState(
-                  oOrder.statusLabel || oOrder.status,
-                ),
-              },
-            ];
-          }
-
-          // Step 3: Build equipment detail model
-          const oEquipmentDetailModel = new JSONModel({
-            header: oEquipment
-              ? `${oEquipment.equipment} - ${oEquipment.description}`
-              : `${oOrder.equipment} - ${oOrder.description}`,
-
-            type: oEquipment ? oEquipment.type : oOrder.type,
-
-            plant: oEquipment ? oEquipment.plant : oOrder.plant,
-
-            location: oEquipment
-              ? oEquipment.location
-              : `Plant ${oOrder.plant}`,
-
-            status: oEquipment ? oEquipment.status : oOrder.statusLabel,
-
-            statusState: formatter.formatStatusState(
-              oEquipment ? oEquipment.status : oOrder.statusLabel,
-            ),
-
-            criticality: oEquipment ? oEquipment.criticality : oOrder.priority,
-
-            manufacturer: oEquipment ? oEquipment.manufacturer : "N/A",
-
-            recentOrders: aRecentOrdersList,
-          });
-
-          // Step 4: Bind detail model to view
-          this.getView().setModel(oEquipmentDetailModel, "equipmentDetail");
-
-          // Step 5: Expand layout
-          this.getView()
-            .getModel("ui")
-            .setProperty("/layout", "TwoColumnsMidExpanded");
-        },
-
-        // ===================================
-        // Private: KPI and filter application
-        // ===================================
-
-        /**
-         * Applies or clears a KPI filter on the orders table.
-         *
-         * @param {string} sFilterKey Identifier for the active KPI filter.
-         * @param {sap.ui.model.Filter} [oFilter] Deprecated filter param.
-         * @returns {void}
-         */
-        _applyKpiFilter(sFilterKey, oFilter) {
-          const oKpiModel = this.getView().getModel("kpi");
-          const sActiveFilterKey = oKpiModel.getProperty("/activeFilterKey");
-          const aAll = this._aAllOrders || [];
-
-          // Clicking the same KPI twice clears the filter
-          if (sActiveFilterKey === sFilterKey) {
-            this._aFilteredOrders = aAll.slice();
-            this.byId("selStatus")?.setSelectedKey("All");
-            this.byId("selPriority")?.setSelectedKey("All");
-            oKpiModel.setProperty("/activeFilterKey", "");
-          } else {
-            oKpiModel.setProperty("/activeFilterKey", sFilterKey);
-
-            if (sFilterKey === "STATUS_OPEN") {
-              this._aFilteredOrders = aAll.filter(
-                (r) =>
-                  r.statusKey === constants.STATUS.OPEN ||
-                  r.statusLabel === "OPEN",
-              );
-            } else if (sFilterKey === "STATUS_IN_PROCESS") {
-              this._aFilteredOrders = aAll.filter(
-                (r) =>
-                  r.statusKey === constants.STATUS.IN_PROCESS_DISPLAY ||
-                  r.statusLabel === "IN PROCESS",
-              );
-            } else if (sFilterKey === "PRIORITY_CRITICAL") {
-              this._aFilteredOrders = aAll.filter(
-                (r) => r.isCritical === true || r.priority === "CRITICAL",
-              );
-            } else if (sFilterKey === "OVERDUE") {
-              this._aFilteredOrders = aAll.filter((r) => r.isOverdue === true);
-            } else {
-              this._aFilteredOrders = aAll.slice();
-            }
-          }
-
-          const oPagination = this.getView().getModel("pagination");
-          if (oPagination) {
-            oPagination.setProperty("/currentPage", 1);
-          }
-
-          this._applyPagination();
-        },
-
-        /**
-         * Applies client-side pagination to the filtered orders list.
-         *
-         * Computes total pages, current page slice, start/end counters,
-         * navigation button states, and dynamic page buttons with smooth loading animation.
-         *
-         * @returns {void}
-         */
-        _applyPagination() {
-          const oPaginationModel = this.getView().getModel("pagination");
-          if (!oPaginationModel) {
-            return;
-          }
-
-          const oTable = this.byId("ordersTable");
-          if (oTable) {
-            oTable.setBusyIndicatorDelay(0);
-            oTable.setBusy(true);
-          }
-
-          const iPageSize =
-            parseInt(oPaginationModel.getProperty("/pageSize"), 10) || 10;
-          const aFiltered = this._aFilteredOrders || [];
-          const iTotalItems = aFiltered.length;
-          const iTotalPages = Math.max(1, Math.ceil(iTotalItems / iPageSize));
-          let iCurrentPage =
-            parseInt(oPaginationModel.getProperty("/currentPage"), 10) || 1;
-
-          if (iCurrentPage > iTotalPages) {
-            iCurrentPage = iTotalPages;
-          }
-          if (iCurrentPage < 1) {
-            iCurrentPage = 1;
-          }
-
-          const iStartIndex =
-            iTotalItems === 0 ? 0 : (iCurrentPage - 1) * iPageSize + 1;
-          const iEndIndex = Math.min(iTotalItems, iCurrentPage * iPageSize);
-
-          const aPagedRows = aFiltered.slice(
-            (iCurrentPage - 1) * iPageSize,
-            iCurrentPage * iPageSize,
-          );
-
-          // Build dynamic page buttons (up to 5 page window)
-          const aPageButtons = [];
-          let iStartP = Math.max(1, iCurrentPage - 2);
-          let iEndP = Math.min(iTotalPages, iStartP + 4);
-          if (iEndP - iStartP < 4) {
-            iStartP = Math.max(1, iEndP - 4);
-          }
-          for (let p = iStartP; p <= iEndP; p++) {
-            aPageButtons.push({
-              page: p,
-              text: String(p),
-              current: p === iCurrentPage,
-            });
-          }
-
-          oPaginationModel.setProperty("/currentPage", iCurrentPage);
-          oPaginationModel.setProperty("/totalPages", iTotalPages);
-          oPaginationModel.setProperty("/totalItems", iTotalItems);
-          oPaginationModel.setProperty("/startIndex", iStartIndex);
-          oPaginationModel.setProperty("/endIndex", iEndIndex);
-          oPaginationModel.setProperty("/hasPrevious", iCurrentPage > 1);
-          oPaginationModel.setProperty("/hasNext", iCurrentPage < iTotalPages);
-          oPaginationModel.setProperty("/pageButtons", aPageButtons);
-
-          const oOrdersModel = this.getView().getModel("orders");
-          if (oOrdersModel) {
-            oOrdersModel.setProperty("/rows", aPagedRows);
-            oOrdersModel.refresh(true);
-          }
-
-          const oKpiModel = this.getView().getModel("kpi");
-          if (oKpiModel) {
-            oKpiModel.setProperty("/visibleOrderCount", iTotalItems);
-            oKpiModel.setProperty(
-              "/estimatedCost",
-              formatter.calculateEstimatedCost(aFiltered),
-            );
-          }
-
-          setTimeout(() => {
-            if (oTable) {
-              oTable.setBusy(false);
-            }
-          }, 80);
-        },
-
-        /**
-         * Navigates to the first page.
-         *
-         * @returns {void}
-         */
-        onFirstPage() {
-          const oPagination = this.getView().getModel("pagination");
-          if (oPagination && oPagination.getProperty("/hasPrevious")) {
-            oPagination.setProperty("/currentPage", 1);
-            this._applyPagination();
-          }
-        },
-
-        /**
-         * Navigates to the previous page.
-         *
-         * @returns {void}
-         */
-        onPreviousPage() {
-          const oPagination = this.getView().getModel("pagination");
-          if (oPagination && oPagination.getProperty("/hasPrevious")) {
-            const cur = oPagination.getProperty("/currentPage");
-            oPagination.setProperty("/currentPage", cur - 1);
-            this._applyPagination();
-          }
-        },
-
-        /**
-         * Navigates to the next page.
-         *
-         * @returns {void}
-         */
-        onNextPage() {
-          const oPagination = this.getView().getModel("pagination");
-          if (oPagination && oPagination.getProperty("/hasNext")) {
-            const cur = oPagination.getProperty("/currentPage");
-            oPagination.setProperty("/currentPage", cur + 1);
-            this._applyPagination();
-          }
-        },
-
-        /**
-         * Navigates to the last page.
-         *
-         * @returns {void}
-         */
-        onLastPage() {
-          const oPagination = this.getView().getModel("pagination");
-          if (oPagination && oPagination.getProperty("/hasNext")) {
-            const total = oPagination.getProperty("/totalPages");
-            oPagination.setProperty("/currentPage", total);
-            this._applyPagination();
-          }
-        },
-
-        /**
-         * Navigates to a specific clicked page number.
-         *
-         * @param {sap.ui.base.Event} oEvent Button press event
-         * @returns {void}
-         */
-        onPagePress(oEvent) {
-          const oContext = oEvent.getSource().getBindingContext("pagination");
-          if (oContext) {
-            const iPage = oContext.getProperty("page");
-            this.getView()
-              .getModel("pagination")
-              .setProperty("/currentPage", iPage);
-            this._applyPagination();
-          }
-        },
-
-        /**
-         * Updates the page size and resets to page 1.
-         *
-         * @param {sap.ui.base.Event} oEvent Select change event
-         * @returns {void}
-         */
-        onPageSizeChange(oEvent) {
-          const sKey = oEvent.getParameter("selectedItem")
-            ? oEvent.getParameter("selectedItem").getKey()
-            : oEvent.getSource().getSelectedKey();
-          const oPagination = this.getView().getModel("pagination");
-          oPagination.setProperty("/pageSize", parseInt(sKey, 10) || 10);
-          oPagination.setProperty("/currentPage", 1);
-          this._applyPagination();
-        },
-
-        /**
-         * Refreshes KPI counters after order data changes.
-         *
-         * @param {object[]} [aExplicitRows] Optional order collection to calculate.
-         * @returns {void}
-         */
-        _refreshKpiCounts(aExplicitRows) {
-          const aRows =
-            aExplicitRows ||
-            (this.getView().getModel("orders")
-              ? this.getView().getModel("orders").getProperty("/rows")
-              : []) ||
-            [];
-
-          const oKpiModel = this.getView().getModel("kpi");
-          if (!oKpiModel) {
-            return;
-          }
-
-          oKpiModel.setProperty(
-            "/openCount",
-            this._countOrdersByStatus(aRows, constants.STATUS.OPEN),
-          );
-
-          oKpiModel.setProperty(
-            "/inProcessCount",
-            this._countOrdersByStatus(
-              aRows,
-              constants.STATUS.IN_PROCESS_DISPLAY,
-            ),
-          );
-
-          oKpiModel.setProperty(
-            "/criticalCount",
-            this._countOrdersByFlag(aRows, "isCritical"),
-          );
-
-          oKpiModel.setProperty(
-            "/overdueCount",
-            this._countOrdersByFlag(aRows, "isOverdue"),
-          );
-
-          oKpiModel.setProperty(
-            "/estimatedCost",
-            formatter.calculateEstimatedCost(aRows),
-          );
-
-          oKpiModel.setProperty("/visibleOrderCount", aRows.length);
-        },
-
-        // ==================================
-        // Private: Model initialization data
-        // ==================================
-
-        /**
-         * Builds FilterBar dropdown values from
-         * maintenance order data.
-         *
-         * @param {object[]} aRows Maintenance order collection
-         * @returns {void}
-         */
-        _initFilterData(aRows) {
-          // Step 1: Create helper function for unique values
-          const unique = (aValues) => [...new Set(aValues)];
-
-          // Step 2: Build filter model data
-          const oFilterModel = new JSONModel({
-            equipments: [...unique(aRows.map((oRow) => oRow.equipment))],
-
-            plants: ["All", ...unique(aRows.map((oRow) => oRow.plant))],
-
-            statuses: ["All", ...unique(aRows.map((oRow) => oRow.statusLabel))],
-
-            priorities: ["All", ...unique(aRows.map((oRow) => oRow.priority))],
-
-            maintenanceTypes: [
-              "All",
-              ...unique(aRows.map((oRow) => oRow.type)),
-            ],
-
-            planners: ["All", ...unique(aRows.map((oRow) => oRow.planner))],
-
-            selectedEquipments: [],
-          });
-
-          // Step 3: Register FilterBar model
-          this.getView().setModel(oFilterModel, "filters");
-        },
-
-        /**
-         * Initializes the Mass Change model.
-         *
-         * Stores selected maintenance orders and
-         * target update values.
-         *
-         * @returns {void}
-         */
-        /**
-         * Initializes the mass-change model with default values.
-         *
-         * @returns {void}
-         */
-        _initMassChangeModel() {
-          // Step 1: Create Mass Change model
-          this.getView().setModel(
-            new JSONModel({
-              selectedOrders: [],
-              priority: "LOW",
-            }),
-            "massChange",
-          );
-        },
-
-        /**
-         * Initializes the Equipment Value Help model.
-         *
-         * Creates a unique equipment list from
-         * maintenance order data.
-         *
-         * @returns {void}
-         */
-        _initEquipmentValueHelpModel() {
-          // Step 1: Get maintenance orders
-          const aRows =
-            this.getView().getModel("orders").getProperty("/rows") || [];
-
-          // Step 2: Collect unique equipment entries
-          const mUniqueEquipment = {};
-
-          aRows.forEach((oRow) => {
-            if (!mUniqueEquipment[oRow.equipment]) {
-              mUniqueEquipment[oRow.equipment] = {
-                equipment: oRow.equipment,
-                description: oRow.description,
-                plant: oRow.plant,
-              };
-            }
-          });
-
-          // Step 3: Register Value Help model
-          this.getView().setModel(
-            new JSONModel({
-              equipments: Object.values(mUniqueEquipment),
-            }),
-            "equipmentVH",
-          );
-        },
-
-        /**
-         * Initializes the Adapt Filters configuration model.
-         *
-         * Controls which filter fields are visible
-         * in the FilterBar.
-         *
-         * @returns {void}
-         */
-        _initFilterConfigModel() {
-          // Step 1: Create filter visibility configuration
-          this.getView().setModel(
-            new JSONModel({
-              search: true,
-              equipment: true,
-              plant: true,
-              status: true,
-              priority: true,
-              maintenanceType: true,
-              planner: true,
-              scheduledDateFrom: true,
-              equipmentType: false,
-              criticality: false,
-              actualStart: false,
-              location: false,
-              createdBy: false,
-              actualEnd: false,
-            }),
-            "filterConfig",
-          );
-        },
-
-        // ================================
-        // Private: Data normalization utils
-        // ================================
-
-        /**
-         * Counts maintenance orders matching
-         * the specified status value.
-         *
-         * @param {object[]} aRows Maintenance order collection
-         * @param {string} sStatus Target status
-         * @returns {number} Number of matching orders
-         */
-        _countOrdersByStatus(aRows, sStatus) {
-          return (aRows || []).filter(
-            (oRow) => formatter.normalizeStatus(oRow.statusLabel) === sStatus,
-          ).length;
-        },
-
-        /**
-         * Counts rows where the specified
-         * boolean flag is true.
-         *
-         * @param {object[]} aRows Maintenance order collection
-         * @param {string} sFlagName Flag property name
-         * @returns {number} Number of matching rows
-         */
-        _countOrdersByFlag(aRows, sFlagName) {
-          return (aRows || []).filter((oRow) => Boolean(oRow[sFlagName]))
-            .length;
-        },
-
-        /**
-         * Refreshes KPI counts from the current orders model.
-         *
-         * @returns {void}
-         */
-        _refreshKpiCounts() {
-          const aRows =
-            this.getView().getModel("orders").getProperty("/rows") || [];
-          const oKpiModel = this.getView().getModel("kpi");
-
-          if (oKpiModel) {
-            oKpiModel.setProperty(
-              "/openCount",
-              this._countOrdersByStatus(aRows, constants.STATUS.OPEN),
-            );
-            oKpiModel.setProperty(
-              "/inProcessCount",
-              this._countOrdersByStatus(
-                aRows,
-                constants.STATUS.IN_PROCESS_DISPLAY,
-              ),
-            );
-            oKpiModel.setProperty(
-              "/criticalCount",
-              this._countOrdersByFlag(aRows, "isCritical"),
-            );
-            oKpiModel.setProperty(
-              "/overdueCount",
-              this._countOrdersByFlag(aRows, "isOverdue"),
-            );
-            oKpiModel.setProperty(
-              "/estimatedCost",
-              formatter.calculateEstimatedCost(aRows),
-            );
-          }
-        },
-
-        // ================================
-        // Mass Change Implementation
-        // ================================
-
-        _initMassChangeModel() {
-          this.getView().setModel(
-            new JSONModel({
-              selectedOrders: [],
-              priority: "MEDIUM",
-            }),
-            "massChange",
-          );
-        },
+        /* =========================================================== */
+        /* Public: Mass Change Actions                                 */
+        /* =========================================================== */
 
         /**
          * Updates the mass-change selection after an order is selected.
@@ -1834,7 +375,7 @@ sap.ui.define(
         /**
          * Opens the mass-change dialog for eligible selected orders with loading indicator.
          *
-         * @returns {void}
+         * @returns {Promise<void>}
          */
         async onMassChangePress() {
           const oUser = AuthService.getCurrentUser();
@@ -1982,50 +523,396 @@ sap.ui.define(
           }
         },
 
+        /* =========================================================== */
+        /* Public: Export Action                                       */
+        /* =========================================================== */
+
         /**
-         * Reloads the order list from the CAP service.
+         * Exports all currently filtered maintenance orders (across all pages)
+         * to a CSV file with loading indicator.
          *
-         * @returns {Promise<void>} Resolves after orders and KPIs are refreshed.
+         * @returns {void}
          */
-        async _reloadOrdersFromBackend() {
+        onExportPress() {
+          const aRows =
+            this._aFilteredOrders && this._aFilteredOrders.length
+              ? this._aFilteredOrders
+              : [];
+
+          if (!aRows.length) {
+            MessageBox.information(
+              this.getView()
+                .getModel("i18n")
+                .getResourceBundle()
+                .getText("maintenanceOrdersExportNoData") || "No orders available to export.",
+            );
+            return;
+          }
+
+          sap.ui.core.BusyIndicator.show(0);
+
+          setTimeout(() => {
+            try {
+              const aCsvRows = [
+                [
+                  "Order",
+                  "Equipment",
+                  "Description",
+                  "Plant",
+                  "Type",
+                  "Priority",
+                  "Status",
+                  "Planner",
+                  "Scheduled From",
+                  "Scheduled To",
+                ].join(","),
+              ];
+
+              aRows.forEach((oRow) => {
+                const cleanDesc = (oRow.description || "").replace(/"/g, '""');
+                aCsvRows.push(
+                  [
+                    oRow.order || "",
+                    oRow.equipment || "",
+                    `"${cleanDesc}"`,
+                    oRow.plant || "",
+                    oRow.type || "",
+                    oRow.priority || "",
+                    oRow.statusLabel || oRow.status || "",
+                    oRow.planner || "",
+                    oRow.scheduledFrom || "",
+                    oRow.scheduledTo || "",
+                  ].join(","),
+                );
+              });
+
+              const sCsvContent = "\uFEFF" + aCsvRows.join("\r\n");
+              const oBlob = new Blob([sCsvContent], {
+                type: "text/csv;charset=utf-8;",
+              });
+
+              const sFileName = `MaintenanceOrders_${new Date()
+                .toISOString()
+                .slice(0, 10)}.csv`;
+
+              const oLink = document.createElement("a");
+              oLink.href = URL.createObjectURL(oBlob);
+              oLink.download = sFileName;
+              document.body.appendChild(oLink);
+              oLink.click();
+
+              document.body.removeChild(oLink);
+              setTimeout(() => URL.revokeObjectURL(oLink.href), 1000);
+
+              MessageToast.show(`Exported ${aRows.length} order(s) successfully.`);
+            } finally {
+              sap.ui.core.BusyIndicator.hide();
+            }
+          }, 30);
+        },
+
+        /* =========================================================== */
+        /* Public: Value Help Dialog                                   */
+        /* =========================================================== */
+
+        /**
+         * Opens the Equipment Value Help dialog with loading indicator.
+         *
+         * @returns {Promise<void>}
+         */
+        async onEquipmentValueHelpPress() {
+          sap.ui.core.BusyIndicator.show(0);
           try {
-            const aRawOrders = await CAPService.getMaintenanceOrders();
-            const aOrderRows = (aRawOrders || []).map((oOrderItem) => ({
-              order: oOrderItem.order_no,
-              equipment: oOrderItem.equipment_no,
-              description: oOrderItem.description,
-              plant: oOrderItem.plant,
-              type: oOrderItem.maintenance_type,
-              priority: oOrderItem.priority,
-              priorityState: oOrderItem.priority_state,
-              statusLabel: oOrderItem.status,
-              statusKey: formatter.normalizeStatus(oOrderItem.status),
-              statusState: formatter.formatStatusState(oOrderItem.status),
-              planner: oOrderItem.planner,
-              scheduledFrom: oOrderItem.scheduled_from,
-              scheduledTo: oOrderItem.scheduled_to,
-              scheduled: `${oOrderItem.scheduled_from} -> ${oOrderItem.scheduled_to}`,
-              isCritical:
-                formatter.normalizePriority(oOrderItem.priority) ===
-                constants.PRIORITY.CRITICAL,
-              isOverdue: formatter.isOverdue(
-                oOrderItem.scheduled_to,
-                oOrderItem.status,
-              ),
-              etag: oOrderItem.etag,
-            }));
+            if (!this._pEquipmentValueHelp) {
+              this._pEquipmentValueHelp = Fragment.load({
+                id: this.getView().getId(),
+                name: "com.fsoft.zpmmaintenancecockpit.view.fragment.EquipmentValueHelp",
+                controller: this,
+              }).then((oDialog) => {
+                this.getView().addDependent(oDialog);
+                return oDialog;
+              });
+            }
 
-            OrderRepository.setOrders(aOrderRows);
-            this._aAllOrders = aOrderRows;
-            this._aFilteredOrders = aOrderRows.slice();
+            this._initEquipmentValueHelpModel();
+            const oDialog = await this._pEquipmentValueHelp;
+            oDialog.open();
 
-            this._refreshKpiCounts(aOrderRows);
-            this._initFilterData(aOrderRows);
-            this._applyPagination();
-          } catch (err) {
-            console.error("Failed to reload orders from backend:", err);
+            const oTable = this.byId("tblEqValueHelp");
+            const aSelectedEquipments =
+              this.getView()
+                .getModel("filters")
+                ?.getProperty("/selectedEquipments") || [];
+
+            if (oTable) {
+              oTable.removeSelections(true);
+              setTimeout(() => {
+                oTable.getItems().forEach((oItem) => {
+                  const oContext = oItem.getBindingContext("equipmentVH");
+                  if (oContext) {
+                    const sEquipment = oContext.getProperty("equipment");
+                    if (aSelectedEquipments.includes(sEquipment)) {
+                      oItem.setSelected(true);
+                    }
+                  }
+                });
+              }, 0);
+            }
+          } finally {
+            sap.ui.core.BusyIndicator.hide();
           }
         },
+
+        /**
+         * Filters equipment records in the Equipment Value Help dialog.
+         *
+         * @param {sap.ui.base.Event} oEvent Search event
+         * @returns {void}
+         */
+        onSearchEquipmentValueHelp(oEvent) {
+          const sValue = oEvent.getParameter("newValue");
+          const oTable = this.byId("tblEqValueHelp");
+          const oBinding = oTable.getBinding("items");
+
+          const oFilter = new Filter({
+            filters: [
+              new Filter("equipment", FilterOperator.Contains, sValue),
+              new Filter("description", FilterOperator.Contains, sValue),
+            ],
+            and: false,
+          });
+
+          oBinding.filter(sValue ? [oFilter] : []);
+        },
+
+        /**
+         * Applies the selected equipment from the Value Help dialog to the FilterBar.
+         *
+         * @returns {void}
+         */
+        onConfirmEquipmentValueHelp() {
+          const oTable = this.byId("tblEqValueHelp");
+          const aSelectedItems = oTable.getSelectedItems();
+
+          if (!aSelectedItems.length) {
+            return;
+          }
+
+          const aSelectedEquipments = aSelectedItems.map(
+            (oItem) =>
+              oItem.getBindingContext("equipmentVH").getObject().equipment,
+          );
+
+          this.getView()
+            .getModel("filters")
+            .setProperty("/selectedEquipments", aSelectedEquipments);
+
+          this.onFilterGo();
+          this.byId("dlgEqValueHelp").close();
+        },
+
+        /**
+         * Closes the Equipment Value Help dialog.
+         *
+         * @returns {void}
+         */
+        onCloseEquipmentValueHelp() {
+          this.byId("dlgEqValueHelp").close();
+        },
+
+        /* =========================================================== */
+        /* Public: Adapt Filters Visibility                            */
+        /* =========================================================== */
+
+        /**
+         * Opens the Adapt Filters dialog with loading indicator.
+         *
+         * @returns {Promise<void>}
+         */
+        async onAdaptFiltersPress() {
+          sap.ui.core.BusyIndicator.show(0);
+          try {
+            const oCurrentConfig = this.getView()
+              .getModel("filterConfig")
+              .getData();
+
+            this.getView().setModel(
+              new JSONModel(JSON.parse(JSON.stringify(oCurrentConfig))),
+              "filterConfigDraft",
+            );
+
+            if (!this._pAdaptFiltersDialog) {
+              this._pAdaptFiltersDialog = Fragment.load({
+                id: this.getView().getId(),
+                name: "com.fsoft.zpmmaintenancecockpit.view.fragment.AdaptFilters",
+                controller: this,
+              }).then((oDialog) => {
+                this.getView().addDependent(oDialog);
+                return oDialog;
+              });
+            }
+
+            const oDialog = await this._pAdaptFiltersDialog;
+            oDialog.open();
+          } finally {
+            sap.ui.core.BusyIndicator.hide();
+          }
+        },
+
+        /**
+         * Applies the current Adapt Filters configuration and closes dialog.
+         *
+         * @returns {void}
+         */
+        onAdaptFiltersApply() {
+          const oDraftData = this.getView()
+            .getModel("filterConfigDraft")
+            .getData();
+
+          this.getView()
+            .getModel("filterConfig")
+            .setData(JSON.parse(JSON.stringify(oDraftData)));
+
+          this.byId("adaptFiltersDialog").close();
+        },
+
+        /**
+         * Closes the Adapt Filters dialog without applying any changes.
+         *
+         * @returns {void}
+         */
+        onAdaptFiltersCancel() {
+          this.byId("adaptFiltersDialog").close();
+        },
+
+        /* =========================================================== */
+        /* Public: Navigation to Order Detail                          */
+        /* =========================================================== */
+
+        /**
+         * Navigates to the Maintenance Order Detail page with loading indicator.
+         *
+         * @param {sap.ui.base.Event} oEvent Press event
+         * @returns {void}
+         */
+        onOrderPress(oEvent) {
+          const oObjectIdentifier = oEvent.getSource();
+          const oContext = oObjectIdentifier.getBindingContext("orders");
+
+          if (!oContext) {
+            return;
+          }
+
+          const sOrder = oContext.getProperty("order");
+          if (!sOrder) {
+            return;
+          }
+
+          sap.ui.core.BusyIndicator.show(0);
+
+          setTimeout(() => {
+            this.getOwnerComponent().getRouter().navTo("RouteOrderDetail", {
+              orderId: sOrder,
+            });
+            sap.ui.core.BusyIndicator.hide();
+          }, 60);
+        },
+
+        /* =========================================================== */
+        /* Public: Pagination Actions                                  */
+        /* =========================================================== */
+
+        /**
+         * Navigates to the first page.
+         *
+         * @returns {void}
+         */
+        onFirstPage() {
+          const oPagination = this.getView().getModel("pagination");
+          if (oPagination && oPagination.getProperty("/hasPrevious")) {
+            oPagination.setProperty("/currentPage", 1);
+            this._applyPagination();
+          }
+        },
+
+        /**
+         * Navigates to the previous page.
+         *
+         * @returns {void}
+         */
+        onPreviousPage() {
+          const oPagination = this.getView().getModel("pagination");
+          if (oPagination && oPagination.getProperty("/hasPrevious")) {
+            const cur = oPagination.getProperty("/currentPage");
+            oPagination.setProperty("/currentPage", cur - 1);
+            this._applyPagination();
+          }
+        },
+
+        /**
+         * Navigates to the next page.
+         *
+         * @returns {void}
+         */
+        onNextPage() {
+          const oPagination = this.getView().getModel("pagination");
+          if (oPagination && oPagination.getProperty("/hasNext")) {
+            const cur = oPagination.getProperty("/currentPage");
+            oPagination.setProperty("/currentPage", cur + 1);
+            this._applyPagination();
+          }
+        },
+
+        /**
+         * Navigates to the last page.
+         *
+         * @returns {void}
+         */
+        onLastPage() {
+          const oPagination = this.getView().getModel("pagination");
+          if (oPagination && oPagination.getProperty("/hasNext")) {
+            const total = oPagination.getProperty("/totalPages");
+            oPagination.setProperty("/currentPage", total);
+            this._applyPagination();
+          }
+        },
+
+        /**
+         * Navigates to a specific clicked page number.
+         *
+         * @param {sap.ui.base.Event} oEvent Button press event
+         * @returns {void}
+         */
+        onPagePress(oEvent) {
+          const oContext = oEvent.getSource().getBindingContext("pagination");
+          if (oContext) {
+            const iPage = oContext.getProperty("page");
+            this.getView()
+              .getModel("pagination")
+              .setProperty("/currentPage", iPage);
+            this._applyPagination();
+          }
+        },
+
+        /**
+         * Updates the page size and resets to page 1.
+         *
+         * @param {sap.ui.base.Event} oEvent Select change event
+         * @returns {void}
+         */
+        onPageSizeChange(oEvent) {
+          const sKey = oEvent.getParameter("selectedItem")
+            ? oEvent.getParameter("selectedItem").getKey()
+            : oEvent.getSource().getSelectedKey();
+          const oPagination = this.getView().getModel("pagination");
+          oPagination.setProperty("/pageSize", parseInt(sKey, 10) || 10);
+          oPagination.setProperty("/currentPage", 1);
+          this._applyPagination();
+        },
+
+        /* =========================================================== */
+        /* Public: Import Excel Actions                                */
+        /* =========================================================== */
 
         /**
          * Opens the import-orders dialog with loading indicator.
@@ -2281,6 +1168,662 @@ sap.ui.define(
           }
           if (this._pImportOrdersDialog) {
             this._pImportOrdersDialog.then((oDialog) => oDialog.close());
+          }
+        },
+
+        /* =========================================================== */
+        /* Private / Internal Helper Methods                           */
+        /* =========================================================== */
+
+        /**
+         * Loads page data and initializes dependent view models.
+         *
+         * @returns {Promise<void>} Resolves after controller data is initialized.
+         */
+        async _initControllerAsync() {
+          try {
+            // Step 2: Load equipment master data from CAP
+            const aEquipment = await CAPService.getEquipments();
+            this.getView().setModel(
+              new JSONModel({
+                equipment: aEquipment || [],
+              }),
+              "equipmentData",
+            );
+
+            // Step 3: Load maintenance orders from CAP
+            const aRawOrders = await CAPService.getMaintenanceOrders();
+
+            // Default navigation items
+            const aNavItems = [
+              { text: "Orders", icon: "sap-icon://wrench", selected: true },
+              {
+                text: "Operations",
+                icon: "sap-icon://action-settings",
+                selected: false,
+              },
+              {
+                text: "Equipment",
+                icon: "sap-icon://machine",
+                selected: false,
+              },
+              {
+                text: "Technicians",
+                icon: "sap-icon://group",
+                selected: false,
+              },
+            ];
+
+            // Transform maintenance order records
+            const aOrderRows = (aRawOrders || []).map((oOrderItem) => ({
+              order: oOrderItem.order_no,
+              equipment: oOrderItem.equipment_no,
+              description: oOrderItem.description,
+              plant: oOrderItem.plant,
+              type: oOrderItem.maintenance_type,
+              priority: oOrderItem.priority,
+              priorityState: oOrderItem.priority_state,
+              statusLabel: oOrderItem.status,
+              statusKey: formatter.normalizeStatus(oOrderItem.status),
+              statusState: formatter.formatStatusState(oOrderItem.status),
+              planner: oOrderItem.planner,
+              scheduledFrom: oOrderItem.scheduled_from,
+              scheduledTo: oOrderItem.scheduled_to,
+              scheduled: `${oOrderItem.scheduled_from} -> ${oOrderItem.scheduled_to}`,
+              isCritical:
+                formatter.normalizePriority(oOrderItem.priority) ===
+                constants.PRIORITY.CRITICAL,
+              isOverdue: formatter.isOverdue(
+                oOrderItem.scheduled_to,
+                oOrderItem.status,
+              ),
+              etag: oOrderItem.etag,
+            }));
+
+            this._aAllOrders = aOrderRows;
+            this._aFilteredOrders = aOrderRows.slice();
+
+            OrderRepository.setOrders(aOrderRows);
+
+            // Register Navigation model
+            this.getView().setModel(
+              new JSONModel({
+                items: aNavItems,
+              }),
+              "navModel",
+            );
+
+            // Register Orders model
+            this.getView().setModel(
+              new JSONModel({
+                rows: aOrderRows,
+              }),
+              "orders",
+            );
+
+            // Register Pagination model
+            this.getView().setModel(
+              new JSONModel({
+                currentPage: 1,
+                pageSize: 10,
+                pageSizeOptions: [
+                  { key: "5", text: "5 / page" },
+                  { key: "10", text: "10 / page" },
+                  { key: "20", text: "20 / page" },
+                  { key: "50", text: "50 / page" },
+                ],
+                totalItems: aOrderRows.length,
+                totalPages: Math.ceil(aOrderRows.length / 10) || 1,
+                startIndex: aOrderRows.length > 0 ? 1 : 0,
+                endIndex: Math.min(10, aOrderRows.length),
+                hasPrevious: false,
+                hasNext: aOrderRows.length > 10,
+                pageButtons: [],
+              }),
+              "pagination",
+            );
+
+            // Create KPI dashboard model
+            this.getView().setModel(
+              new JSONModel({
+                openCount: this._countOrdersByStatus(
+                  aOrderRows,
+                  constants.STATUS.OPEN,
+                ),
+                inProcessCount: this._countOrdersByStatus(
+                  aOrderRows,
+                  constants.STATUS.IN_PROCESS_DISPLAY,
+                ),
+                criticalCount: this._countOrdersByFlag(
+                  aOrderRows,
+                  "isCritical",
+                ),
+                overdueCount: this._countOrdersByFlag(aOrderRows, "isOverdue"),
+                estimatedCost: formatter.calculateEstimatedCost(aOrderRows),
+                activeFilterKey: "",
+                visibleOrderCount: aOrderRows.length,
+              }),
+              "kpi",
+            );
+
+            // Apply initial pagination
+            this._applyPagination();
+
+            // Initialize Mass Change model
+            this._initMassChangeModel();
+
+            // Build dropdown values for FilterBar
+            this._initFilterData(aOrderRows);
+
+            // Initialize Adapt Filters settings
+            this._initFilterConfigModel();
+          } catch (err) {
+            console.error(
+              "Failed to initialize MaintenanceOrders from CAP:",
+              err,
+            );
+            this.getView().setModel(new JSONModel({ rows: [] }), "orders");
+          }
+        },
+
+        /**
+         * Loads and opens the Create Maintenance Order dialog with loading indicator.
+         *
+         * @returns {Promise<void>}
+         */
+        async _openCreateOrderDialog() {
+          sap.ui.core.BusyIndicator.show(0);
+          try {
+            this._ensureDialogController();
+
+            if (!this._pCreateOrderDialog) {
+              this._pCreateOrderDialog = Fragment.load({
+                id: this.getView().getId(),
+                name: "com.fsoft.zpmmaintenancecockpit.view.fragment.CreateMaintenanceOrder",
+                controller: this._dialogController,
+              }).then((oDialog) => {
+                this.getView().addDependent(oDialog);
+                return oDialog;
+              });
+            }
+
+            const oDialog = await this._pCreateOrderDialog;
+            this._dialogController.initDialogState();
+            oDialog.open();
+          } finally {
+            sap.ui.core.BusyIndicator.hide();
+          }
+        },
+
+        /**
+         * Creates the Create Maintenance Order dialog controller
+         * if it does not already exist.
+         *
+         * @returns {void}
+         */
+        _ensureDialogController() {
+          if (!this._dialogController) {
+            this._dialogController = new CreateMaintenanceOrderDialog();
+            this._dialogController.setParentController(this);
+          }
+        },
+
+        /**
+         * Builds the Equipment Detail model and displays the Equipment Detail panel.
+         *
+         * @param {object} oOrder Selected maintenance order
+         * @returns {void}
+         */
+        _openEquipmentDetail(oOrder) {
+          if (!oOrder) {
+            return;
+          }
+
+          const aEquipment =
+            this.getView()
+              .getModel("equipmentData")
+              ?.getProperty("/equipment") || [];
+
+          const oEquipment = aEquipment.find(
+            (item) => item.equipment === oOrder.equipment,
+          );
+
+          const sTargetEquipmentKey = oEquipment
+            ? oEquipment.equipment
+            : oOrder.equipment;
+
+          const aAllOrders =
+            this.getView().getModel("orders")?.getProperty("/rows") || [];
+          const aMatchingOrders = aAllOrders.filter(
+            (row) => row.equipment === sTargetEquipmentKey,
+          );
+
+          let aRecentOrdersList = [];
+          if (aMatchingOrders.length > 0) {
+            aRecentOrdersList = aMatchingOrders.map((row) => ({
+              order: row.order,
+              description: row.description,
+              status: row.statusLabel || row.status,
+              statusState: formatter.formatStatusState(
+                row.statusLabel || row.status,
+              ),
+            }));
+          } else if (
+            oEquipment &&
+            oEquipment.orders &&
+            Array.isArray(oEquipment.orders) &&
+            oEquipment.orders.length > 0
+          ) {
+            aRecentOrdersList = oEquipment.orders.map((oRecentOrder) => ({
+              order: oRecentOrder.order_no || oRecentOrder.order,
+              description: oRecentOrder.description,
+              status: oRecentOrder.status,
+              statusState: formatter.formatStatusState(oRecentOrder.status),
+            }));
+          } else if (
+            oEquipment &&
+            oEquipment.recentOrders &&
+            Array.isArray(oEquipment.recentOrders) &&
+            oEquipment.recentOrders.length > 0
+          ) {
+            aRecentOrdersList = oEquipment.recentOrders.map((oRecentOrder) => ({
+              order: oRecentOrder.order,
+              description: oRecentOrder.description,
+              status: oRecentOrder.status,
+              statusState: formatter.formatStatusState(oRecentOrder.status),
+            }));
+          } else if (oOrder.order) {
+            aRecentOrdersList = [
+              {
+                order: oOrder.order,
+                description: oOrder.description,
+                status: oOrder.statusLabel || oOrder.status,
+                statusState: formatter.formatStatusState(
+                  oOrder.statusLabel || oOrder.status,
+                ),
+              },
+            ];
+          }
+
+          const oEquipmentDetailModel = new JSONModel({
+            header: oEquipment
+              ? `${oEquipment.equipment} - ${oEquipment.description}`
+              : `${oOrder.equipment} - ${oOrder.description}`,
+            type: oEquipment ? oEquipment.type : oOrder.type,
+            plant: oEquipment ? oEquipment.plant : oOrder.plant,
+            location: oEquipment
+              ? oEquipment.location
+              : `Plant ${oOrder.plant}`,
+            status: oEquipment ? oEquipment.status : oOrder.statusLabel,
+            statusState: formatter.formatStatusState(
+              oEquipment ? oEquipment.status : oOrder.statusLabel,
+            ),
+            criticality: oEquipment ? oEquipment.criticality : oOrder.priority,
+            manufacturer: oEquipment ? oEquipment.manufacturer : "N/A",
+            recentOrders: aRecentOrdersList,
+          });
+
+          this.getView().setModel(oEquipmentDetailModel, "equipmentDetail");
+          this.getView()
+            .getModel("ui")
+            .setProperty("/layout", "TwoColumnsMidExpanded");
+        },
+
+        /**
+         * Applies or clears a KPI filter on the orders table.
+         *
+         * @param {string} sFilterKey Identifier for the active KPI filter.
+         * @param {sap.ui.model.Filter} [oFilter] Deprecated filter param.
+         * @returns {void}
+         */
+        _applyKpiFilter(sFilterKey, oFilter) {
+          const oKpiModel = this.getView().getModel("kpi");
+          const sActiveFilterKey = oKpiModel.getProperty("/activeFilterKey");
+          const aAll = this._aAllOrders || [];
+
+          if (sActiveFilterKey === sFilterKey) {
+            this._aFilteredOrders = aAll.slice();
+            this.byId("selStatus")?.setSelectedKey("All");
+            this.byId("selPriority")?.setSelectedKey("All");
+            oKpiModel.setProperty("/activeFilterKey", "");
+          } else {
+            oKpiModel.setProperty("/activeFilterKey", sFilterKey);
+
+            if (sFilterKey === "STATUS_OPEN") {
+              this._aFilteredOrders = aAll.filter(
+                (r) =>
+                  r.statusKey === constants.STATUS.OPEN ||
+                  r.statusLabel === "OPEN",
+              );
+            } else if (sFilterKey === "STATUS_IN_PROCESS") {
+              this._aFilteredOrders = aAll.filter(
+                (r) =>
+                  r.statusKey === constants.STATUS.IN_PROCESS_DISPLAY ||
+                  r.statusLabel === "IN PROCESS",
+              );
+            } else if (sFilterKey === "PRIORITY_CRITICAL") {
+              this._aFilteredOrders = aAll.filter(
+                (r) => r.isCritical === true || r.priority === "CRITICAL",
+              );
+            } else if (sFilterKey === "OVERDUE") {
+              this._aFilteredOrders = aAll.filter((r) => r.isOverdue === true);
+            } else {
+              this._aFilteredOrders = aAll.slice();
+            }
+          }
+
+          const oPagination = this.getView().getModel("pagination");
+          if (oPagination) {
+            oPagination.setProperty("/currentPage", 1);
+          }
+
+          this._applyPagination();
+        },
+
+        /**
+         * Applies client-side pagination to the filtered orders list.
+         *
+         * @returns {void}
+         */
+        _applyPagination() {
+          const oPaginationModel = this.getView().getModel("pagination");
+          if (!oPaginationModel) {
+            return;
+          }
+
+          const oTable = this.byId("ordersTable");
+          if (oTable) {
+            oTable.setBusyIndicatorDelay(0);
+            oTable.setBusy(true);
+          }
+
+          const iPageSize =
+            parseInt(oPaginationModel.getProperty("/pageSize"), 10) || 10;
+          const aFiltered = this._aFilteredOrders || [];
+          const iTotalItems = aFiltered.length;
+          const iTotalPages = Math.max(1, Math.ceil(iTotalItems / iPageSize));
+          let iCurrentPage =
+            parseInt(oPaginationModel.getProperty("/currentPage"), 10) || 1;
+
+          if (iCurrentPage > iTotalPages) {
+            iCurrentPage = iTotalPages;
+          }
+          if (iCurrentPage < 1) {
+            iCurrentPage = 1;
+          }
+
+          const iStartIndex =
+            iTotalItems === 0 ? 0 : (iCurrentPage - 1) * iPageSize + 1;
+          const iEndIndex = Math.min(iTotalItems, iCurrentPage * iPageSize);
+
+          const aPagedRows = aFiltered.slice(
+            (iCurrentPage - 1) * iPageSize,
+            iCurrentPage * iPageSize,
+          );
+
+          // Build dynamic page buttons (up to 5 page window)
+          const aPageButtons = [];
+          let iStartP = Math.max(1, iCurrentPage - 2);
+          let iEndP = Math.min(iTotalPages, iStartP + 4);
+          if (iEndP - iStartP < 4) {
+            iStartP = Math.max(1, iEndP - 4);
+          }
+          for (let p = iStartP; p <= iEndP; p++) {
+            aPageButtons.push({
+              page: p,
+              text: String(p),
+              current: p === iCurrentPage,
+            });
+          }
+
+          oPaginationModel.setProperty("/currentPage", iCurrentPage);
+          oPaginationModel.setProperty("/totalPages", iTotalPages);
+          oPaginationModel.setProperty("/totalItems", iTotalItems);
+          oPaginationModel.setProperty("/startIndex", iStartIndex);
+          oPaginationModel.setProperty("/endIndex", iEndIndex);
+          oPaginationModel.setProperty("/hasPrevious", iCurrentPage > 1);
+          oPaginationModel.setProperty("/hasNext", iCurrentPage < iTotalPages);
+          oPaginationModel.setProperty("/pageButtons", aPageButtons);
+
+          const oOrdersModel = this.getView().getModel("orders");
+          if (oOrdersModel) {
+            oOrdersModel.setProperty("/rows", aPagedRows);
+            oOrdersModel.refresh(true);
+          }
+
+          const oKpiModel = this.getView().getModel("kpi");
+          if (oKpiModel) {
+            oKpiModel.setProperty("/visibleOrderCount", iTotalItems);
+            oKpiModel.setProperty(
+              "/estimatedCost",
+              formatter.calculateEstimatedCost(aFiltered),
+            );
+          }
+
+          setTimeout(() => {
+            if (oTable) {
+              oTable.setBusy(false);
+            }
+          }, 80);
+        },
+
+        /**
+         * Refreshes KPI counters after order data changes.
+         *
+         * @param {object[]} [aExplicitRows] Optional order collection to calculate.
+         * @returns {void}
+         */
+        _refreshKpiCounts(aExplicitRows) {
+          const aRows =
+            aExplicitRows ||
+            (this.getView().getModel("orders")
+              ? this.getView().getModel("orders").getProperty("/rows")
+              : []) ||
+            [];
+
+          const oKpiModel = this.getView().getModel("kpi");
+          if (!oKpiModel) {
+            return;
+          }
+
+          oKpiModel.setProperty(
+            "/openCount",
+            this._countOrdersByStatus(aRows, constants.STATUS.OPEN),
+          );
+
+          oKpiModel.setProperty(
+            "/inProcessCount",
+            this._countOrdersByStatus(
+              aRows,
+              constants.STATUS.IN_PROCESS_DISPLAY,
+            ),
+          );
+
+          oKpiModel.setProperty(
+            "/criticalCount",
+            this._countOrdersByFlag(aRows, "isCritical"),
+          );
+
+          oKpiModel.setProperty(
+            "/overdueCount",
+            this._countOrdersByFlag(aRows, "isOverdue"),
+          );
+
+          oKpiModel.setProperty(
+            "/estimatedCost",
+            formatter.calculateEstimatedCost(aRows),
+          );
+
+          oKpiModel.setProperty("/visibleOrderCount", aRows.length);
+        },
+
+        /**
+         * Builds FilterBar dropdown values from
+         * maintenance order data.
+         *
+         * @param {object[]} aRows Maintenance order collection
+         * @returns {void}
+         */
+        _initFilterData(aRows) {
+          const unique = (aValues) => [...new Set(aValues)];
+
+          const oFilterModel = new JSONModel({
+            equipments: [...unique(aRows.map((oRow) => oRow.equipment))],
+            plants: ["All", ...unique(aRows.map((oRow) => oRow.plant))],
+            statuses: ["All", ...unique(aRows.map((oRow) => oRow.statusLabel))],
+            priorities: ["All", ...unique(aRows.map((oRow) => oRow.priority))],
+            maintenanceTypes: [
+              "All",
+              ...unique(aRows.map((oRow) => oRow.type)),
+            ],
+            planners: ["All", ...unique(aRows.map((oRow) => oRow.planner))],
+            selectedEquipments: [],
+          });
+
+          this.getView().setModel(oFilterModel, "filters");
+        },
+
+        /**
+         * Initializes the mass-change model with default values.
+         *
+         * @returns {void}
+         */
+        _initMassChangeModel() {
+          this.getView().setModel(
+            new JSONModel({
+              selectedOrders: [],
+              priority: "MEDIUM",
+            }),
+            "massChange",
+          );
+        },
+
+        /**
+         * Initializes the Equipment Value Help model.
+         *
+         * Creates a unique equipment list from
+         * maintenance order data.
+         *
+         * @returns {void}
+         */
+        _initEquipmentValueHelpModel() {
+          const aRows =
+            this.getView().getModel("orders").getProperty("/rows") || [];
+
+          const mUniqueEquipment = {};
+
+          aRows.forEach((oRow) => {
+            if (!mUniqueEquipment[oRow.equipment]) {
+              mUniqueEquipment[oRow.equipment] = {
+                equipment: oRow.equipment,
+                description: oRow.description,
+                plant: oRow.plant,
+              };
+            }
+          });
+
+          this.getView().setModel(
+            new JSONModel({
+              equipments: Object.values(mUniqueEquipment),
+            }),
+            "equipmentVH",
+          );
+        },
+
+        /**
+         * Initializes the Adapt Filters configuration model.
+         *
+         * @returns {void}
+         */
+        _initFilterConfigModel() {
+          this.getView().setModel(
+            new JSONModel({
+              search: true,
+              equipment: true,
+              plant: true,
+              status: true,
+              priority: true,
+              maintenanceType: true,
+              planner: true,
+              scheduledDateFrom: true,
+              equipmentType: false,
+              criticality: false,
+              actualStart: false,
+              location: false,
+              createdBy: false,
+              actualEnd: false,
+            }),
+            "filterConfig",
+          );
+        },
+
+        /**
+         * Counts maintenance orders matching the specified status value.
+         *
+         * @param {object[]} aRows Maintenance order collection
+         * @param {string} sStatus Target status
+         * @returns {number} Number of matching orders
+         */
+        _countOrdersByStatus(aRows, sStatus) {
+          return (aRows || []).filter(
+            (oRow) => formatter.normalizeStatus(oRow.statusLabel) === sStatus,
+          ).length;
+        },
+
+        /**
+         * Counts rows where the specified boolean flag is true.
+         *
+         * @param {object[]} aRows Maintenance order collection
+         * @param {string} sFlagName Flag property name
+         * @returns {number} Number of matching rows
+         */
+        _countOrdersByFlag(aRows, sFlagName) {
+          return (aRows || []).filter((oRow) => Boolean(oRow[sFlagName]))
+            .length;
+        },
+
+        /**
+         * Reloads the order list from the CAP service.
+         *
+         * @returns {Promise<void>} Resolves after orders and KPIs are refreshed.
+         */
+        async _reloadOrdersFromBackend() {
+          try {
+            const aRawOrders = await CAPService.getMaintenanceOrders();
+            const aOrderRows = (aRawOrders || []).map((oOrderItem) => ({
+              order: oOrderItem.order_no,
+              equipment: oOrderItem.equipment_no,
+              description: oOrderItem.description,
+              plant: oOrderItem.plant,
+              type: oOrderItem.maintenance_type,
+              priority: oOrderItem.priority,
+              priorityState: oOrderItem.priority_state,
+              statusLabel: oOrderItem.status,
+              statusKey: formatter.normalizeStatus(oOrderItem.status),
+              statusState: formatter.formatStatusState(oOrderItem.status),
+              planner: oOrderItem.planner,
+              scheduledFrom: oOrderItem.scheduled_from,
+              scheduledTo: oOrderItem.scheduled_to,
+              scheduled: `${oOrderItem.scheduled_from} -> ${oOrderItem.scheduled_to}`,
+              isCritical:
+                formatter.normalizePriority(oOrderItem.priority) ===
+                constants.PRIORITY.CRITICAL,
+              isOverdue: formatter.isOverdue(
+                oOrderItem.scheduled_to,
+                oOrderItem.status,
+              ),
+              etag: oOrderItem.etag,
+            }));
+
+            OrderRepository.setOrders(aOrderRows);
+            this._aAllOrders = aOrderRows;
+            this._aFilteredOrders = aOrderRows.slice();
+
+            this._refreshKpiCounts(aOrderRows);
+            this._initFilterData(aOrderRows);
+            this._applyPagination();
+          } catch (err) {
+            console.error("Failed to reload orders from backend:", err);
           }
         },
       },

@@ -33,4 +33,3 @@ sap.ui.define(
     });
   },
 );
-//# sourceMappingURL=Technicians.controller.js.map

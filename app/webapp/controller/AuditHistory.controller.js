@@ -42,4 +42,3 @@ sap.ui.define(
     });
   },
 );
-//# sourceMappingURL=AuditHistory.controller.js.map
