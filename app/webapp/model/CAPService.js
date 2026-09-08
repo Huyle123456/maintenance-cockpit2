@@ -4,11 +4,17 @@ sap.ui.define([], function () {
   const DIRECT_SRV_URL = "https://3b342f32trial-dev-zpm-maintenance-cockpit-srv.cfapps.us10-001.hana.ondemand.com";
 
   function getBaseUrl() {
-    const sPath = sap.ui.require.toUrl("com/fsoft/zpmmaintenancecockpit");
-    if (!sPath || sPath === "." || sPath === "./") {
+    // If running directly on local CAP server (port 4004), use relative path
+    if (
+      typeof window !== "undefined" &&
+      window.location &&
+      (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") &&
+      window.location.port === "4004"
+    ) {
       return "";
     }
-    return sPath.replace(/\/$/, "");
+    // In SAP Build Work Zone, Fiori Launchpad, or HTML5 repo, use DIRECT_SRV_URL directly
+    return DIRECT_SRV_URL;
   }
 
   function getODataUrl() {
@@ -20,7 +26,8 @@ sap.ui.define([], function () {
   }
 
   function _getDirectUrl(url) {
-    if (url.startsWith(DIRECT_SRV_URL)) {
+    if (!url) return DIRECT_SRV_URL;
+    if (url.startsWith("http://") || url.startsWith("https://")) {
       return url;
     }
     const idx = url.indexOf("/odata/v4/maintenance");
@@ -31,7 +38,7 @@ sap.ui.define([], function () {
     if (apiIdx !== -1) {
       return DIRECT_SRV_URL + url.substring(apiIdx);
     }
-    return url;
+    return DIRECT_SRV_URL + (url.startsWith("/") ? url : "/" + url);
   }
 
   async function _fetchJson(url, options = {}) {
@@ -41,38 +48,22 @@ sap.ui.define([], function () {
     };
     options.headers = Object.assign(defaultHeaders, options.headers || {});
     
-    // First try the standard relative route
+    // Resolve target URL directly and ensure proper URI encoding
+    let targetUrl = url.startsWith("http://") || url.startsWith("https://") ? url : _getDirectUrl(url);
+    targetUrl = encodeURI(targetUrl);
+
     try {
-      const res = await fetch(url, options);
+      const res = await fetch(targetUrl, options);
       if (res.ok) {
         if (res.status === 204) return null;
         return await res.json();
       }
-      // If relative route returns error (404, 500 etc.), fallback to direct backend
-      const directUrl = _getDirectUrl(url);
-      if (directUrl && directUrl !== url) {
-        console.warn(`[CAPService] Request ${url} returned ${res.status}. Falling back to direct URL: ${directUrl}`);
-        const fallbackRes = await fetch(directUrl, options);
-        if (fallbackRes.ok) {
-          if (fallbackRes.status === 204) return null;
-          return await fallbackRes.json();
-        }
-      }
-      const errText = await res.text();
-      throw new Error(`CAP Service error [${res.status}]: ${errText}`);
+      const errText = await res.text().catch(() => "");
+      console.warn(`[CAPService] Response ${res.status} on ${targetUrl}:`, errText);
+      return { value: [] };
     } catch (err) {
-      // If network error on relative URL, try direct URL
-      const directUrl = _getDirectUrl(url);
-      if (directUrl && directUrl !== url) {
-        try {
-          const fallbackRes = await fetch(directUrl, options);
-          if (fallbackRes.ok) {
-            if (fallbackRes.status === 204) return null;
-            return await fallbackRes.json();
-          }
-        } catch (fbErr) {}
-      }
-      throw err;
+      console.warn(`[CAPService] Fetch error on ${targetUrl}:`, err);
+      return { value: [] };
     }
   }
 
@@ -83,15 +74,15 @@ sap.ui.define([], function () {
     getDirectUrl: _getDirectUrl,
 
     /**
-     * Get all maintenance orders with operations
+     * Get all maintenance orders (optimized for fast table rendering)
      */
     async getMaintenanceOrders() {
-      const data = await _fetchJson(`${getODataUrl()}/MaintenanceOrders?$expand=operations,equipment&$orderby=order_no desc`);
-      return data.value || [];
+      const data = await _fetchJson(`${getODataUrl()}/MaintenanceOrders?$orderby=order_no desc&$top=5000`);
+      return data?.value || [];
     },
 
     /**
-     * Get a single maintenance order by ID
+     * Get a single maintenance order by ID (with deep expands)
      */
     async getOrderById(orderId) {
       const data = await _fetchJson(`${getODataUrl()}/MaintenanceOrders('${orderId}')?$expand=operations,materials,equipment,history`);
@@ -174,8 +165,8 @@ sap.ui.define([], function () {
      * Get equipment list
      */
     async getEquipments() {
-      const data = await _fetchJson(`${getODataUrl()}/Equipments?$expand=orders`);
-      return data.value || [];
+      const data = await _fetchJson(`${getODataUrl()}/Equipments`);
+      return data?.value || [];
     },
 
     /**
@@ -249,8 +240,8 @@ sap.ui.define([], function () {
      * Get audit history entries
      */
     async getAuditHistory() {
-      const data = await _fetchJson(`${getODataUrl()}/AuditHistory?$orderby=timestamp desc`);
-      return data.value || [];
+      const data = await _fetchJson(`${getODataUrl()}/AuditHistory?$orderby=timestamp desc&$top=500`);
+      return data?.value || [];
     },
 
     /**

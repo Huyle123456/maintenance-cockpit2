@@ -3,8 +3,6 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
 
   const STORAGE_KEY = "zpm_maintenance_current_account";
   const LOGGED_IN_KEY = "zpm_maintenance_is_logged_in";
-  const BACKEND_PREFIX = (window.location.hostname || "").includes("launchpad.") ? "/destinations/srv-api" : "";
-  const CAP_USERINFO_URL = `${BACKEND_PREFIX}/odata/v4/maintenance/getUserInfo()`;
 
   const DEFAULT_ACCOUNTS = [
     {
@@ -250,7 +248,6 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
      * Fetch authenticated user info from SAP Approuter, Work Zone, or CAP service
      */
     async fetchSapUser() {
-      const baseUrl = _getBaseUrl();
       const lpUser = (function () {
         try {
           if (window.sap && sap.ushell && sap.ushell.Container) {
@@ -267,56 +264,33 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
         return null;
       })();
 
-      // 1. Check SAP Approuter / Work Zone user-api
-      try {
-        const res = await fetch(`${baseUrl}/user-api/currentUser`, {
-          headers: { Accept: "application/json" }
-        });
-        if (res.ok) {
-          const sapUser = await res.json();
-          if (sapUser && (sapUser.name || sapUser.email || sapUser.firstname || sapUser.scopes)) {
-            this._applySapUser(sapUser, lpUser);
-            return;
-          }
-        }
-      } catch (e) {}
+      // 1. If running inside SAP Build Work Zone / Fiori Launchpad, use Launchpad user directly
+      if (lpUser) {
+        this._applyLaunchpadUser(lpUser);
+        return;
+      }
 
-      // 2. Check CAP Backend getUserInfo()
+      // 2. Only check local endpoint if running in local development mode
       try {
-        let resCap = await fetch(`${baseUrl}/odata/v4/maintenance/getUserInfo()`, {
-          headers: { Accept: "application/json" }
-        });
-        if (!resCap.ok && resCap.status >= 500) {
-          resCap = await fetch("https://3b342f32trial-dev-zpm-maintenance-cockpit-srv.cfapps.us10-001.hana.ondemand.com/odata/v4/maintenance/getUserInfo()", {
+        const isLocal4004 =
+          typeof window !== "undefined" &&
+          window.location &&
+          (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") &&
+          window.location.port === "4004";
+
+        if (isLocal4004) {
+          const res = await fetch("/user-api/currentUser", {
             headers: { Accept: "application/json" }
           });
-        }
-        if (resCap.ok) {
-          const capUser = await resCap.json();
-          if (capUser && capUser.name && capUser.name !== "anonymous") {
-            this._applyCapUser(capUser, lpUser);
-            return;
-          }
-        }
-      } catch (e) {
-        try {
-          const resDirect = await fetch("https://3b342f32trial-dev-zpm-maintenance-cockpit-srv.cfapps.us10-001.hana.ondemand.com/odata/v4/maintenance/getUserInfo()", {
-            headers: { Accept: "application/json" }
-          });
-          if (resDirect.ok) {
-            const capUser = await resDirect.json();
-            if (capUser && capUser.name && capUser.name !== "anonymous") {
-              this._applyCapUser(capUser, lpUser);
+          if (res.ok) {
+            const sapUser = await res.json();
+            if (sapUser && (sapUser.name || sapUser.email || sapUser.firstname || sapUser.scopes)) {
+              this._applySapUser(sapUser, null);
               return;
             }
           }
-        } catch (dirErr) {}
-      }
-
-      // 3. Fallback to Launchpad user if present
-      if (lpUser) {
-        this._applyLaunchpadUser(lpUser);
-      }
+        }
+      } catch (e) {}
     },
 
     _applySapUser(sapUser, lpUser) {
@@ -416,20 +390,28 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
 
     _applyLaunchpadUser(lpUser) {
       const displayName = lpUser.name || "SAP User";
-      const email = lpUser.email || "user@sap.com";
-      const userId = lpUser.id || "user";
-      const isAdmin = true; // Default admin access for Work Zone user unless restricted by backend
+      const rawEmail = (lpUser.email || "").trim().toLowerCase();
+      const rawId = (lpUser.id || "").trim().toLowerCase();
+
+      // Check if user is an Administrator:
+      // The administrator account is yuhuyle3@gmail.com, or user/email explicitly containing 'admin'.
+      // All other accounts (e.g. lehoangngocthoi01@gmail.com) assigned Maintenance_User_RoleCollection are Standard Users (Read-only).
+      const isAdmin =
+        rawEmail === "yuhuyle3@gmail.com" ||
+        rawId === "admin" ||
+        rawEmail.includes("admin") ||
+        rawId.includes("admin");
 
       const userObj = {
-        id: userId,
-        username: userId,
+        id: lpUser.id || (isAdmin ? "admin" : "user"),
+        username: lpUser.id || (isAdmin ? "admin" : "user"),
         name: displayName,
         role: isAdmin ? "admin" : "user",
         roleText: isAdmin ? "Admin" : "User",
         avatarInitials: _generateInitials(displayName),
         avatarColor: isAdmin ? "Accent6" : "Accent1",
-        email: email,
-        description: "SAP Build Work Zone User",
+        email: lpUser.email || (isAdmin ? "admin@maintenance.sap" : "user@maintenance.sap"),
+        description: `SAP Build Work Zone · ${isAdmin ? "Administrator" : "Standard User (Read-Only)"}`,
         isAdmin: isAdmin,
         isUser: !isAdmin,
         permissions: {
@@ -453,6 +435,8 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
         _oAuthModel.setProperty("/currentUser", userObj);
         _oAuthModel.setProperty("/canSwitchRole", isAdmin);
         _oAuthModel.setProperty("/selectedAccountId", userObj.id);
+        _oAuthModel.setProperty("/isLoggedIn", true);
+        _oAuthModel.setProperty("/isSapXsuaa", true);
       }
     },
 

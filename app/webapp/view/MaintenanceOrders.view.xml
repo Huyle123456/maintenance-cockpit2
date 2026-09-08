@@ -52,15 +52,13 @@
                                                 text="{i18n>maintenanceOrdersActionCreate}"
                                                 type="Emphasized"
                                                 icon="sap-icon://add"
-                                                enabled="{auth>/currentUser/permissions/createOrder}"
-                                                tooltip="{= ${auth>/currentUser/permissions/createOrder} ? ${i18n>maintenanceOrdersActionCreate} : ${i18n>roleAdminRequired} }"
+                                                visible="{auth>/currentUser/permissions/createOrder}"
                                                 press="onCreateOrderPress"
                                             />
                                             <Button
                                                 id="btnMassChange"
                                                 text="{i18n>maintenanceOrdersActionMassChange}"
-                                                enabled="{auth>/currentUser/permissions/massChange}"
-                                                tooltip="{= ${auth>/currentUser/permissions/massChange} ? ${i18n>maintenanceOrdersActionMassChange} : ${i18n>roleAdminRequired} }"
+                                                visible="{auth>/currentUser/permissions/massChange}"
                                                 press="onMassChangePress"
                                             />
 
@@ -68,8 +66,7 @@
                                                 id="btnImport"
                                                 text="{i18n>maintenanceOrdersActionImport}"
                                                 icon="sap-icon://excel-attachment"
-                                                enabled="{auth>/currentUser/permissions/createOrder}"
-                                                tooltip="{= ${auth>/currentUser/permissions/createOrder} ? ${i18n>maintenanceOrdersActionImport} : ${i18n>roleAdminRequired} }"
+                                                visible="{auth>/currentUser/permissions/createOrder}"
                                                 press="onImportOrdersPress"
                                             />
 
