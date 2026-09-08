@@ -7,7 +7,7 @@
         id="userProfilePopover"
         title="{i18n>userProfileTitle}"
         placement="Bottom"
-        contentWidth="420px"
+        contentWidth="620px"
         class="sapUiContentPadding"
     >
         <content>
@@ -94,7 +94,7 @@
                     visible="{= !${auth>/canSwitchRole} }"
                 >
                     <MessageStrip
-                        text="Tài khoản Standard User: Chỉ có quyền xem và xuất dữ liệu. Không thể chuyển đổi quyền sang Admin."
+                        text="{i18n>standardUserNotification}"
                         type="Information"
                         showIcon="true"
                         class="sapUiTinyMarginBottom"
