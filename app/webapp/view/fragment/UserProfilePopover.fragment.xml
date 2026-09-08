@@ -55,7 +55,7 @@
                     visible="{auth>/canSwitchRole}"
                 >
                     <MessageStrip
-                        text="{= ${auth>/currentUser/isAdmin} ? 'Tài khoản có quyền Admin. Bạn có thể chuyển sang User để kiểm tra giao diện phân quyền.' : 'Đang giả lập quyền User để test. Toàn bộ nút chức năng thêm/sửa/xóa/hủy đã bị khóa (disabled).' }"
+                        text="{= ${auth>/currentUser/isAdmin} ? ${i18n>userAdminInfoMessage} : ${i18n>userSimulationWarningMessage} }"
                         type="{= ${auth>/currentUser/isAdmin} ? 'Information' : 'Warning' }"
                         showIcon="true"
                         class="sapUiTinyMarginBottom"
@@ -74,13 +74,13 @@
                         <items>
                             <SegmentedButtonItem
                                 key="admin"
-                                text="Admin (Toàn quyền)"
+                                text="{i18n>userSwitchAdminOption}"
                                 icon="sap-icon://user-settings"
                                 width="50%"
                             />
                             <SegmentedButtonItem
                                 key="user"
-                                text="User (Xem / Disabled)"
+                                text="{i18n>userSwitchUserOption}"
                                 icon="sap-icon://person-placeholder"
                                 width="50%"
                             />
