@@ -7,82 +7,103 @@ sap.ui.define(
     "com/fsoft/zpmmaintenancecockpit/model/constants",
     "com/fsoft/zpmmaintenancecockpit/model/CAPService",
   ],
-  function (e, t, o, n, r, c) {
+  function (Controller, UIComponent, JSONModel, formatter, constants, CAPService) {
     "use strict";
-    return e.extend(
+
+    return Controller.extend(
       "com.fsoft.zpmmaintenancecockpit.controller.OperationsDashboard",
       {
-        formatter: n,
+        formatter: formatter,
+
         /**
          * Loads maintenance order data and calculates dashboard metrics.
          *
          * @returns {Promise<void>} Resolves after the dashboard model is populated.
          */
-        onInit: async function () {
+        async onInit() {
           try {
-            const e = await c.getMaintenanceOrders();
-            let t = 0,
-              n = 0,
-              s = 0,
-              i = 0;
-            let a = 0;
-            const d = [];
-            e.forEach((e) => {
-              if (e.status === r.STATUS.OPEN) t++;
-              else if (e.status === r.STATUS.IN_PROCESS) n++;
-              else if (e.status === r.STATUS.COMPLETED) s++;
-              else if (e.status === r.STATUS.CANCELLED) i++;
-              if (e.priority === r.PRIORITY.CRITICAL) {
-                a++;
-                d.push(e);
+            const aOrders = (await CAPService.getMaintenanceOrders()) || [];
+            let iOpenCount = 0;
+            let iInProcessCount = 0;
+            let iCompletedCount = 0;
+            let iCancelledCount = 0;
+            let iCriticalCount = 0;
+            const aCriticalOrders = [];
+
+            aOrders.forEach((oOrder) => {
+              if (oOrder.status === constants.STATUS.OPEN) {
+                iOpenCount++;
+              } else if (oOrder.status === constants.STATUS.IN_PROCESS) {
+                iInProcessCount++;
+              } else if (oOrder.status === constants.STATUS.COMPLETED) {
+                iCompletedCount++;
+              } else if (oOrder.status === constants.STATUS.CANCELLED) {
+                iCancelledCount++;
+              }
+
+              if (oOrder.priority === constants.PRIORITY.CRITICAL) {
+                iCriticalCount++;
+                aCriticalOrders.push(oOrder);
               }
             });
-            const l = e.length;
-            const p = {
-              kpi: { open: t, inProcess: n, critical: a, completed: s },
-              statusDistribution: {
-                openPercent: l ? (t / l) * 100 : 0,
-                openCount: t,
-                inProcessPercent: l ? (n / l) * 100 : 0,
-                inProcessCount: n,
-                completedPercent: l ? (s / l) * 100 : 0,
-                completedCount: s,
-                cancelledPercent: l ? (i / l) * 100 : 0,
-                cancelledCount: i,
+
+            const iTotal = aOrders.length;
+            const oDashboardData = {
+              kpi: {
+                open: iOpenCount,
+                inProcess: iInProcessCount,
+                critical: iCriticalCount,
+                completed: iCompletedCount,
               },
-              criticalOrders: d,
+              statusDistribution: {
+                openPercent: iTotal ? (iOpenCount / iTotal) * 100 : 0,
+                openCount: iOpenCount,
+                inProcessPercent: iTotal ? (iInProcessCount / iTotal) * 100 : 0,
+                inProcessCount: iInProcessCount,
+                completedPercent: iTotal ? (iCompletedCount / iTotal) * 100 : 0,
+                completedCount: iCompletedCount,
+                cancelledPercent: iTotal ? (iCancelledCount / iTotal) * 100 : 0,
+                cancelledCount: iCancelledCount,
+              },
+              criticalOrders: aCriticalOrders,
             };
-            const u = new o(p);
-            this.getView().setModel(u, "dashboard");
-          } catch (e) {
-            console.error("Failed to load dashboard data from CAP:", e);
+
+            const oModel = new JSONModel(oDashboardData);
+            this.getView().setModel(oModel, "dashboard");
+          } catch (err) {
+            console.error("Failed to load dashboard data from CAP:", err);
           }
         },
+
         /**
          * Navigates to the selected critical order's detail page with loading indicator.
          *
-         * @param {sap.ui.base.Event} e List item title press event.
+         * @param {sap.ui.base.Event} oEvent List item title press event.
          * @returns {void}
          */
-        onCriticalOrderPress(e) {
-          const o = e
+        onCriticalOrderPress(oEvent) {
+          const sOrderNo = oEvent
             .getSource()
             .getBindingContext("dashboard")
             .getProperty("order_no");
+
           sap.ui.core.BusyIndicator.show(0);
-          t.getRouterFor(this).navTo("RouteOrderDetail", { orderId: o });
+          UIComponent.getRouterFor(this).navTo("RouteOrderDetail", {
+            orderId: sOrderNo,
+          });
           setTimeout(() => {
             sap.ui.core.BusyIndicator.hide();
           }, 80);
         },
+
         /**
          * Navigates to the Maintenance Orders page with loading indicator.
          *
          * @returns {void}
          */
-        onOpenOrderPress: function () {
+        onOpenOrderPress() {
           sap.ui.core.BusyIndicator.show(0);
-          t.getRouterFor(this).navTo("RouteMaintenanceOrders");
+          UIComponent.getRouterFor(this).navTo("RouteMaintenanceOrders");
           setTimeout(() => {
             sap.ui.core.BusyIndicator.hide();
           }, 80);

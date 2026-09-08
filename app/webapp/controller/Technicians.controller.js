@@ -4,30 +4,39 @@ sap.ui.define(
     "sap/ui/model/json/JSONModel",
     "com/fsoft/zpmmaintenancecockpit/model/CAPService",
   ],
-  function (e, n, c) {
+  function (Controller, JSONModel, CAPService) {
     "use strict";
-    return e.extend("com.fsoft.zpmmaintenancecockpit.controller.Technicians", {
+
+    return Controller.extend("com.fsoft.zpmmaintenancecockpit.controller.Technicians", {
       /**
        * Loads technician catalog data and calculates assigned operation counts.
        *
        * @returns {Promise<void>} Resolves after the technicians model is populated.
        */
-      onInit: async function () {
+      async onInit() {
         try {
-          const e = await c.getTechnicians();
-          const t = e.technicianCatalog || [];
-          const o = { "T-001": 3, "T-002": 2, "T-003": 1, "T-004": 1 };
-          t.forEach((e) => {
-            e.assignedOperations = o[e.key] || 0;
+          const oData = await CAPService.getTechnicians();
+          const aCatalog = oData.technicianCatalog || [];
+          const mAssignedCounts = {
+            "T-001": 3,
+            "T-002": 2,
+            "T-003": 1,
+            "T-004": 1,
+          };
+
+          aCatalog.forEach((oTech) => {
+            oTech.assignedOperations = mAssignedCounts[oTech.key] || 0;
           });
-          const i = t.filter((e) =>
-            ["T-001", "T-002", "T-003", "T-004"].includes(e.key),
+
+          const aFilteredTechs = aCatalog.filter((oTech) =>
+            ["T-001", "T-002", "T-003", "T-004"].includes(oTech.key),
           );
-          const a = new n({ catalog: i });
-          this.getView().setModel(a, "technicians");
-        } catch (e) {
-          console.error("Failed to load technicians from CAP:", e);
-          this.getView().setModel(new n({ catalog: [] }), "technicians");
+
+          const oModel = new JSONModel({ catalog: aFilteredTechs });
+          this.getView().setModel(oModel, "technicians");
+        } catch (err) {
+          console.error("Failed to load technicians from CAP:", err);
+          this.getView().setModel(new JSONModel({ catalog: [] }), "technicians");
         }
       },
     });

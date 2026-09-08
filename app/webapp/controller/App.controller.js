@@ -1,4 +1,5 @@
-sap.ui.define(["sap/ui/core/mvc/Controller"], (e) => {
+sap.ui.define(["sap/ui/core/mvc/Controller"], function (Controller) {
   "use strict";
-  return e.extend("com.fsoft.zpmmaintenancecockpit.controller.App", {});
+
+  return Controller.extend("com.fsoft.zpmmaintenancecockpit.controller.App", {});
 });
