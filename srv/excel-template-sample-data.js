@@ -7,7 +7,6 @@ function getExcelTemplateSampleData() {
   return {
     orders: [
       {
-        order: "MO-2001",
         equipment: "EQ-001",
         description: "Pump A Monthly Overhaul & Inspection",
         plant: "1000",
@@ -16,11 +15,10 @@ function getExcelTemplateSampleData() {
         planner: "JOHN",
         scheduledFrom: "2026-09-10",
         scheduledTo: "2026-09-15",
-        operations: "",
-        materials: "",
+        operations: "10:Visual pump inspection:2; 20:Dismantle housing:3.5; 30:Reassemble & test:2",
+        materials: "MAT-001:2; MAT-003:5",
       },
       {
-        order: "MO-2002",
         equipment: "EQ-002",
         description: "Motor Bearing Check & Alignment",
         plant: "2000",
@@ -29,11 +27,10 @@ function getExcelTemplateSampleData() {
         planner: "SARAH",
         scheduledFrom: "2026-09-12",
         scheduledTo: "2026-09-18",
-        operations: "",
-        materials: "",
+        operations: "10:Measure bearing temp:1.5; 20:Grease motor bearings:1",
+        materials: "MAT-001:1; MAT-003:2",
       },
       {
-        order: "MO-2003",
         equipment: "EQ-003",
         description: "Emergency Valve Fix & Replacement",
         plant: "3000",
@@ -42,11 +39,10 @@ function getExcelTemplateSampleData() {
         planner: "ALEX",
         scheduledFrom: "2026-09-05",
         scheduledTo: "2026-09-05",
-        operations: "",
-        materials: "",
+        operations: "10:Isolate valve:1; 20:Replace valve core & seals:4",
+        materials: "MAT-002:1; MAT-005:8",
       },
       {
-        order: "MO-2004",
         equipment: "EQ-004",
         description: "Conveyor Belt Tension Tuning",
         plant: "1000",
@@ -59,7 +55,6 @@ function getExcelTemplateSampleData() {
         materials: "MAT-005:10",
       },
       {
-        order: "MO-2005",
         equipment: "EQ-005",
         description: "Turbine Lubricant & Filter Service",
         plant: "2000",
@@ -74,7 +69,7 @@ function getExcelTemplateSampleData() {
     ],
     operations: [
       {
-        order: "MO-2001",
+        equipment: "EQ-001",
         no: "10",
         description: "Visual pump inspection & vibration test",
         workCenter: "WC-001",
@@ -82,7 +77,7 @@ function getExcelTemplateSampleData() {
         plannedHours: 2.0,
       },
       {
-        order: "MO-2001",
+        equipment: "EQ-001",
         no: "20",
         description: "Dismantle housing and check seals",
         workCenter: "WC-002",
@@ -90,7 +85,7 @@ function getExcelTemplateSampleData() {
         plannedHours: 3.5,
       },
       {
-        order: "MO-2001",
+        equipment: "EQ-001",
         no: "30",
         description: "Reassemble and conduct pressure test",
         workCenter: "WC-003",
@@ -98,7 +93,7 @@ function getExcelTemplateSampleData() {
         plannedHours: 2.0,
       },
       {
-        order: "MO-2002",
+        equipment: "EQ-002",
         no: "10",
         description: "Measure motor bearing temperature",
         workCenter: "WC-001",
@@ -106,7 +101,7 @@ function getExcelTemplateSampleData() {
         plannedHours: 1.5,
       },
       {
-        order: "MO-2002",
+        equipment: "EQ-002",
         no: "20",
         description: "Grease motor bearings",
         workCenter: "WC-002",
@@ -114,7 +109,7 @@ function getExcelTemplateSampleData() {
         plannedHours: 1.0,
       },
       {
-        order: "MO-2003",
+        equipment: "EQ-003",
         no: "10",
         description: "Shut down pipeline & isolate valve",
         workCenter: "WC-001",
@@ -122,7 +117,7 @@ function getExcelTemplateSampleData() {
         plannedHours: 1.0,
       },
       {
-        order: "MO-2003",
+        equipment: "EQ-003",
         no: "20",
         description: "Replace broken valve core and seals",
         workCenter: "WC-002",
@@ -131,12 +126,12 @@ function getExcelTemplateSampleData() {
       },
     ],
     materials: [
-      { order: "MO-2001", material: "MAT-001", qty: 2, unit: "EA" },
-      { order: "MO-2001", material: "MAT-003", qty: 5, unit: "L" },
-      { order: "MO-2002", material: "MAT-001", qty: 1, unit: "EA" },
-      { order: "MO-2002", material: "MAT-003", qty: 2, unit: "L" },
-      { order: "MO-2003", material: "MAT-002", qty: 1, unit: "EA" },
-      { order: "MO-2003", material: "MAT-005", qty: 8, unit: "SET" },
+      { equipment: "EQ-001", material: "MAT-001", qty: 2, unit: "EA" },
+      { equipment: "EQ-001", material: "MAT-003", qty: 5, unit: "L" },
+      { equipment: "EQ-002", material: "MAT-001", qty: 1, unit: "EA" },
+      { equipment: "EQ-002", material: "MAT-003", qty: 2, unit: "L" },
+      { equipment: "EQ-003", material: "MAT-002", qty: 1, unit: "EA" },
+      { equipment: "EQ-003", material: "MAT-005", qty: 8, unit: "SET" },
     ],
     masterData: [
       {

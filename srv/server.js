@@ -83,10 +83,9 @@ cds.on("bootstrap", (app) => {
       });
 
       wsOrders.columns = [
-        { header: "Order", key: "order", width: 14 },
-        { header: "Equipment", key: "equipment", width: 14 },
-        { header: "Description", key: "description", width: 36 },
-        { header: "Plant", key: "plant", width: 10 },
+        { header: "Equipment", key: "equipment", width: 16 },
+        { header: "Description", key: "description", width: 38 },
+        { header: "Plant", key: "plant", width: 12 },
         { header: "Type", key: "type", width: 16 },
         { header: "Priority", key: "priority", width: 14 },
         { header: "Planner", key: "planner", width: 16 },
@@ -95,7 +94,7 @@ cds.on("bootstrap", (app) => {
         {
           header: "Operations (Inline Optional)",
           key: "operations",
-          width: 34,
+          width: 38,
         },
         { header: "Materials (Inline Optional)", key: "materials", width: 32 },
       ];
@@ -120,7 +119,7 @@ cds.on("bootstrap", (app) => {
       });
 
       wsOperations.columns = [
-        { header: "Order", key: "order", width: 14 },
+        { header: "Equipment", key: "equipment", width: 16 },
         { header: "OperationNo", key: "no", width: 14 },
         { header: "Description", key: "description", width: 38 },
         { header: "WorkCenter", key: "workCenter", width: 16 },
@@ -148,7 +147,7 @@ cds.on("bootstrap", (app) => {
       });
 
       wsMaterials.columns = [
-        { header: "Order", key: "order", width: 14 },
+        { header: "Equipment", key: "equipment", width: 16 },
         { header: "Material", key: "material", width: 16 },
         { header: "Quantity", key: "qty", width: 14 },
         { header: "Unit", key: "unit", width: 12 },

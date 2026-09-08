@@ -17,7 +17,6 @@ async function generateExcelTemplate() {
   });
 
   wsOrders.columns = [
-    { header: 'Order', key: 'order', width: 16 },
     { header: 'Equipment', key: 'equipment', width: 16 },
     { header: 'Description', key: 'description', width: 42 },
     { header: 'Plant', key: 'plant', width: 12 },
@@ -42,7 +41,6 @@ async function generateExcelTemplate() {
 
   wsOrders.addRows([
     {
-      order: 'MO-2001',
       equipment: 'EQ-001',
       description: 'Pump A Monthly Overhaul & Inspection',
       plant: '1000',
@@ -51,11 +49,10 @@ async function generateExcelTemplate() {
       planner: 'JOHN',
       scheduledFrom: '2026-09-10',
       scheduledTo: '2026-09-15',
-      operations: '',
-      materials: ''
+      operations: '10:Visual pump inspection:2; 20:Dismantle housing:3.5; 30:Reassemble & test:2',
+      materials: 'MAT-001:2; MAT-003:5'
     },
     {
-      order: 'MO-2002',
       equipment: 'EQ-002',
       description: 'Motor Bearing Check & Alignment',
       plant: '2000',
@@ -64,11 +61,10 @@ async function generateExcelTemplate() {
       planner: 'SARAH',
       scheduledFrom: '2026-09-12',
       scheduledTo: '2026-09-18',
-      operations: '',
-      materials: ''
+      operations: '10:Measure bearing temp:1.5; 20:Grease motor bearings:1',
+      materials: 'MAT-001:1; MAT-003:2'
     },
     {
-      order: 'MO-2003',
       equipment: 'EQ-003',
       description: 'Emergency Valve Fix & Replacement',
       plant: '3000',
@@ -77,11 +73,10 @@ async function generateExcelTemplate() {
       planner: 'ALEX',
       scheduledFrom: '2026-09-05',
       scheduledTo: '2026-09-05',
-      operations: '',
-      materials: ''
+      operations: '10:Isolate valve:1; 20:Replace valve core & seals:4',
+      materials: 'MAT-002:1; MAT-005:8'
     },
     {
-      order: 'MO-2004',
       equipment: 'EQ-004',
       description: 'Conveyor Belt Tension Tuning',
       plant: '1000',
@@ -94,7 +89,6 @@ async function generateExcelTemplate() {
       materials: 'MAT-005:10'
     },
     {
-      order: 'MO-2005',
       equipment: 'EQ-005',
       description: 'Turbine Lubricant & Filter Service',
       plant: '2000',
@@ -114,13 +108,12 @@ async function generateExcelTemplate() {
       row.height = 20;
       row.alignment = { vertical: 'middle' };
       row.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
-      row.getCell(2).alignment = { vertical: 'middle', horizontal: 'center' };
+      row.getCell(3).alignment = { vertical: 'middle', horizontal: 'center' };
       row.getCell(4).alignment = { vertical: 'middle', horizontal: 'center' };
       row.getCell(5).alignment = { vertical: 'middle', horizontal: 'center' };
       row.getCell(6).alignment = { vertical: 'middle', horizontal: 'center' };
       row.getCell(7).alignment = { vertical: 'middle', horizontal: 'center' };
       row.getCell(8).alignment = { vertical: 'middle', horizontal: 'center' };
-      row.getCell(9).alignment = { vertical: 'middle', horizontal: 'center' };
     }
   });
 
@@ -132,7 +125,7 @@ async function generateExcelTemplate() {
   });
 
   wsOps.columns = [
-    { header: 'Order', key: 'order', width: 16 },
+    { header: 'Equipment', key: 'equipment', width: 16 },
     { header: 'OperationNo', key: 'no', width: 16 },
     { header: 'Description', key: 'description', width: 42 },
     { header: 'WorkCenter', key: 'workCenter', width: 16 },
@@ -151,13 +144,13 @@ async function generateExcelTemplate() {
   headerRow2.alignment = { vertical: 'middle', horizontal: 'center' };
 
   wsOps.addRows([
-    { order: 'MO-2001', no: '10', description: 'Visual pump inspection & vibration test', workCenter: 'WC-001', technician: 'T-001', plannedHours: 2.0 },
-    { order: 'MO-2001', no: '20', description: 'Dismantle housing and check seals', workCenter: 'WC-002', technician: 'T-002', plannedHours: 3.5 },
-    { order: 'MO-2001', no: '30', description: 'Reassemble and conduct pressure test', workCenter: 'WC-003', technician: 'T-003', plannedHours: 2.0 },
-    { order: 'MO-2002', no: '10', description: 'Measure motor bearing temperature', workCenter: 'WC-001', technician: 'T-001', plannedHours: 1.5 },
-    { order: 'MO-2002', no: '20', description: 'Grease motor bearings', workCenter: 'WC-002', technician: 'T-002', plannedHours: 1.0 },
-    { order: 'MO-2003', no: '10', description: 'Shut down pipeline & isolate valve', workCenter: 'WC-001', technician: 'T-001', plannedHours: 1.0 },
-    { order: 'MO-2003', no: '20', description: 'Replace broken valve core and seals', workCenter: 'WC-002', technician: 'T-002', plannedHours: 4.0 }
+    { equipment: 'EQ-001', no: '10', description: 'Visual pump inspection & vibration test', workCenter: 'WC-001', technician: 'T-001', plannedHours: 2.0 },
+    { equipment: 'EQ-001', no: '20', description: 'Dismantle housing and check seals', workCenter: 'WC-002', technician: 'T-002', plannedHours: 3.5 },
+    { equipment: 'EQ-001', no: '30', description: 'Reassemble and conduct pressure test', workCenter: 'WC-003', technician: 'T-003', plannedHours: 2.0 },
+    { equipment: 'EQ-002', no: '10', description: 'Measure motor bearing temperature', workCenter: 'WC-001', technician: 'T-001', plannedHours: 1.5 },
+    { equipment: 'EQ-002', no: '20', description: 'Grease motor bearings', workCenter: 'WC-002', technician: 'T-002', plannedHours: 1.0 },
+    { equipment: 'EQ-003', no: '10', description: 'Shut down pipeline & isolate valve', workCenter: 'WC-001', technician: 'T-001', plannedHours: 1.0 },
+    { equipment: 'EQ-003', no: '20', description: 'Replace broken valve core and seals', workCenter: 'WC-002', technician: 'T-002', plannedHours: 4.0 }
   ]);
 
   wsOps.eachRow((row, rowNumber) => {
@@ -180,7 +173,7 @@ async function generateExcelTemplate() {
   });
 
   wsMats.columns = [
-    { header: 'Order', key: 'order', width: 16 },
+    { header: 'Equipment', key: 'equipment', width: 16 },
     { header: 'Material', key: 'material', width: 18 },
     { header: 'Quantity', key: 'qty', width: 16 },
     { header: 'Unit', key: 'unit', width: 12 }
@@ -197,12 +190,12 @@ async function generateExcelTemplate() {
   headerRow3.alignment = { vertical: 'middle', horizontal: 'center' };
 
   wsMats.addRows([
-    { order: 'MO-2001', material: 'MAT-001', qty: 2, unit: 'EA' },
-    { order: 'MO-2001', material: 'MAT-003', qty: 5, unit: 'L' },
-    { order: 'MO-2002', material: 'MAT-001', qty: 1, unit: 'EA' },
-    { order: 'MO-2002', material: 'MAT-003', qty: 2, unit: 'L' },
-    { order: 'MO-2003', material: 'MAT-002', qty: 1, unit: 'EA' },
-    { order: 'MO-2003', material: 'MAT-005', qty: 8, unit: 'SET' }
+    { equipment: 'EQ-001', material: 'MAT-001', qty: 2, unit: 'EA' },
+    { equipment: 'EQ-001', material: 'MAT-003', qty: 5, unit: 'L' },
+    { equipment: 'EQ-002', material: 'MAT-001', qty: 1, unit: 'EA' },
+    { equipment: 'EQ-002', material: 'MAT-003', qty: 2, unit: 'L' },
+    { equipment: 'EQ-003', material: 'MAT-002', qty: 1, unit: 'EA' },
+    { equipment: 'EQ-003', material: 'MAT-005', qty: 8, unit: 'SET' }
   ]);
 
   wsMats.eachRow((row, rowNumber) => {

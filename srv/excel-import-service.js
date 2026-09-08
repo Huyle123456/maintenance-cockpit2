@@ -1,29 +1,6 @@
 const ExcelJS = require("exceljs");
+const XLSX = require("xlsx");
 const cds = global.cds || require("@sap/cds");
-
-/**
- * Cleans and normalizes an ExcelJS cell value.
- *
- * @param {*} val ExcelJS cell value to normalize.
- * @returns {string} Normalized cell text.
- */
-function cleanCellValue(val) {
-  if (val === null || val === undefined) return "";
-  if (typeof val === "object") {
-    if (val instanceof Date) {
-      return val.toISOString().slice(0, 10);
-    }
-    if (val.text !== undefined) return String(val.text).trim();
-    if (val.result !== undefined) return String(val.result).trim();
-    if (Array.isArray(val.richText)) {
-      return val.richText
-        .map((t) => t.text || "")
-        .join("")
-        .trim();
-    }
-  }
-  return String(val).trim();
-}
 
 /**
  * Normalizes a date value to the YYYY-MM-DD format.
@@ -46,7 +23,13 @@ function normalizeDate(rawDate) {
   }
 
   // Handle numeric Excel date serial number (e.g. 45231)
-  if (typeof rawDate === "number" || (!isNaN(rawDate) && !isNaN(parseFloat(rawDate)) && String(rawDate).indexOf("-") === -1 && String(rawDate).indexOf("/") === -1)) {
+  if (
+    typeof rawDate === "number" ||
+    (!isNaN(rawDate) &&
+      !isNaN(parseFloat(rawDate)) &&
+      String(rawDate).indexOf("-") === -1 &&
+      String(rawDate).indexOf("/") === -1)
+  ) {
     const serial = parseFloat(rawDate);
     if (serial > 1000) {
       const utcDays = Math.floor(serial - 25569);
@@ -86,51 +69,6 @@ function normalizeDate(rawDate) {
 }
 
 /**
- * Builds a normalized header-to-column-index lookup.
- *
- * @param {import('exceljs').Worksheet} worksheet Worksheet containing the header row.
- * @returns {Record<string, number>} Header map keyed by normalized header text.
- */
-function buildHeaderMap(worksheet) {
-  const headerMap = {};
-  if (!worksheet || worksheet.rowCount < 1) return headerMap;
-
-  const headerRow = worksheet.getRow(1);
-  headerRow.eachCell({ includeEmpty: false }, (cell, colNumber) => {
-    const cleanName = cleanCellValue(cell.value)
-      .toLowerCase()
-      .replace(/[\s_\-#.]+/g, "");
-    if (cleanName) {
-      headerMap[cleanName] = colNumber;
-    }
-  });
-  return headerMap;
-}
-
-/**
- * Gets the first populated value for a set of possible column names.
- *
- * @param {import('exceljs').Row} row Worksheet row to read.
- * @param {Record<string, number>} headerMap Header-to-column-index lookup.
- * @param {string[]} possibleKeys Candidate normalized column names.
- * @param {string} def Fallback value when no candidate column has a value.
- * @returns {string} Cell value or the supplied fallback.
- */
-function getRowVal(row, headerMap, possibleKeys, def = "") {
-  for (const k of possibleKeys) {
-    const colIdx = headerMap[k];
-    if (colIdx !== undefined) {
-      const cell = row.getCell(colIdx);
-      if (cell && cell.value !== null && cell.value !== undefined) {
-        const v = cleanCellValue(cell.value);
-        if (v !== "") return v;
-      }
-    }
-  }
-  return def;
-}
-
-/**
  * Normalizes Maintenance Type strings to valid system values.
  *
  * @param {string} raw
@@ -139,10 +77,20 @@ function getRowVal(row, headerMap, possibleKeys, def = "") {
 function normalizeMaintenanceType(raw) {
   if (!raw) return "PREVENTIVE";
   const s = String(raw).toUpperCase().trim();
-  if (s.includes("PREV") || s.includes("PHÒNG") || s.includes("ĐỊNH KỲ") || s.includes("PLAN")) {
+  if (
+    s.includes("PREV") ||
+    s.includes("PHÒNG") ||
+    s.includes("ĐỊNH KỲ") ||
+    s.includes("PLAN")
+  ) {
     return "PREVENTIVE";
   }
-  if (s.includes("CORR") || s.includes("SỬA CHỮA") || s.includes("FIX") || s.includes("BREAK")) {
+  if (
+    s.includes("CORR") ||
+    s.includes("SỬA CHỮA") ||
+    s.includes("FIX") ||
+    s.includes("BREAK")
+  ) {
     return "CORRECTIVE";
   }
   if (s.includes("EMERG") || s.includes("KHẨN") || s.includes("URGENT")) {
@@ -160,7 +108,12 @@ function normalizeMaintenanceType(raw) {
 function normalizePriority(raw) {
   if (!raw) return { priority: "MEDIUM", priorityState: "Warning" };
   const s = String(raw).toUpperCase().trim();
-  if (s.includes("CRIT") || s.includes("KHẨN") || s.includes("VERY HIGH") || s.includes("P1")) {
+  if (
+    s.includes("CRIT") ||
+    s.includes("KHẨN") ||
+    s.includes("VERY HIGH") ||
+    s.includes("P1")
+  ) {
     return { priority: "CRITICAL", priorityState: "Error" };
   }
   if (s.includes("HIGH") || s.includes("CAO") || s.includes("P2")) {
@@ -173,35 +126,66 @@ function normalizePriority(raw) {
 }
 
 /**
- * Process Excel file buffer using ExcelJS
- * Supports:
- * 1. Upsert when Order ID already exists in DB (Updates header + syncs operations/materials)
- * 2. Multi-row Order grouping within the same Excel file
- * 3. Auto-sequence generation when Order ID is blank (MO-XXXX)
- * 4. Multi-Sheet imports (Sheet 1: MaintenanceOrders, Sheet 2: Operations, Sheet 3: Materials)
- * 5. Single-Sheet imports with inline operations/materials
- * 6. Date inversion auto-correction (swaps if scheduledFrom > scheduledTo)
- * 7. Master data normalization and safe fallbacks for Equipment, Plant, Type, Priority, Planner
- * 8. Automatic Material Catalog lookup and price/cost calculations
- * 9. Safe batch DB transaction processing with detailed Audit & History logs
+ * Normalizes object property keys to lower-case alphanumeric strings.
  *
- * @param {Buffer|import('stream').Readable} fileSource File buffer or stream
- * @param {string} currentUser ID of user performing import
- * @param {object} options Optional configs (batchSize, etc.)
- * @returns {Promise<{
- *   success: boolean,
- *   totalRows: number,
- *   importedCount: number,
- *   createdCount: number,
- *   updatedCount: number,
- *   operationsCount: number,
- *   materialsCount: number,
- *   failedCount: number,
- *   durationMs: number,
- *   durationSec: string,
- *   warnings: Array<{row: number, order: string, message: string}>,
- *   errors: Array<{row: number, order: string, details: string}>
- * }>}
+ * @param {object} obj Raw row object from SheetJS.
+ * @returns {Record<string, *>} Cleaned key-value map.
+ */
+function normalizeRowKeys(obj) {
+  const clean = {};
+  if (!obj) return clean;
+  for (const k of Object.keys(obj)) {
+    const normKey = String(k)
+      .toLowerCase()
+      .replace(/[\s_\-#.()\/]+/g, "");
+    clean[normKey] = obj[k];
+  }
+  return clean;
+}
+
+/**
+ * Gets the first matching key value from a normalized row object.
+ *
+ * @param {Record<string, *>} normRow Cleaned key-value map.
+ * @param {string[]} keys List of candidate keys.
+ * @param {*} def Fallback value.
+ * @returns {*} First found value or fallback.
+ */
+function getRowField(normRow, keys, def = "") {
+  for (const k of keys) {
+    if (
+      normRow[k] !== undefined &&
+      normRow[k] !== null &&
+      String(normRow[k]).trim() !== ""
+    ) {
+      return String(normRow[k]).trim();
+    }
+  }
+  return def;
+}
+
+/**
+ * High-performance batch insert for database operations to prevent parameter limits.
+ *
+ * @param {*} entity CDS entity definition.
+ * @param {object[]} entries Array of entries to insert.
+ * @param {number} batchSize Batch chunk size.
+ */
+async function batchInsert(entity, entries, batchSize = 500) {
+  if (!entries || entries.length === 0) return;
+  for (let i = 0; i < entries.length; i += batchSize) {
+    const chunk = entries.slice(i, i + batchSize);
+    await INSERT.into(entity).entries(chunk);
+  }
+}
+
+/**
+ * High-performance Process Excel file buffer supporting 50,000+ rows.
+ *
+ * @param {Buffer|import('stream').Readable} fileSource File buffer or stream.
+ * @param {string} currentUser ID of user performing import.
+ * @param {object} options Optional configs.
+ * @returns {Promise<object>} Import result summary.
  */
 async function processExcelImport(
   fileSource,
@@ -210,6 +194,7 @@ async function processExcelImport(
 ) {
   const startTime = Date.now();
   const db = await cds.connect.to("db");
+  const entities = typeof cds.entities === "function" ? cds.entities("sap.cap.maintenance") : (cds.model ? cds.model.entities : {});
   const {
     MaintenanceOrders,
     Equipments,
@@ -223,7 +208,7 @@ async function processExcelImport(
     OrderMaterials,
     AuditHistory,
     OrderHistory,
-  } = cds.entities("sap.cap.maintenance");
+  } = entities;
 
   // Step 1: Pre-fetch master data cache for validation and fallbacks
   const [
@@ -253,10 +238,8 @@ async function processExcelImport(
 
   const setEquipments = new Set((aEquipments || []).map((e) => e.equipment));
   const setPlants = new Set((aPlants || []).map((p) => p.key));
-  const setTypes = new Set((aTypes || []).map((t) => t.key));
-  const setPriorities = new Set((aPriorities || []).map((p) => p.key));
-  const setPlanners = new Set((aPlanners || []).map((p) => p.key));
   const setWorkCenters = new Set((aWorkCenters || []).map((w) => w.key));
+  const setPlanners = new Set((aPlanners || []).map((p) => p.key));
 
   const mapMaterialsCatalog = new Map();
   (aMaterialsCatalog || []).forEach((m) => {
@@ -268,7 +251,7 @@ async function processExcelImport(
     });
   });
 
-  // Map of existing orders in DB: order_no -> { status, status_state }
+  // Calculate highest existing order sequence in DB
   const mapExistingOrders = new Map();
   let maxOrderSeq = 1000;
   (aExistingOrders || []).forEach((o) => {
@@ -282,8 +265,7 @@ async function processExcelImport(
 
   let nextOrderNum = maxOrderSeq + 1;
 
-  // Step 2: Load workbook
-  const workbook = new ExcelJS.Workbook();
+  // Step 2: Read Excel buffer using high-speed SheetJS parser
   let buffer = fileSource;
   if (!Buffer.isBuffer(fileSource)) {
     const chunks = [];
@@ -292,73 +274,90 @@ async function processExcelImport(
     }
     buffer = Buffer.concat(chunks);
   }
-  await workbook.xlsx.load(buffer);
+
+  const workbook = XLSX.read(buffer, {
+    type: "buffer",
+    cellDates: true,
+    dense: true,
+  });
+
+  const sheetNames = workbook.SheetNames || [];
+  if (sheetNames.length === 0) {
+    throw new Error("Uploaded workbook contains no sheets.");
+  }
 
   // Identify worksheets
-  const orderSheet =
-    workbook.getWorksheet("MaintenanceOrders") ||
-    workbook.getWorksheet("maintenanceorders") ||
-    workbook.worksheets[0];
-  const opSheet =
-    workbook.getWorksheet("Operations") ||
-    workbook.getWorksheet("operations") ||
-    workbook.getWorksheet("maintenanceoperations");
-  const matSheet =
-    workbook.getWorksheet("Materials") ||
-    workbook.getWorksheet("materials") ||
-    workbook.getWorksheet("ordermaterials");
+  const orderSheetName =
+    sheetNames.find(
+      (n) => n.toLowerCase().replace(/[\s_-]/g, "") === "maintenanceorders",
+    ) || sheetNames[0];
 
-  if (!orderSheet || orderSheet.rowCount < 2) {
+  const opSheetName = sheetNames.find(
+    (n) =>
+      n.toLowerCase().replace(/[\s_-]/g, "") === "operations" ||
+      n.toLowerCase().replace(/[\s_-]/g, "") === "maintenanceoperations",
+  );
+
+  const matSheetName = sheetNames.find(
+    (n) =>
+      n.toLowerCase().replace(/[\s_-]/g, "") === "materials" ||
+      n.toLowerCase().replace(/[\s_-]/g, "") === "ordermaterials",
+  );
+
+  const orderRowsRaw = XLSX.utils.sheet_to_json(
+    workbook.Sheets[orderSheetName] || {},
+    { defval: "" },
+  );
+
+  if (!orderRowsRaw || orderRowsRaw.length === 0) {
     throw new Error("The uploaded Excel file has no order rows to process.");
   }
 
-  // Step 3: Parse Operations from Operations Sheet (if present)
-  // Map: normalizedOrderNo -> Array of operation objects
-  const operationsByOrder = new Map();
-  if (opSheet && opSheet.rowCount >= 2) {
-    const opHeaderMap = buildHeaderMap(opSheet);
-    opSheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-      if (rowNumber === 1) return; // skip header
-      const rawOrderKey = getRowVal(row, opHeaderMap, [
+  // Step 3: Parse Operations sheet (if present)
+  const operationsByKey = new Map();
+  if (opSheetName && workbook.Sheets[opSheetName]) {
+    const opRowsRaw = XLSX.utils.sheet_to_json(workbook.Sheets[opSheetName], {
+      defval: "",
+    });
+    for (const r of opRowsRaw) {
+      const norm = normalizeRowKeys(r);
+      const rawKey = getRowField(norm, [
+        "equipment",
+        "equipmentno",
+        "equipmentid",
+        "eq",
         "order",
         "orderno",
         "orderid",
+        "orderref",
         "id",
-      ]).toUpperCase().trim();
-      const rawNo = getRowVal(
-        row,
-        opHeaderMap,
+      ]).toUpperCase();
+      const rawNo = getRowField(
+        norm,
         ["operationno", "no", "opno", "seq"],
         "10",
       );
-      const rawDesc = getRowVal(
-        row,
-        opHeaderMap,
+      const rawDesc = getRowField(
+        norm,
         ["description", "operationdescription", "task", "desc"],
         "Inspection & Maintenance",
       );
-      const rawWc = getRowVal(row, opHeaderMap, ["workcenter", "wc"], "WC-001");
-      const rawTech = getRowVal(
-        row,
-        opHeaderMap,
+      const rawWc = getRowField(norm, ["workcenter", "wc"], "WC-001");
+      const rawTech = getRowField(
+        norm,
         ["technician", "tech", "assignedtechnician"],
         "T-001",
       );
       const rawHours =
         parseFloat(
-          getRowVal(
-            row,
-            opHeaderMap,
-            ["plannedhours", "hours", "duration"],
-            "2",
-          ),
+          getRowField(norm, ["plannedhours", "hours", "duration"], "2"),
         ) || 2.0;
 
-      if (rawOrderKey) {
-        if (!operationsByOrder.has(rawOrderKey)) {
-          operationsByOrder.set(rawOrderKey, []);
+      if (rawKey) {
+        if (!operationsByKey.has(rawKey)) {
+          operationsByKey.set(rawKey, []);
         }
-        operationsByOrder.get(rawOrderKey).push({
+        operationsByKey.get(rawKey).push({
           no: String(rawNo),
           description: rawDesc,
           workCenter: setWorkCenters.has(rawWc) ? rawWc : "WC-001",
@@ -368,37 +367,41 @@ async function processExcelImport(
           status: "OPEN",
         });
       }
-    });
+    }
   }
 
-  // Step 4: Parse Materials from Materials Sheet (if present)
-  // Map: normalizedOrderNo -> Array of material objects
-  const materialsByOrder = new Map();
-  if (matSheet && matSheet.rowCount >= 2) {
-    const matHeaderMap = buildHeaderMap(matSheet);
-    matSheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-      if (rowNumber === 1) return; // skip header
-      const rawOrderKey = getRowVal(row, matHeaderMap, [
+  // Step 4: Parse Materials sheet (if present)
+  const materialsByKey = new Map();
+  if (matSheetName && workbook.Sheets[matSheetName]) {
+    const matRowsRaw = XLSX.utils.sheet_to_json(workbook.Sheets[matSheetName], {
+      defval: "",
+    });
+    for (const r of matRowsRaw) {
+      const norm = normalizeRowKeys(r);
+      const rawKey = getRowField(norm, [
+        "equipment",
+        "equipmentno",
+        "equipmentid",
+        "eq",
         "order",
         "orderno",
         "orderid",
+        "orderref",
         "id",
-      ]).toUpperCase().trim();
-      const rawMat = getRowVal(
-        row,
-        matHeaderMap,
+      ]).toUpperCase();
+      const rawMat = getRowField(
+        norm,
         ["material", "materialid", "part", "matno"],
         "MAT-001",
-      ).toUpperCase().trim();
+      ).toUpperCase();
       const rawQty =
-        parseFloat(
-          getRowVal(row, matHeaderMap, ["quantity", "qty", "amount"], "1"),
-        ) || 1.0;
-      const rawUnit = getRowVal(row, matHeaderMap, ["unit", "uom"], "EA");
+        parseFloat(getRowField(norm, ["quantity", "qty", "amount"], "1")) ||
+        1.0;
+      const rawUnit = getRowField(norm, ["unit", "uom"], "EA");
 
-      if (rawOrderKey && rawMat) {
-        if (!materialsByOrder.has(rawOrderKey)) {
-          materialsByOrder.set(rawOrderKey, []);
+      if (rawKey && rawMat) {
+        if (!materialsByKey.has(rawKey)) {
+          materialsByKey.set(rawKey, []);
         }
         const catalogItem = mapMaterialsCatalog.get(rawMat) || {
           material: rawMat,
@@ -406,188 +409,170 @@ async function processExcelImport(
           unit: rawUnit || "EA",
           unitPrice: 25.0,
         };
-
         const unitPrice = catalogItem.unitPrice || 25.0;
-        const value = rawQty * unitPrice;
-
-        materialsByOrder.get(rawOrderKey).push({
+        materialsByKey.get(rawKey).push({
           material: catalogItem.material || rawMat,
           description: catalogItem.description,
           qty: rawQty,
           unit: catalogItem.unit || rawUnit || "EA",
           unitPrice: unitPrice,
-          value: value,
+          value: rawQty * unitPrice,
         });
       }
-    });
+    }
   }
 
-  // Step 5: Read Orders sheet and group rows
-  const orderHeaderMap = buildHeaderMap(orderSheet);
+  // Step 5: Process Order rows and assign sequential MO- numbers
   let totalRows = 0;
-  let failedCount = 0;
+  let createdCount = 0;
+  let updatedCount = 0;
+  let totalOpsImported = 0;
+  let totalMatsImported = 0;
   const warnings = [];
   const errors = [];
 
-  // Grouping map to handle in-file duplicates and multi-line definitions:
-  // key: order_no -> { orderEntity, isUpdate, operations: [], materials: [], rowNumbers: [] }
-  const groupedOrders = new Map();
+  const ordersToInsert = [];
+  const ordersToUpdate = [];
+  const operationsToSave = [];
+  const materialsToSave = [];
+  const historyToInsert = [];
 
-  orderSheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-    if (rowNumber === 1) return; // skip header
+  const timestampStr = new Date()
+    .toISOString()
+    .replace("T", " ")
+    .substring(0, 16);
+  const laborRatePerHour = 50.0;
 
-    // Read all values
-    let rawOrderNo = getRowVal(row, orderHeaderMap, [
+  for (let idx = 0; idx < orderRowsRaw.length; idx++) {
+    const row = orderRowsRaw[idx];
+    const rowNumber = idx + 2;
+    const norm = normalizeRowKeys(row);
+
+    const rawOrderNo = getRowField(norm, [
       "order",
       "orderno",
       "orderid",
+      "orderref",
       "id",
     ]);
-    const rawEquipment = getRowVal(row, orderHeaderMap, [
+    const rawEquipment = getRowField(norm, [
       "equipment",
       "equipmentno",
       "equipmentid",
       "eq",
     ]);
-    const rawDescription = getRowVal(row, orderHeaderMap, [
+    const rawDescription = getRowField(norm, [
       "description",
       "orderdescription",
       "desc",
       "title",
     ]);
-    const rawPlant = getRowVal(row, orderHeaderMap, [
-      "plant",
-      "plantid",
-    ]);
-    const rawType = getRowVal(row, orderHeaderMap, [
+    const rawPlant = getRowField(norm, ["plant", "plantid"]);
+    const rawType = getRowField(norm, [
       "type",
       "maintenancetype",
       "ordertype",
     ]);
-    const rawPriority = getRowVal(row, orderHeaderMap, [
-      "priority",
-      "prio",
-    ]);
-    const rawPlanner = getRowVal(row, orderHeaderMap, [
+    const rawPriority = getRowField(norm, ["priority", "prio"]);
+    const rawPlanner = getRowField(norm, [
       "planner",
       "plannerid",
       "assignedplanner",
     ]);
-    const rawFrom = getRowVal(row, orderHeaderMap, [
+    const rawFrom = getRowField(norm, [
       "scheduledfrom",
       "from",
       "startdate",
       "scheduledstart",
     ]);
-    const rawTo = getRowVal(row, orderHeaderMap, [
+    const rawTo = getRowField(norm, [
       "scheduledto",
       "to",
       "enddate",
       "scheduledend",
     ]);
-    const inlineOps = getRowVal(row, orderHeaderMap, [
+    const inlineOps = getRowField(norm, [
       "operations",
       "operationlist",
       "tasks",
     ]);
-    const inlineMats = getRowVal(row, orderHeaderMap, [
+    const inlineMats = getRowField(norm, [
       "materials",
       "materiallist",
       "parts",
     ]);
 
-    // Check if entire row is empty (ghost row)
-    if (!rawOrderNo && !rawDescription && !rawEquipment && !rawPlant && !inlineOps && !inlineMats) {
-      return; // ignore empty ghost row
+    if (
+      !rawOrderNo &&
+      !rawDescription &&
+      !rawEquipment &&
+      !rawPlant &&
+      !inlineOps &&
+      !inlineMats
+    ) {
+      continue; // Skip ghost empty row
     }
 
     totalRows++;
 
-    // Edge Case 4: Normalize Order Number (casing, prefix, trim)
-    if (rawOrderNo) {
-      rawOrderNo = rawOrderNo.trim().toUpperCase();
-      if (/^\d+$/.test(rawOrderNo)) {
-        // Pure number like 1001 -> convert to MO-1001
-        rawOrderNo = `MO-${rawOrderNo}`;
-      }
-    }
-
-    // Edge Case 3: Missing / Empty Order ID -> Auto generate sequence
-    if (!rawOrderNo) {
-      while (mapExistingOrders.has(`MO-${nextOrderNum}`) || groupedOrders.has(`MO-${nextOrderNum}`)) {
-        nextOrderNum++;
-      }
-      rawOrderNo = `MO-${nextOrderNum++}`;
-      warnings.push({
-        row: rowNumber,
-        order: rawOrderNo,
-        message: `Empty Order ID auto-assigned to '${rawOrderNo}'.`,
-      });
-    }
-
-    // Edge Case 1: Detect if this order already exists in DB
-    const existingInDb = mapExistingOrders.get(rawOrderNo);
-    const isUpdate = !!existingInDb;
-
-    // Edge Case 5: Master Data Fallbacks & Normalization
     // Equipment validation & fallback
     let equipmentNo = rawEquipment ? rawEquipment.trim().toUpperCase() : "";
-    if (!equipmentNo || (setEquipments.size > 0 && !setEquipments.has(equipmentNo))) {
-      const fallbackEq = "EQ-001";
-      if (equipmentNo) {
-        warnings.push({
-          row: rowNumber,
-          order: rawOrderNo,
-          message: `Equipment '${equipmentNo}' not found in master data; fallback to '${fallbackEq}'.`,
-        });
-      }
-      equipmentNo = fallbackEq;
+    if (
+      !equipmentNo ||
+      (setEquipments.size > 0 && !setEquipments.has(equipmentNo))
+    ) {
+      equipmentNo = "EQ-001";
     }
 
-    // Description fallback
-    const description = rawDescription || `Maintenance for ${equipmentNo}`;
+    // Assign sequential MO- number if not an existing order
+    let finalOrderNo = "";
+    let isUpdate = false;
 
-    // Plant fallback
+    if (rawOrderNo) {
+      const normalizedRaw = rawOrderNo.trim().toUpperCase();
+      if (
+        normalizedRaw.startsWith("MO-") &&
+        mapExistingOrders.has(normalizedRaw)
+      ) {
+        finalOrderNo = normalizedRaw;
+        isUpdate = true;
+      }
+    }
+
+    if (!finalOrderNo) {
+      finalOrderNo = `MO-${nextOrderNum++}`;
+    }
+
+    const description = rawDescription || `Maintenance for ${equipmentNo}`;
     let plant = rawPlant ? rawPlant.trim().toUpperCase() : "1000";
     if (setPlants.size > 0 && !setPlants.has(plant)) {
       plant = "1000";
     }
 
-    // Type normalization
     const maintenanceType = normalizeMaintenanceType(rawType);
-
-    // Priority normalization
     const { priority, priorityState } = normalizePriority(rawPriority);
-
-    // Planner fallback
     let planner = rawPlanner ? rawPlanner.trim() : "";
     if (!planner || (setPlanners.size > 0 && !setPlanners.has(planner))) {
-      planner = currentUser && currentUser !== "Current User" ? currentUser : "JOHN";
+      planner =
+        currentUser && currentUser !== "Current User" ? currentUser : "JOHN";
     }
 
-    // Edge Case 6: Date Parsing & Inversion Auto-Correction
     let scheduledFrom = normalizeDate(rawFrom);
     let scheduledTo = normalizeDate(rawTo || rawFrom);
-
     if (scheduledFrom && scheduledTo && scheduledFrom > scheduledTo) {
-      warnings.push({
-        row: rowNumber,
-        order: rawOrderNo,
-        message: `Start date (${scheduledFrom}) was after end date (${scheduledTo}); dates automatically aligned.`,
-      });
-      // Auto-correct: swap or align
       const temp = scheduledFrom;
       scheduledFrom = scheduledTo;
       scheduledTo = temp;
     }
 
-    // Parse Inline Operations if provided
+    // Parse Inline Operations
     const rowOps = [];
     if (inlineOps) {
-      const parts = inlineOps.split(/[;,|]+/);
-      parts.forEach((p, idx) => {
+      const parts = String(inlineOps).split(/[;,|]+/);
+      parts.forEach((p, pIdx) => {
         const segs = p.split(/[:\-]/);
-        const opNo = segs.length > 1 ? segs[0].trim() : String((idx + 1) * 10);
+        const opNo =
+          segs.length > 1 ? segs[0].trim() : String((pIdx + 1) * 10);
         const opDesc = segs.length > 1 ? segs[1].trim() : segs[0].trim();
         const opHours =
           segs.length > 2
@@ -595,7 +580,7 @@ async function processExcelImport(
             : 2.0;
         if (opDesc) {
           rowOps.push({
-            order_no: rawOrderNo,
+            order_no: finalOrderNo,
             no: opNo,
             description: opDesc,
             workCenter: "WC-001",
@@ -608,10 +593,10 @@ async function processExcelImport(
       });
     }
 
-    // Parse Inline Materials if provided
+    // Parse Inline Materials
     const rowMats = [];
     if (inlineMats) {
-      const parts = inlineMats.split(/[;,|]+/);
+      const parts = String(inlineMats).split(/[;,|]+/);
       parts.forEach((p) => {
         const segs = p.split(/[:\-xX\s*]+/);
         const matKey = segs[0]?.trim()?.toUpperCase();
@@ -628,7 +613,7 @@ async function processExcelImport(
           };
           const unitPrice = catalogItem.unitPrice || 25.0;
           rowMats.push({
-            order_no: rawOrderNo,
+            order_no: finalOrderNo,
             material: catalogItem.material || matKey,
             description: catalogItem.description,
             qty: Math.max(0.1, matQty),
@@ -640,76 +625,28 @@ async function processExcelImport(
       });
     }
 
-    // Edge Case 2: Grouping orders if multiple rows share the same Order ID in the file
-    if (groupedOrders.has(rawOrderNo)) {
-      const existingGroup = groupedOrders.get(rawOrderNo);
-      existingGroup.rowNumbers.push(rowNumber);
-      // Append additional operations/materials
-      if (rowOps.length > 0) {
-        rowOps.forEach((op) => existingGroup.operations.push(op));
-      }
-      if (rowMats.length > 0) {
-        rowMats.forEach((mat) => existingGroup.materials.push(mat));
-      }
-      // Update header details if previously empty
-      if (rawDescription) existingGroup.orderEntity.description = description;
-      if (rawEquipment) existingGroup.orderEntity.equipment_no = equipmentNo;
-      if (rawPlant) existingGroup.orderEntity.plant = plant;
-    } else {
-      // Determine initial status
-      const status = existingInDb ? existingInDb.status || "OPEN" : "OPEN";
-      const statusState = existingInDb ? existingInDb.status_state || "Success" : "Success";
+    // External operations & materials from other sheets
+    const extOps =
+      (rawOrderNo && operationsByKey.get(rawOrderNo.trim().toUpperCase())) ||
+      operationsByKey.get(equipmentNo) ||
+      [];
+    const extMats =
+      (rawOrderNo && materialsByKey.get(rawOrderNo.trim().toUpperCase())) ||
+      materialsByKey.get(equipmentNo) ||
+      [];
 
-      // Check external operations sheet
-      const extOps = operationsByOrder.get(rawOrderNo) || [];
-      const extMats = materialsByOrder.get(rawOrderNo) || [];
+    const combinedOps = [
+      ...extOps.map((o) => ({ ...o, order_no: finalOrderNo })),
+      ...rowOps,
+    ];
+    const combinedMats = [
+      ...extMats.map((m) => ({ ...m, order_no: finalOrderNo })),
+      ...rowMats,
+    ];
 
-      const combinedOps = [...extOps.map((o) => ({ ...o, order_no: rawOrderNo })), ...rowOps];
-      const combinedMats = [...extMats.map((m) => ({ ...m, order_no: rawOrderNo })), ...rowMats];
-
-      groupedOrders.set(rawOrderNo, {
-        order_no: rawOrderNo,
-        isUpdate,
-        rowNumbers: [rowNumber],
-        orderEntity: {
-          order_no: rawOrderNo,
-          equipment_no: equipmentNo,
-          description: description,
-          plant: plant,
-          maintenance_type: maintenanceType,
-          priority: priority,
-          priority_state: priorityState,
-          status: status,
-          status_state: statusState,
-          planner: planner,
-          scheduled_from: scheduledFrom,
-          scheduled_to: scheduledTo,
-          currency: "USD",
-          etag: `W/"${Date.now()}"`,
-        },
-        operations: combinedOps,
-        materials: combinedMats,
-      });
-    }
-  });
-
-  // Step 6: Post-process operations, materials, and aggregate calculations for each order
-  let createdCount = 0;
-  let updatedCount = 0;
-  let totalOpsImported = 0;
-  let totalMatsImported = 0;
-
-  const ordersToInsert = [];
-  const ordersToUpdate = [];
-  const operationsToSave = []; // list of ops with clean sequences
-  const materialsToSave = [];  // list of mats aggregated by (order_no, material)
-  const historyToInsert = [];
-
-  for (const [orderNo, group] of groupedOrders.entries()) {
-    // 1. Ensure at least one default operation exists
-    if (group.operations.length === 0) {
-      group.operations.push({
-        order_no: orderNo,
+    if (combinedOps.length === 0) {
+      combinedOps.push({
+        order_no: finalOrderNo,
         no: "10",
         description: "Standard Maintenance & Inspection",
         workCenter: "WC-001",
@@ -720,109 +657,77 @@ async function processExcelImport(
       });
     }
 
-    // Normalize operation sequences (10, 20, 30...) to prevent duplicate keys in MaintenanceOperations
-    const uniqueOpsMap = new Map();
-    group.operations.forEach((op, idx) => {
-      let opNo = op.no || String((idx + 1) * 10);
-      if (uniqueOpsMap.has(opNo)) {
-        opNo = String((uniqueOpsMap.size + 1) * 10);
-      }
-      uniqueOpsMap.set(opNo, {
-        order_no: orderNo,
-        no: opNo,
-        description: op.description || "Maintenance Task",
-        workCenter: setWorkCenters.has(op.workCenter) ? op.workCenter : "WC-001",
-        technician: op.technician || "T-001",
-        plannedHours: Number(op.plannedHours) || 2.0,
-        actualHours: Number(op.actualHours) || 0.0,
-        status: op.status || "OPEN",
-      });
-    });
+    // Aggregations
+    const totalPlannedHours = combinedOps.reduce(
+      (sum, o) => sum + (Number(o.plannedHours) || 0),
+      0,
+    );
+    const totalMaterialCost = combinedMats.reduce(
+      (sum, m) => sum + (Number(m.value) || 0),
+      0,
+    );
+    const estimatedCost =
+      totalMaterialCost + totalPlannedHours * laborRatePerHour;
 
-    const finalOps = Array.from(uniqueOpsMap.values());
+    const existingInDb = isUpdate ? mapExistingOrders.get(finalOrderNo) : null;
+    const status = existingInDb ? existingInDb.status || "OPEN" : "OPEN";
+    const statusState = existingInDb
+      ? existingInDb.status_state || "Success"
+      : "Success";
 
-    // 2. Aggregate Materials by material key (since key is order_no + material)
-    const uniqueMatsMap = new Map();
-    group.materials.forEach((mat) => {
-      const matKey = String(mat.material).toUpperCase().trim();
-      if (uniqueMatsMap.has(matKey)) {
-        const existing = uniqueMatsMap.get(matKey);
-        existing.qty += Number(mat.qty) || 1.0;
-        existing.value = existing.qty * existing.unitPrice;
-      } else {
-        const catalogItem = mapMaterialsCatalog.get(matKey) || {
-          material: matKey,
-          description: mat.description || matKey,
-          unit: mat.unit || "EA",
-          unitPrice: Number(mat.unitPrice) || 25.0,
-        };
-        const unitPrice = catalogItem.unitPrice || 25.0;
-        const qty = Number(mat.qty) || 1.0;
-        uniqueMatsMap.set(matKey, {
-          order_no: orderNo,
-          material: catalogItem.material || matKey,
-          description: catalogItem.description,
-          qty: qty,
-          unit: catalogItem.unit || "EA",
-          unitPrice: unitPrice,
-          value: qty * unitPrice,
-        });
-      }
-    });
+    const orderEntity = {
+      order_no: finalOrderNo,
+      equipment_no: equipmentNo,
+      description: description,
+      plant: plant,
+      maintenance_type: maintenanceType,
+      priority: priority,
+      priority_state: priorityState,
+      status: status,
+      status_state: statusState,
+      planner: planner,
+      scheduled_from: scheduledFrom,
+      scheduled_to: scheduledTo,
+      operation_count: combinedOps.length,
+      completed_operation_count: 0,
+      planned_hours: totalPlannedHours,
+      actual_hours: 0.0,
+      estimated_cost: estimatedCost,
+      currency: "USD",
+      etag: `W/"${Date.now()}"`,
+    };
 
-    const finalMats = Array.from(uniqueMatsMap.values());
-
-    // 3. Compute aggregations
-    const totalPlannedHours = finalOps.reduce((sum, o) => sum + (Number(o.plannedHours) || 0), 0);
-    const totalMaterialCost = finalMats.reduce((sum, m) => sum + (Number(m.value) || 0), 0);
-    const laborRatePerHour = 50.0;
-    const estimatedCost = totalMaterialCost + totalPlannedHours * laborRatePerHour;
-
-    group.orderEntity.operation_count = finalOps.length;
-    group.orderEntity.planned_hours = totalPlannedHours;
-    group.orderEntity.estimated_cost = estimatedCost;
-
-    finalOps.forEach((op) => operationsToSave.push(op));
-    finalMats.forEach((mat) => materialsToSave.push(mat));
-
-    const timestampStr = new Date().toISOString().replace("T", " ").substring(0, 16);
-
-    if (group.isUpdate) {
-      ordersToUpdate.push(group.orderEntity);
-      historyToInsert.push({
-        order_no: orderNo,
-        title: "Order updated via Excel import (Upsert)",
-        dateTime: timestampStr,
-        userName: currentUser,
-        text: `Order data synced from Excel with ${finalOps.length} operation(s) and ${finalMats.length} material(s).`,
-        icon: "sap-icon://synchronize",
-      });
+    if (isUpdate) {
+      ordersToUpdate.push(orderEntity);
       updatedCount++;
     } else {
-      group.orderEntity.completed_operation_count = 0;
-      group.orderEntity.actual_hours = 0.0;
-      ordersToInsert.push(group.orderEntity);
-      historyToInsert.push({
-        order_no: orderNo,
-        title: "Order created via Excel import",
-        dateTime: timestampStr,
-        userName: currentUser,
-        text: `Maintenance order imported with ${finalOps.length} operation(s) and ${finalMats.length} material(s).`,
-        icon: "sap-icon://excel-attachment",
-      });
+      ordersToInsert.push(orderEntity);
       createdCount++;
     }
 
-    totalOpsImported += finalOps.length;
-    totalMatsImported += finalMats.length;
+    combinedOps.forEach((op) => operationsToSave.push(op));
+    combinedMats.forEach((mat) => materialsToSave.push(mat));
+
+    // Keep history records compact for large bulk imports
+    if (ordersToInsert.length + ordersToUpdate.length <= 5000) {
+      historyToInsert.push({
+        order_no: finalOrderNo,
+        title: isUpdate ? "Order updated via import" : "Order created",
+        dateTime: timestampStr,
+        userName: currentUser,
+        text: `Maintenance order synced with ${combinedOps.length} op(s).`,
+        icon: isUpdate ? "sap-icon://synchronize" : "sap-icon://create",
+      });
+    }
+
+    totalOpsImported += combinedOps.length;
+    totalMatsImported += combinedMats.length;
   }
 
-  // Step 7: Execute Database Transaction
+  // Step 6: Chunked Database Transactions (prevents SQLite/HANA parameter limits)
   await cds.tx(async () => {
-    // 1. Insert new orders
-    if (ordersToInsert.length > 0) {
-      await INSERT.into(MaintenanceOrders).entries(ordersToInsert);
-    }
+    // 1. Insert new orders in batches of 500
+    await batchInsert(MaintenanceOrders, ordersToInsert, 500);
 
     // 2. Update existing orders
     for (const ord of ordersToUpdate) {
@@ -843,44 +748,34 @@ async function processExcelImport(
           estimated_cost: ord.estimated_cost,
           etag: ord.etag,
         });
-
-      // Clear previous operations and materials for updated orders before re-inserting fresh sync
-      await DELETE.from(MaintenanceOperations).where({ order_no: ord.order_no });
+      await DELETE.from(MaintenanceOperations).where({
+        order_no: ord.order_no,
+      });
       await DELETE.from(OrderMaterials).where({ order_no: ord.order_no });
     }
 
-    // 3. Save all operations
-    if (operationsToSave.length > 0) {
-      await INSERT.into(MaintenanceOperations).entries(operationsToSave);
-    }
+    // 3. Batch save operations
+    await batchInsert(MaintenanceOperations, operationsToSave, 500);
 
-    // 4. Save all materials
-    if (materialsToSave.length > 0) {
-      await INSERT.into(OrderMaterials).entries(materialsToSave);
-    }
+    // 4. Batch save materials
+    await batchInsert(OrderMaterials, materialsToSave, 500);
 
-    // 5. Save order history
-    if (historyToInsert.length > 0) {
-      await INSERT.into(OrderHistory).entries(historyToInsert);
-    }
+    // 5. Batch save history
+    await batchInsert(OrderHistory, historyToInsert, 500);
   });
 
   const durationMs = Date.now() - startTime;
   const durationSec = (durationMs / 1000).toFixed(2);
   const importedCount = createdCount + updatedCount;
 
-  // Step 8: Record Audit Log for the bulk import
+  // Step 7: Record summary audit log
   if (importedCount > 0) {
-    const timestampStr = new Date()
-      .toISOString()
-      .replace("T", " ")
-      .substring(0, 16);
     await INSERT.into(AuditHistory).entries({
       timestamp: timestampStr,
       user: currentUser,
       object: `Bulk Import (${importedCount} orders)`,
       action: "IMPORT",
-      details: `Imported ${importedCount} orders (${createdCount} created, ${updatedCount} updated), ${totalOpsImported} operations, and ${totalMatsImported} materials in ${durationSec}s.`,
+      details: `Imported ${importedCount} orders (${createdCount} created, ${updatedCount} updated), ${totalOpsImported} operations in ${durationSec}s.`,
     });
   }
 
@@ -892,7 +787,7 @@ async function processExcelImport(
     updatedCount,
     operationsCount: totalOpsImported,
     materialsCount: totalMatsImported,
-    failedCount,
+    failedCount: 0,
     durationMs,
     durationSec: `${durationSec}s`,
     warnings,
@@ -906,4 +801,3 @@ module.exports = {
   normalizeMaintenanceType,
   normalizePriority,
 };
-

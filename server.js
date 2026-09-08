@@ -50,16 +50,15 @@ cds.on('bootstrap', (app) => {
       });
 
       wsOrders.columns = [
-        { header: 'Order', key: 'order', width: 14 },
-        { header: 'Equipment', key: 'equipment', width: 14 },
-        { header: 'Description', key: 'description', width: 36 },
-        { header: 'Plant', key: 'plant', width: 10 },
+        { header: 'Equipment', key: 'equipment', width: 16 },
+        { header: 'Description', key: 'description', width: 38 },
+        { header: 'Plant', key: 'plant', width: 12 },
         { header: 'Type', key: 'type', width: 16 },
         { header: 'Priority', key: 'priority', width: 14 },
         { header: 'Planner', key: 'planner', width: 16 },
         { header: 'ScheduledFrom', key: 'scheduledFrom', width: 16 },
         { header: 'ScheduledTo', key: 'scheduledTo', width: 16 },
-        { header: 'Operations (Inline Optional)', key: 'operations', width: 34 },
+        { header: 'Operations (Inline Optional)', key: 'operations', width: 38 },
         { header: 'Materials (Inline Optional)', key: 'materials', width: 32 }
       ];
 
@@ -73,13 +72,7 @@ cds.on('bootstrap', (app) => {
       headerOrders.height = 24;
       headerOrders.alignment = { vertical: 'middle', horizontal: 'center' };
 
-      wsOrders.addRows([
-        { order: 'MO-2001', equipment: 'EQ-001', description: 'Pump A Monthly Overhaul & Inspection', plant: '1000', type: 'PREVENTIVE', priority: 'HIGH', planner: 'JOHN', scheduledFrom: '2026-09-10', scheduledTo: '2026-09-15', operations: '', materials: '' },
-        { order: 'MO-2002', equipment: 'EQ-002', description: 'Motor Bearing Check & Alignment', plant: '2000', type: 'CORRECTIVE', priority: 'MEDIUM', planner: 'SARAH', scheduledFrom: '2026-09-12', scheduledTo: '2026-09-18', operations: '', materials: '' },
-        { order: 'MO-2003', equipment: 'EQ-003', description: 'Emergency Valve Fix & Replacement', plant: '3000', type: 'EMERGENCY', priority: 'CRITICAL', planner: 'ALEX', scheduledFrom: '2026-09-05', scheduledTo: '2026-09-05', operations: '', materials: '' },
-        { order: 'MO-2004', equipment: 'EQ-004', description: 'Conveyor Belt Tension Tuning', plant: '1000', type: 'PREVENTIVE', priority: 'LOW', planner: 'JOHN', scheduledFrom: '2026-09-20', scheduledTo: '2026-09-25', operations: '10:Tension Check:2; 20:Alignment:1', materials: 'MAT-005:10' },
-        { order: 'MO-2005', equipment: 'EQ-005', description: 'Turbine Lubricant & Filter Service', plant: '2000', type: 'PREVENTIVE', priority: 'HIGH', planner: 'SARAH', scheduledFrom: '2026-09-15', scheduledTo: '2026-09-22', operations: '10:Drain Oil:1; 20:Refill Lubricant:2', materials: 'MAT-003:5; MAT-002:1' }
-      ]);
+      wsOrders.addRows(sampleData.orders);
 
       // ==========================================
       // Sheet 2: Operations (Step 3: Operations)
@@ -89,7 +82,7 @@ cds.on('bootstrap', (app) => {
       });
 
       wsOperations.columns = [
-        { header: 'Order', key: 'order', width: 14 },
+        { header: 'Equipment', key: 'equipment', width: 16 },
         { header: 'OperationNo', key: 'no', width: 14 },
         { header: 'Description', key: 'description', width: 38 },
         { header: 'WorkCenter', key: 'workCenter', width: 16 },
@@ -107,15 +100,7 @@ cds.on('bootstrap', (app) => {
       headerOps.height = 24;
       headerOps.alignment = { vertical: 'middle', horizontal: 'center' };
 
-      wsOperations.addRows([
-        { order: 'MO-2001', no: '10', description: 'Visual pump inspection & vibration test', workCenter: 'WC-001', technician: 'T-001', plannedHours: 2.0 },
-        { order: 'MO-2001', no: '20', description: 'Dismantle housing and check seals', workCenter: 'WC-002', technician: 'T-002', plannedHours: 3.5 },
-        { order: 'MO-2001', no: '30', description: 'Reassemble and conduct pressure test', workCenter: 'WC-003', technician: 'T-003', plannedHours: 2.0 },
-        { order: 'MO-2002', no: '10', description: 'Measure motor bearing temperature', workCenter: 'WC-001', technician: 'T-001', plannedHours: 1.5 },
-        { order: 'MO-2002', no: '20', description: 'Grease motor bearings', workCenter: 'WC-002', technician: 'T-002', plannedHours: 1.0 },
-        { order: 'MO-2003', no: '10', description: 'Shut down pipeline & isolate valve', workCenter: 'WC-001', technician: 'T-001', plannedHours: 1.0 },
-        { order: 'MO-2003', no: '20', description: 'Replace broken valve core and seals', workCenter: 'WC-002', technician: 'T-002', plannedHours: 4.0 }
-      ]);
+      wsOperations.addRows(sampleData.operations);
 
       // ==========================================
       // Sheet 3: Materials (Step 4: Materials)
@@ -125,7 +110,7 @@ cds.on('bootstrap', (app) => {
       });
 
       wsMaterials.columns = [
-        { header: 'Order', key: 'order', width: 14 },
+        { header: 'Equipment', key: 'equipment', width: 16 },
         { header: 'Material', key: 'material', width: 16 },
         { header: 'Quantity', key: 'qty', width: 14 },
         { header: 'Unit', key: 'unit', width: 12 }

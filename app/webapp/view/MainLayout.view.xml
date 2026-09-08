@@ -48,43 +48,6 @@
                 </HBox>
 
                 <ToolbarSpacer id="headerToolbarSpacer" />
-
-                <HBox
-                    id="headerUserArea"
-                    class="sapUiTinyMarginTopBottom"
-                    alignItems="Center"
-                >
-                    <!-- User name and Role badge -->
-                    <HBox
-                        id="headerUserInfoBox"
-                        alignItems="Center"
-                        class="sapUiSmallMarginEnd"
-                        visible="{= !${device>/system/phone} }"
-                    >
-                        <Text
-                            id="headerUserText"
-                            text="{auth>/currentUser/name}"
-                            class="sapUiSmallMarginEnd"
-                        />
-                        <ObjectStatus
-                            id="headerUserRoleBadge"
-                            text="{auth>/currentUser/roleText}"
-                            state="{= ${auth>/currentUser/isAdmin} ? 'Success' : 'Information' }"
-                            inverted="true"
-                        />
-                    </HBox>
-
-                    <Avatar
-                        id="headerUserAvatar"
-                        initials="{auth>/currentUser/avatarInitials}"
-                        backgroundColor="{auth>/currentUser/avatarColor}"
-                        displaySize="S"
-                        showBorder="false"
-                        tooltip="{i18n>userProfileTooltip}"
-                        class="sapUiTinyMarginBegin"
-                        press=".onUserAvatarPress"
-                    />
-                </HBox>
             </tnt:ToolHeader>
         </tnt:header>
 

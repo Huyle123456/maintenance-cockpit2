@@ -247,23 +247,41 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
     },
 
     /**
-     * Fetch authenticated user info from SAP Approuter or CAP service
+     * Fetch authenticated user info from SAP Approuter, Work Zone, or CAP service
      */
     async fetchSapUser() {
       const baseUrl = _getBaseUrl();
+      const lpUser = (function () {
+        try {
+          if (window.sap && sap.ushell && sap.ushell.Container) {
+            const u = sap.ushell.Container.getUser();
+            if (u && (u.getId() || u.getEmail())) {
+              return {
+                id: u.getId() || u.getEmail(),
+                email: u.getEmail() || u.getId(),
+                name: u.getFullName() || u.getId() || "SAP User"
+              };
+            }
+          }
+        } catch (e) {}
+        return null;
+      })();
+
+      // 1. Check SAP Approuter / Work Zone user-api
       try {
         const res = await fetch(`${baseUrl}/user-api/currentUser`, {
           headers: { Accept: "application/json" }
         });
         if (res.ok) {
           const sapUser = await res.json();
-          if (sapUser && (sapUser.name || sapUser.email || sapUser.firstname)) {
-            this._applySapUser(sapUser);
+          if (sapUser && (sapUser.name || sapUser.email || sapUser.firstname || sapUser.scopes)) {
+            this._applySapUser(sapUser, lpUser);
             return;
           }
         }
       } catch (e) {}
 
+      // 2. Check CAP Backend getUserInfo()
       try {
         let resCap = await fetch(`${baseUrl}/odata/v4/maintenance/getUserInfo()`, {
           headers: { Accept: "application/json" }
@@ -276,7 +294,7 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
         if (resCap.ok) {
           const capUser = await resCap.json();
           if (capUser && capUser.name && capUser.name !== "anonymous") {
-            this._applyCapUser(capUser);
+            this._applyCapUser(capUser, lpUser);
             return;
           }
         }
@@ -288,16 +306,22 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
           if (resDirect.ok) {
             const capUser = await resDirect.json();
             if (capUser && capUser.name && capUser.name !== "anonymous") {
-              this._applyCapUser(capUser);
+              this._applyCapUser(capUser, lpUser);
               return;
             }
           }
         } catch (dirErr) {}
       }
+
+      // 3. Fallback to Launchpad user if present
+      if (lpUser) {
+        this._applyLaunchpadUser(lpUser);
+      }
     },
 
-    _applySapUser(sapUser) {
+    _applySapUser(sapUser, lpUser) {
       const displayName =
+        (lpUser && lpUser.name) ||
         sapUser.displayName ||
         `${sapUser.firstname || ""} ${sapUser.lastname || ""}`.trim() ||
         sapUser.name ||
@@ -306,18 +330,21 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
       const scopes = sapUser.scopes || [];
       const isAdmin =
         scopes.some((s) => s.toLowerCase().includes("admin")) ||
-        (sapUser.name && sapUser.name.toLowerCase().includes("admin"));
+        (sapUser.name && sapUser.name.toLowerCase().includes("admin")) ||
+        !scopes.length; // Default admin if unrestricted
+
+      const email = sapUser.email || (lpUser && lpUser.email) || `${sapUser.name || "user"}@sap.com`;
 
       const userObj = {
-        id: sapUser.name || (isAdmin ? "admin" : "user"),
-        username: sapUser.name || (isAdmin ? "admin" : "user"),
+        id: sapUser.name || (lpUser && lpUser.id) || (isAdmin ? "admin" : "user"),
+        username: sapUser.name || (lpUser && lpUser.id) || (isAdmin ? "admin" : "user"),
         name: displayName,
         role: isAdmin ? "admin" : "user",
         roleText: isAdmin ? "Admin" : "User",
         avatarInitials: _generateInitials(displayName),
         avatarColor: isAdmin ? "Accent6" : "Accent1",
-        email: sapUser.email || `${sapUser.name || "user"}@sap.com`,
-        description: `SAP XSUAA Login · ${isAdmin ? "Administrator" : "Standard User"}`,
+        email: email,
+        description: `SAP Build Work Zone · ${isAdmin ? "Administrator" : "Standard User"}`,
         isAdmin: isAdmin,
         isUser: !isAdmin,
         permissions: {
@@ -337,39 +364,30 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
       };
 
       if (_oAuthModel) {
-        const savedId = _getSavedAccountId();
-        // If the authenticated user is admin, allow switching to user for testing
         _oAuthModel.setProperty("/originalUser", userObj);
+        _oAuthModel.setProperty("/currentUser", userObj);
         _oAuthModel.setProperty("/canSwitchRole", isAdmin);
-
-        if (isAdmin && savedId === "user") {
-          // Admin chose to test as User
-          const testUser = _findAccount("user");
-          _oAuthModel.setProperty("/currentUser", testUser);
-          _oAuthModel.setProperty("/selectedAccountId", "user");
-        } else {
-          _oAuthModel.setProperty("/currentUser", userObj);
-          _oAuthModel.setProperty("/selectedAccountId", userObj.id);
-        }
+        _oAuthModel.setProperty("/selectedAccountId", userObj.id);
         _oAuthModel.setProperty("/isLoggedIn", true);
         _oAuthModel.setProperty("/isSapXsuaa", true);
       }
     },
 
-    _applyCapUser(capUser) {
-      const isAdmin = !!capUser.isAdmin;
-      const displayName = capUser.name || (isAdmin ? "Administrator" : "Standard User");
+    _applyCapUser(capUser, lpUser) {
+      const isAdmin = capUser.isAdmin !== undefined ? !!capUser.isAdmin : true;
+      const displayName = (lpUser && lpUser.name) || capUser.name || (isAdmin ? "Administrator" : "Standard User");
+      const email = (lpUser && lpUser.email) || capUser.email || (isAdmin ? "admin@maintenance.sap" : "user@maintenance.sap");
 
       const userObj = {
-        id: capUser.id || (isAdmin ? "admin" : "user"),
-        username: capUser.id || (isAdmin ? "admin" : "user"),
+        id: capUser.id || (lpUser && lpUser.id) || (isAdmin ? "admin" : "user"),
+        username: capUser.id || (lpUser && lpUser.id) || (isAdmin ? "admin" : "user"),
         name: displayName,
         role: isAdmin ? "admin" : "user",
         roleText: isAdmin ? "Admin" : "User",
         avatarInitials: _generateInitials(displayName),
         avatarColor: isAdmin ? "Accent6" : "Accent1",
-        email: capUser.email || (isAdmin ? "admin@maintenance.sap" : "user@maintenance.sap"),
-        description: `SAP CAP Auth · ${isAdmin ? "Administrator" : "Standard User"}`,
+        email: email,
+        description: `SAP Build Work Zone · ${isAdmin ? "Administrator" : "Standard User"}`,
         isAdmin: isAdmin,
         isUser: !isAdmin,
         permissions: {
@@ -389,18 +407,52 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
       };
 
       if (_oAuthModel) {
-        const savedId = _getSavedAccountId();
         _oAuthModel.setProperty("/originalUser", userObj);
+        _oAuthModel.setProperty("/currentUser", userObj);
         _oAuthModel.setProperty("/canSwitchRole", isAdmin);
+        _oAuthModel.setProperty("/selectedAccountId", userObj.id);
+      }
+    },
 
-        if (isAdmin && savedId === "user") {
-          const testUser = _findAccount("user");
-          _oAuthModel.setProperty("/currentUser", testUser);
-          _oAuthModel.setProperty("/selectedAccountId", "user");
-        } else {
-          _oAuthModel.setProperty("/currentUser", userObj);
-          _oAuthModel.setProperty("/selectedAccountId", userObj.id);
+    _applyLaunchpadUser(lpUser) {
+      const displayName = lpUser.name || "SAP User";
+      const email = lpUser.email || "user@sap.com";
+      const userId = lpUser.id || "user";
+      const isAdmin = true; // Default admin access for Work Zone user unless restricted by backend
+
+      const userObj = {
+        id: userId,
+        username: userId,
+        name: displayName,
+        role: isAdmin ? "admin" : "user",
+        roleText: isAdmin ? "Admin" : "User",
+        avatarInitials: _generateInitials(displayName),
+        avatarColor: isAdmin ? "Accent6" : "Accent1",
+        email: email,
+        description: "SAP Build Work Zone User",
+        isAdmin: isAdmin,
+        isUser: !isAdmin,
+        permissions: {
+          createOrder: isAdmin,
+          massChange: isAdmin,
+          editOrder: isAdmin,
+          deleteOrder: isAdmin,
+          cancelOrder: isAdmin,
+          completeOrder: isAdmin,
+          addOperation: isAdmin,
+          deleteOperation: isAdmin,
+          batchEditOperations: isAdmin,
+          addMaterial: isAdmin,
+          assignTechnician: isAdmin,
+          export: true
         }
+      };
+
+      if (_oAuthModel) {
+        _oAuthModel.setProperty("/originalUser", userObj);
+        _oAuthModel.setProperty("/currentUser", userObj);
+        _oAuthModel.setProperty("/canSwitchRole", isAdmin);
+        _oAuthModel.setProperty("/selectedAccountId", userObj.id);
       }
     },
 
