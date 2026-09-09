@@ -175,7 +175,10 @@ Dưới đây là chi tiết tất cả các trang, tệp mã nguồn và tên h
 ## 5. Chi tiết các Thuật toán & Cơ chế Tự Phục Hồi (Auto-Healing Algorithms)
 
 ### 5.1. Cơ chế Bất đồng bộ Job Registry & Clean Memory (Worker TTL)
-* **Vị trí file**: [`server.js`](file:///d:/ĐỒ%20ÁN%20ĐI%20LÀM/FPT/maintenance-cockpit2/server.js) & [`srv/server.js`](file:///d:/ĐỒ%20ÁN%20ĐI%20LÀM/FPT/maintenance-cockpit2/srv/server.js)
+* **Vị trí File & Hàm Triển khai**:
+  - [`server.js:L185-L264`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/server.js#L185-L264) & [`srv/server.js:L185-L264`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/server.js#L185-L264): Khởi tạo `importJobs` Map, timer dọn dẹp TTL (15 phút/lần), và route `POST /api/maintenance/import-excel-async`.
+  - [`server.js:L269-L276`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/server.js#L269-L276) & [`srv/server.js:L269-L276`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/server.js#L269-L276): Endpoint trả trạng thái `GET /api/maintenance/import-job/:jobId`.
+  - [`CAPService.js:L391-L471`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/app/webapp/model/CAPService.js#L391-L471): Hàm `importOrdersExcelAsync(oFile, fnOnProgress)`.
 * **Nguyên lý hoạt động**:
   1. Khi nhận request tại `POST /api/maintenance/import-excel-async`, server tạo một đối tượng theo dõi trong bộ nhớ RAM:
      ```javascript
@@ -191,8 +194,8 @@ Dưới đây là chi tiết tất cả các trang, tệp mã nguồn và tên h
      };
      importJobs.set(jobId, jobRecord);
      ```
-  2. Hàm gọi ngay lập tức `res.status(202).json({ jobId, status: 'RUNNING', progress: 5 })`.
-  3. Tiến trình import được kích hoạt trong hàng đợi `setImmediate`:
+  2. Server gọi ngay lập tức `res.status(202).json({ jobId, status: 'RUNNING', progress: 5 })` trong < 300ms.
+  3. Tiến trình import được kích hoạt trong hàng đợi sự kiện `setImmediate`:
      ```javascript
      setImmediate(async () => {
        try {
@@ -237,7 +240,10 @@ Dưới đây là chi tiết tất cả các trang, tệp mã nguồn và tên h
 ---
 
 ### 5.2. Thuật toán Khử trùng lặp & Tự động Tái đánh số Operation (Resequencing Engine)
-* **Vị trí file**: [`srv/excel-import-service.js`](file:///d:/ĐỒ%20ÁN%20ĐI%20LÀM/FPT/maintenance-cockpit2/srv/excel-import-service.js)
+* **Vị trí File & Hàm Triển khai**:
+  - [`srv/excel-import-service.js:L680-L705`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js#L680-L705): Vòng lặp tự động tái đánh số tuần tự (`opSeq += 10`) trong `processExcelImport`.
+  - [`srv/excel-import-service.js:L816-L827`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js#L816-L827): Lệnh xóa sạch công việc cũ `DELETE.from(MaintenanceOperations)`.
+  - [`srv/excel-import-service.js:L854-L864`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js#L854-L864): Bộ lọc kiểm tra trùng lặp khóa kép `uniqueOpsMap` trước khi `batchInsert`.
 * **Vấn đề giải quyết**: Bảng `MaintenanceOperations` có khóa chính phức hợp gồm 2 trường: `key order_no : String(20); key no : String(10);`. Nếu 2 dòng công việc có cùng số thứ tự `no`, câu lệnh INSERT sẽ đổ vỡ toàn bộ.
 * **Thuật toán xử lý**:
   ```javascript
@@ -285,7 +291,10 @@ Dưới đây là chi tiết tất cả các trang, tệp mã nguồn và tên h
 ---
 
 ### 5.3. Thuật toán Gộp Vật tư & Tự động Tính Chi phí Dự toán (Material Aggregator)
-* **Vị trí file**: [`srv/excel-import-service.js`](file:///d:/ĐỒ%20ÁN%20ĐI%20LÀM/FPT/maintenance-cockpit2/srv/excel-import-service.js)
+* **Vị trí File & Hàm Triển khai**:
+  - [`srv/excel-import-service.js:L720-L744`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js#L720-L744): Vòng lặp `matMap` cộng dồn số lượng `qty` và tính lại `value` trong `processExcelImport`.
+  - [`srv/excel-import-service.js:L825`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js#L825): Lệnh xóa sạch vật tư cũ `DELETE.from(OrderMaterials)`.
+  - [`srv/excel-import-service.js:L866-L880`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js#L866-L880): Bộ lọc kiểm tra trùng lặp khóa kép `uniqueMatsMap` trước khi `batchInsert`.
 * **Nguyên tắc**: Bảng `OrderMaterials` có khóa chính `key order_no : String(20); key material : String(50);`.
 * **Cơ chế gộp số lượng và giá trị**:
   ```javascript
@@ -317,7 +326,11 @@ Dưới đây là chi tiết tất cả các trang, tệp mã nguồn và tên h
 ---
 
 ### 5.4. Thuật toán Upsert Thông minh & Đồng bộ Chi tiết (Smart Upsert)
-* **Vị trí file**: [`srv/excel-import-service.js`](file:///d:/ĐỒ%20ÁN%20ĐI%20LÀM/FPT/maintenance-cockpit2/srv/excel-import-service.js)
+* **Vị trí File & Hàm Triển khai**:
+  - [`srv/excel-import-service.js:L562-L571`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js#L562-L571): Kiểm tra đơn hàng tồn tại `mapExistingOrders.has(normalizedRaw)` $\rightarrow$ gán `isUpdate = true`.
+  - [`srv/excel-import-service.js:L784-L787`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js#L784-L787): Phân loại đơn vào `ordersToUpdate` và tăng `updatedCount`.
+  - [`srv/excel-import-service.js:L816-L827`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js#L816-L827): Lệnh xóa sạch liên kết con cũ `DELETE.from(MaintenanceOperations)` & `DELETE.from(OrderMaterials)`.
+  - [`srv/excel-import-service.js:L832-L851`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js#L832-L851): Lệnh cập nhật Header `UPDATE.entity(MaintenanceOrders)`.
 * Để đảm bảo không để lại bản ghi mồ côi và không xung đột khóa khi người dùng import lại đơn cũ:
   1. Xóa sạch các liên kết con cũ của các đơn trong đợt import này:
      ```javascript
@@ -332,19 +345,29 @@ Dưới đây là chi tiết tất cả các trang, tệp mã nguồn và tên h
 
 ---
 
-### 5.5. Thuật toán Gom nhóm Đa dòng cùng Order ID (In-File Grouping)
+### 5.5. Thuật toán Gom nhóm Đa dòng cùng Order ID (In-File Grouping & Deduplication)
+* **Vị trí File & Hàm Triển khai**:
+  - [`srv/excel-import-service.js:L471`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js#L471): Khởi tạo tập hợp theo dõi `seenOrderNosInFile = new Set()`.
+  - [`srv/excel-import-service.js:L573-L577`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js#L573-L577): Kiểm tra và cấp phát số thứ tự tiếp theo nếu trùng mã đơn trong cùng một file.
+  - [`srv/excel-import-service.js:L601-L679`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js#L601-L679): Gom toàn bộ danh sách `operations` và `materials` theo `finalOrderNo`.
 * Tự động phát hiện các dòng trong file có cùng `rawOrderNo`.
 * Gom toàn bộ danh sách `operations` và `materials` vào đơn cha duy nhất thay vì tạo ra các đơn thừa có cùng mã.
 
 ---
 
 ### 5.6. Thuật toán Tự cấp phát Sequence Tuyến tính (Auto-Sequence Generator)
+* **Vị trí File & Hàm Triển khai**:
+  - [`srv/excel-import-service.js:L279-L291`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js#L279-L291): Tính toán giá trị lớn nhất từ các đơn hiện có trong cơ sở dữ liệu (`maxOrderSeq` scan từ `aExistingOrders`).
+  - [`srv/excel-import-service.js:L573-L576`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js#L573-L576): Cấp phát mã `finalOrderNo = 'MO-' + nextOrderNum++` khi không có mã đơn.
 * Quét tìm số lớn nhất từ các đơn hiện có trong DB (ví dụ: `MO-1025` $\rightarrow$ giá trị lớn nhất là 1025).
 * Biến con trỏ `nextOrderNum` bắt đầu từ 1026 và tự động tăng dần khi gặp các dòng không có mã đơn.
 
 ---
 
 ### 5.7. Bộ Chuẩn hóa & Tự sửa lỗi Ngày tháng Đa định dạng (Date Normalizer & Auto-Swap)
+* **Vị trí File & Hàm Triển khai**:
+  - [`srv/excel-import-service.js:L16-L69`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js#L16-L69): Hàm `normalizeDate(rawDate)` giải mã số serial Excel, `DD/MM/YYYY`, `MM/DD/YYYY`, Date object, và ISO string.
+  - [`srv/excel-import-service.js:L593-L600`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js#L593-L600): Thuật toán đảo ngược thời gian `Date Auto-Swap` nếu `scheduledFrom > scheduledTo`.
 * Hỗ trợ tự động chuyển đổi số serial Excel dạng `45550` thành chuỗi `YYYY-MM-DD`.
 * Nếu ngày bắt đầu lớn hơn ngày kết thúc:
   ```javascript
@@ -358,6 +381,12 @@ Dưới đây là chi tiết tất cả các trang, tệp mã nguồn và tên h
 ---
 
 ### 5.8. Tra cứu Master Data $O(1)$ & Fallback An toàn (Master Data Safe Fallbacks)
+* **Vị trí File & Hàm Triển khai**:
+  - [`srv/excel-import-service.js:L238-L278`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js#L238-L278): Tải trước dữ liệu danh mục Master Data vào các cấu trúc `Set` và `Map` trong RAM.
+  - [`srv/excel-import-service.js:L550-L556`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js#L550-L556): Kiểm tra và gán fallback thiết bị mặc định `EQ-001`.
+  - [`srv/excel-import-service.js:L580-L583`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js#L580-L583): Kiểm tra và gán fallback Plant mặc định `1000`.
+  - [`srv/excel-import-service.js:L77-L100`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js#L77-L100): Hàm `normalizeMaintenanceType(raw)`.
+  - [`srv/excel-import-service.js:L108-L126`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js#L108-L126): Hàm `normalizePriority(raw)`.
 * Trước khi duyệt file, toàn bộ danh mục mã chuẩn (Equipments, Plants, Priorities, Planners, WorkCenters) được nạp vào các `Set` trong RAM.
 * Tốc độ kiểm tra mã đạt độ phức tạp tức thời $\mathcal{O}(1)$.
 * Nếu mã Thiết bị chưa khai báo, tự động fallback về `"EQ-001"`.
@@ -365,6 +394,9 @@ Dưới đây là chi tiết tất cả các trang, tệp mã nguồn và tên h
 ---
 
 ### 5.9. Thuật toán Batch Chunking & Atomic Bulk Transaction
+* **Vị trí File & Hàm Triển khai**:
+  - [`srv/excel-import-service.js:L174-L180`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js#L174-L180): Hàm `batchInsert(entity, entries, batchSize = 500)`.
+  - [`srv/excel-import-service.js:L815-L884`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js#L815-L884): Khối giao dịch nguyên tử `await cds.tx(async () => { ... })`.
 * Sử dụng `batchInsert` với kích thước chunk là **500 bản ghi**:
   ```javascript
   async function batchInsert(entity, entries, batchSize = 500) {
@@ -380,6 +412,9 @@ Dưới đây là chi tiết tất cả các trang, tệp mã nguồn và tên h
 ---
 
 ### 5.10. Tự động Tạo UUID cho cuid Entities (OrderHistory & AuditHistory)
+* **Vị trí File & Hàm Triển khai**:
+  - [`srv/excel-import-service.js:L798-L806`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js#L798-L806): Cấp phát UUID cho `OrderHistory` (`cds.utils?.uuid ? cds.utils.uuid() : crypto.randomUUID()`).
+  - [`srv/excel-import-service.js:L893-L901`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js#L893-L901): Cấp phát UUID và ghi nhận nhật ký tổng hợp vào `AuditHistory`.
 * Khi thực hiện `INSERT.into(OrderHistory)` hoặc `INSERT.into(AuditHistory)` theo khối trực tiếp trên cơ sở dữ liệu, các entity kế thừa `cuid` bắt buộc phải có giá trị cho trường `ID`.
 * Hệ thống chủ động cấp phát UUID chuẩn:
   ```javascript
@@ -413,6 +448,7 @@ Dưới đây là chi tiết tất cả các trang, tệp mã nguồn và tên h
 ## 7. Đặc tả Chi tiết API Backend
 
 ### 1. `POST /api/maintenance/import-excel-async`
+* **Vị trí File & Khai báo Endpoint**: [`server.js:L202-L264`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/server.js#L202-L264) & [`srv/server.js:L202-L264`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/server.js#L202-L264)
 * **Mô tả**: Tiếp nhận file Excel và trả về ngay mã công việc `jobId` trong thời gian ngắn để tránh timeout.
 * **Header**: `Content-Type: multipart/form-data`
 * **Body**: `file: <Binary Excel File .xlsx>`
@@ -429,6 +465,7 @@ Dưới đây là chi tiết tất cả các trang, tệp mã nguồn và tên h
 ---
 
 ### 2. `GET /api/maintenance/import-job/:jobId`
+* **Vị trí File & Khai báo Endpoint**: [`server.js:L269-L276`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/server.js#L269-L276) & [`srv/server.js:L269-L276`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/server.js#L269-L276)
 * **Mô tả**: Endpoint cho frontend gọi polling kiểm tra trạng thái và phần trăm tiến độ xử lý.
 * **Response Output khi đang chạy (`200 OK`)**:
   ```json
@@ -471,6 +508,7 @@ Dưới đây là chi tiết tất cả các trang, tệp mã nguồn và tên h
 ---
 
 ### 3. `GET /api/maintenance/download-template`
+* **Vị trí File & Khai báo Endpoint**: [`server.js:L75-L182`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/server.js#L75-L182) & [`srv/server.js:L75-L182`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/server.js#L75-L182) (kết hợp dữ liệu mẫu tại [`srv/excel-template-sample-data.js:L218`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-template-sample-data.js#L218))
 * **Mô tả**: Tự động tạo và tải về file mẫu Excel chuẩn SAP gồm 4 Sheet:
   - **Sheet 1: `MaintenanceOrders`**: Chứa thông tin tổng quan các đơn bảo trì.
   - **Sheet 2: `Operations`**: Chứa các bước công việc chi tiết theo từng thiết bị/đơn.
