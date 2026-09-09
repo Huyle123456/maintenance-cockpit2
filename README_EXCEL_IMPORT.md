@@ -22,7 +22,7 @@
    - [5.10. Tự động Tạo UUID cho cuid Entities (OrderHistory & AuditHistory)](#510-tự-động-tạo-uuid-cho-cuid-entities-orderhistory--audithistory)
 6. [Bảng So sánh Hiệu năng (Benchmark: 10.000 - 50.000 records)](#6-bảng-so-sánh-hiệu-năng-benchmark-10000---50000-records)
 7. [Đặc tả Chi tiết API Backend](#7-đặc-tả-chi-tiết-api-backend)
-8. [Tích hợp Giao diện SAP Fiori (UI5 Controller & Fragment)](#8-tích-hợp-giao-diện-sap-fiori-ui5-controller--fragment)
+8. [Tích hợp Giao diện SAP Fiori (UI5 Controller, Fragment & Service)](#8-tích-hợp-giao-diện-sap-fiori-ui5-controller-fragment--service)
 
 ---
 
@@ -47,59 +47,65 @@ Khi xử lý các file dữ liệu bảo trì quy mô lớn chứa từ **10.000
 sequenceDiagram
     autonumber
     actor User as Người dùng (SAP Fiori)
-    participant Dialog as Import Dialog Fragment
+    participant Dialog as ImportOrdersDialog.fragment.xml
     participant Ctrl as MaintenanceOrders.controller.js
     participant Service as CAPService.js
-    participant Server as CAP Express Server (server.js)
-    participant Worker as Background Import Worker (excel-import-service.js)
+    participant Server as Express Server (server.js / srv/server.js)
+    participant Worker as Background Worker (excel-import-service.js)
     participant DB as SAP HANA / SQLite DB
 
-    User->>Dialog: Chọn file Excel (.xlsx) & Bấm "Import Orders"
-    Dialog->>Ctrl: onUploadExcel()
-    Ctrl->>Dialog: Bật ProgressIndicator (5%) & Khóa nút bấm
-    Ctrl->>Service: importOrdersExcelAsync(file)
-    Service->>Server: POST /api/maintenance/import-excel-async (Multipart)
+    User->>Dialog: Mở Dialog & chọn file Excel (.xlsx / .xls / .csv)
+    Dialog->>Ctrl: onImportFileChange(oEvent)
+    Ctrl->>Dialog: Lưu file vào _oSelectedImportFile, gán importModel>/canImport = true
+    User->>Dialog: Nhấn nút "Upload & Process on Backend" (btnConfirmImport)
+    Dialog->>Ctrl: onConfirmImportOrders()
+    Ctrl->>Dialog: Cập nhật importModel: isProcessing = true, progressPercent = 5%
+    Ctrl->>Service: CAPService.importOrdersExcel(file, fnOnProgress)
+    Service->>Service: importOrdersExcelAsync(file, fnOnProgress)
+    Service->>Server: POST /api/maintenance/import-excel-async (FormData binary)
     
     rect rgb(235, 247, 255)
     Note over Server: Tiếp nhận File & Khởi tạo Background Job (< 300ms)
     Server->>Server: Sinh mã duy nhất jobId (job-timestamp-rand)
     Server->>Server: Lưu jobRecord vào Map importJobs (status: RUNNING, progress: 5%)
-    Server->>Worker: setImmediate() chạy ngầm processExcelImport(buffer, user, { onProgress })
+    Server->>Worker: setImmediate() chạy ngầm processExcelImport(fileBuffer, user, { onProgress })
     Server-->>Service: HTTP 202 Accepted { jobId, status: "RUNNING", progress: 5% }
-    Service-->>Ctrl: Trả về jobId ngay lập tức (KHÔNG BAO GIỜ BỊ 504 TIMEOUT)
+    Note over Service: Trả về 202 Accepted ngay - KHÔNG BAO GIỜ BỊ 504 GATEWAY TIMEOUT
     end
 
     rect rgb(255, 250, 240)
-    Note over Ctrl,Server: Vòng lặp Polling Tiến độ thời gian thực (Mỗi 1000ms)
-    Ctrl->>Ctrl: _startJobPolling(jobId) kích hoạt setInterval 1000ms
-    loop Mỗi 1 giây
-        Ctrl->>Service: getImportJobStatus(jobId)
+    Note over Service,Server: Vòng lặp Polling Tiến độ thời gian thực (Mỗi 1500ms)
+    Service->>Service: setInterval(..., 1500) bắt đầu polling
+    loop Mỗi 1.5 giây
         Service->>Server: GET /api/maintenance/import-job/:jobId
-        Server-->>Service: { status, progress, message }
-        Service-->>Ctrl: Cập nhật dữ liệu job
-        Ctrl->>Dialog: Cập nhật ProgressIndicator (%Value & Status Text)
+        Server-->>Service: { status: "RUNNING", progress: 35, message: "Validating order row..." }
+        Service->>Ctrl: fnOnProgress({ progress: 35, message: "..." })
+        Ctrl->>Dialog: importModel.setProperty("/progressPercent", 35) & "/statusMessage"
+        Dialog-->>User: Thanh ProgressIndicator & MessageStrip cập nhật % mượt mà
     end
     end
 
     rect rgb(240, 255, 240)
     Note over Worker,DB: Worker chạy ngầm độc lập (Background Processing)
-    Worker->>Worker: onProgress(15%, "Reading Excel workbook...")
-    Worker->>Worker: onProgress(20%-65%, "Validating order row X of N...")
+    Worker->>Worker: notifyProgress(15%, "Reading Excel workbook...")
+    Worker->>Worker: notifyProgress(20%-65%, "Validating order row X of N...")
     Worker->>Worker: Tự động khử trùng Operations & Gộp Materials
-    Worker->>DB: onProgress(70%, "Saving orders to database...")
-    Worker->>DB: cds.tx() chèn Orders, Operations, Materials, History
-    Worker->>Worker: onProgress(100%, "Completed processing rows.")
-    Worker->>Server: Cập nhật importJobs[jobId] -> COMPLETED kèm result
+    Worker->>DB: notifyProgress(70%, "Saving orders to database...")
+    Worker->>DB: cds.tx() batch chèn Orders, Operations, Materials, History
+    Worker->>Worker: notifyProgress(100%, "Completed processing rows.")
+    Worker->>Server: Cập nhật importJobs.get(jobId) -> status = 'COMPLETED' kèm result
     end
 
     rect rgb(245, 245, 255)
-    Note over Ctrl,User: Kết thúc Polling & Báo cáo Kết quả
-    Ctrl->>Service: GET /api/maintenance/import-job/:jobId
-    Server-->>Ctrl: { status: "COMPLETED", progress: 100, result: {...} }
-    Ctrl->>Ctrl: _clearJobPollingTimer() dừng Polling
-    Ctrl->>Dialog: Đóng Dialog import
-    Ctrl->>Ctrl: Làm mới bảng dữ liệu (_refreshOrders) & KPI Metrics (_loadKpis)
-    Ctrl-->>User: Hiển thị MessageBox.success tóm tắt số đơn Tạo mới/Cập nhật
+    Note over Service,User: Kết thúc Polling & Báo cáo Kết quả
+    Service->>Server: GET /api/maintenance/import-job/:jobId
+    Server-->>Service: { status: "COMPLETED", progress: 100, result: { totalRows, createdCount, ... } }
+    Service->>Service: clearInterval(pollInterval) dừng Polling
+    Service-->>Ctrl: resolve(job.result)
+    Ctrl->>Ctrl: this.onCancelImportOrders() (Đóng Dialog import)
+    Ctrl->>Ctrl: await this._reloadOrdersFromBackend() (Cập nhật bảng & KPI)
+    Ctrl->>Ctrl: this.onFilterClear() (Xóa bộ lọc tìm kiếm)
+    Ctrl-->>User: Hiển thị MessageBox chi tiết: Thời gian, Tạo mới, Cập nhật, Operations, Materials
     end
 ```
 
@@ -107,36 +113,43 @@ sequenceDiagram
 
 ## 3. Bảng Tra Cứu File & Hàm Thực Thi (Code Mapping Directory)
 
-Dưới đây là chi tiết tất cả các trang, tệp mã nguồn và tên hàm trực tiếp phụ trách tính năng Import và Polling:
+Dưới đây là chi tiết tất cả các trang, tệp mã nguồn và tên hàm trực tiếp phụ trách tính năng Import và Polling trong mã nguồn thực tế:
 
 ### 3.1. Frontend (SAPUI5 / Fiori)
 
-| Tên File & Đường dẫn | Thành phần / Hàm | Vai trò & Chi tiết triển khai |
+| Tên File & Đường dẫn | Thành phần / Hàm | Vai trò & Chi tiết triển khai thực tế |
 |---|---|---|
-| [`ImportOrdersDialog.fragment.xml`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/app/webapp/view/fragment/ImportOrdersDialog.fragment.xml) | `sap.m.Dialog`<br>`id="importProgressIndicator"` | - Giao diện hộp thoại tải lên Excel.<br>- Chứa `sap.m.ProgressIndicator` gắn binding hai chiều với `progressPercent`, `progressState`.<br>- Hiển thị nhãn tiến trình động qua `progressMessage`.<br>- Tự động kích hoạt thuộc tính `busy` và vô hiệu hóa nút hành động khi `isImporting === true`. |
-| [`MaintenanceOrders.controller.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/app/webapp/controller/MaintenanceOrders.controller.js) | `onOpenImportDialog()` | Khởi tạo mô hình JSON Model `importDialog` (`isImporting: false`, `progressPercent: 0`, `progressMessage: ""`) và mở hộp thoại. |
-| [`MaintenanceOrders.controller.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/app/webapp/controller/MaintenanceOrders.controller.js) | `onUploadExcel()` | - Lấy file từ `FileUploader`.<br>- Chuyển giao diện sang chế độ `isImporting: true`.<br>- Gọi `CAPService.importOrdersExcelAsync(file)`.<br>- Nhận `jobId` và khởi chạy `_startJobPolling(jobId)`. |
-| [`MaintenanceOrders.controller.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/app/webapp/controller/MaintenanceOrders.controller.js) | `_startJobPolling(jobId)` | - Thiết lập bộ đếm thời gian `setInterval` chu kỳ **1.000ms**.<br>- Liên tục gọi `CAPService.getImportJobStatus(jobId)`.<br>- Đồng bộ giá trị `%` và thông điệp trạng thái lên thanh `ProgressIndicator`.<br>- Xử lý ngắt polling khi đạt trạng thái `COMPLETED` hoặc `FAILED`. |
-| [`MaintenanceOrders.controller.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/app/webapp/controller/MaintenanceOrders.controller.js) | `_clearJobPollingTimer()` | Hủy an toàn `setInterval` để giải phóng bộ nhớ trình duyệt, ngăn ngừa rò rỉ timer. |
-| [`MaintenanceOrders.controller.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/app/webapp/controller/MaintenanceOrders.controller.js) | `onDownloadTemplate()` | Gọi `CAPService.getTemplateDownloadUrl()` và kích hoạt tải về trực tiếp file Excel mẫu từ server. |
-| [`CAPService.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/app/webapp/model/CAPService.js) | `importOrdersExcelAsync(file)` | Đóng gói `FormData` và gửi `POST` lên endpoint `/api/maintenance/import-excel-async`, nhận phản hồi `202 Accepted` chứa `jobId`. |
-| [`CAPService.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/app/webapp/model/CAPService.js) | `getImportJobStatus(jobId)` | Gửi `GET /api/maintenance/import-job/${jobId}` để lấy snapshot tiến độ mới nhất của tác vụ nền. |
-| [`CAPService.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/app/webapp/model/CAPService.js) | `getTemplateDownloadUrl()` | Trả về chuỗi đường dẫn tải file mẫu: `"/api/maintenance/download-template"`. |
+| [`ImportOrdersDialog.fragment.xml`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/app/webapp/view/fragment/ImportOrdersDialog.fragment.xml) | Dialog ID `importOrdersDialog`<br>Model: `importModel` | - Hộp thoại tải lên Excel và hiển thị tiến trình import ngầm.<br>- Quản trị dữ liệu qua mô hình `importModel` với các trường: `fileName`, `fileSize`, `canImport`, `isProcessing`, `progressPercent`, `progressState`, `statusMessage`, `statusType`. |
+| [`ImportOrdersDialog.fragment.xml`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/app/webapp/view/fragment/ImportOrdersDialog.fragment.xml) | `<u:FileUploader id="orderFileUploader">` | Điều khiển chọn tệp `.xlsx, .xls, .csv`, liên kết sự kiện `change=".onImportFileChange"`. |
+| [`ImportOrdersDialog.fragment.xml`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/app/webapp/view/fragment/ImportOrdersDialog.fragment.xml) | `<ProgressIndicator id="importProgressIndicator">` | Thanh đo tiến độ trực quan, liên kết dữ liệu `percentValue="{importModel>/progressPercent}"` và `state="{importModel>/progressState}"`. |
+| [`ImportOrdersDialog.fragment.xml`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/app/webapp/view/fragment/ImportOrdersDialog.fragment.xml) | `<MessageStrip id="importOrdersMessageStrip">` | Khối thông báo động, hiển thị thông điệp tiến độ theo thời gian thực từ `statusMessage`. |
+| [`MaintenanceOrders.controller.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/app/webapp/controller/MaintenanceOrders.controller.js) | `onImportOrdersPress()` | Kiểm tra quyền Quản trị viên (`AuthService`), khởi tạo `importModel` (JSONModel), nạp fragment `ImportOrdersDialog` và mở dialog. |
+| [`MaintenanceOrders.controller.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/app/webapp/controller/MaintenanceOrders.controller.js) | `onImportFileChange(oEvent)` | Kiểm tra định dạng hợp lệ (`.xlsx`, `.xls`, `.csv`), lưu đối tượng file vào `this._oSelectedImportFile`, kích hoạt trạng thái sẵn sàng `canImport = true`. |
+| [`MaintenanceOrders.controller.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/app/webapp/controller/MaintenanceOrders.controller.js) | `onDownloadImportTemplate()` | Gọi endpoint tải mẫu `/api/maintenance/download-template`, tạo thẻ `<a>` tạm và tải trực tiếp file `MaintenanceOrders_Template.xlsx`. |
+| [`MaintenanceOrders.controller.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/app/webapp/controller/MaintenanceOrders.controller.js) | `onConfirmImportOrders()` | - Bật cờ `isProcessing = true`.<br>- Gọi `CAPService.importOrdersExcel(file, fnOnProgress)`.<br>- Lắng nghe callback cập nhật `progressPercent` và `statusMessage` lên `importModel`.<br>- Tự động đóng dialog qua `onCancelImportOrders()`, nạp lại đơn hàng qua `_reloadOrdersFromBackend()`, xóa bộ lọc qua `onFilterClear()` và hiển thị tóm tắt `MessageBox`. |
+| [`MaintenanceOrders.controller.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/app/webapp/controller/MaintenanceOrders.controller.js) | `onCancelImportOrders()` | Đóng hộp thoại import qua `this._pImportOrdersDialog.then(oDialog => oDialog.close())`. |
+| [`CAPService.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/app/webapp/model/CAPService.js) | `importOrdersExcelAsync(oFile, fnOnProgress)` | **Trọng tâm Async Polling Client**: Gửi `FormData` lên `/api/maintenance/import-excel-async`, nhận `jobId` trong < 300ms, khởi chạy `setInterval` chu kỳ **1.500ms** gọi `GET /api/maintenance/import-job/${jobId}` để cập nhật tiến độ, ngắt timer và hoàn tất Promise khi nhận trạng thái `COMPLETED`. |
+| [`CAPService.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/app/webapp/model/CAPService.js) | `importOrdersExcel(oFile, fnOnProgress)` | **Hàm Điều phối**: Mặc định kích hoạt `importOrdersExcelAsync`. Có sẵn khối `try...catch` tự động fallback sang endpoint đồng bộ `/api/maintenance/import-excel` nếu xảy ra lỗi mạng bất thường. |
+| [`CAPService.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/app/webapp/model/CAPService.js) | `getApiUrl()` & `getDirectUrl(url)` | Xác định đường dẫn gốc API tương đối hoặc tuyệt đối, hỗ trợ vượt qua các lớp proxy của Cloud Foundry. |
 
 ---
 
 ### 3.2. Backend (Node.js & SAP CAP)
 
-| Tên File & Đường dẫn | Hàm / Endpoint | Vai trò & Chi tiết triển khai |
+| Tên File & Đường dẫn | Hàm / Endpoint | Vai trò & Chi tiết triển khai thực tế |
 |---|---|---|
-| [`server.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/server.js) & [`srv/server.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/server.js) | `POST /api/maintenance/import-excel-async` | **Endpoint Tiếp nhận Bất đồng bộ**: Nhận file qua Multer memory buffer, tạo `jobId`, kích hoạt `processExcelImport` trong background qua `setImmediate`, trả ngay mã `202 Accepted` sau < 300ms. |
-| [`server.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/server.js) & [`srv/server.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/server.js) | `GET /api/maintenance/import-job/:jobId` | **Endpoint Polling Tiến độ**: Tra cứu trong bộ nhớ `importJobs.get(jobId)` và phản hồi thông tin tiến trình thực thi hiện tại. |
+| [`server.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/server.js) & [`srv/server.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/server.js) | `POST /api/maintenance/import-excel-async` | **Endpoint Tiếp nhận Bất đồng bộ**: Nhận file qua Multer memory buffer, tạo mã `jobId`, đăng ký vào `importJobs`, kích hoạt `processExcelImport` ngầm qua `setImmediate`, trả ngay mã `202 Accepted` trong < 300ms. |
+| [`server.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/server.js) & [`srv/server.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/server.js) | `GET /api/maintenance/import-job/:jobId` | **Endpoint Polling Tiến độ**: Tra cứu trong `importJobs.get(jobId)` và trả về đối tượng `{ jobId, status, progress, message, result, error }`. |
+| [`server.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/server.js) & [`srv/server.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/server.js) | `POST /api/maintenance/import-excel` | **Endpoint Đồng bộ Cũ (Legacy Fallback)**: Xử lý đồng bộ file qua `processExcelImport`, dùng làm phương án dự phòng khi client cần. |
 | [`server.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/server.js) & [`srv/server.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/server.js) | `GET /api/maintenance/download-template` | **Tạo File Excel Template Chuẩn 4 Sheet**: Sử dụng thư viện `ExcelJS` nạp dữ liệu từ `getExcelTemplateSampleData()` và stream file `.xlsx` về trình duyệt. |
-| [`server.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/server.js) & [`srv/server.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/server.js) | `importJobs` & Dọn dẹp TTL | Bảng băm `Map` lưu trữ thông tin job nền. Thiết lập timer `setInterval` mỗi 15 phút quét xóa các job có tuổi thọ trên 1 giờ để chống tràn RAM. |
+| [`server.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/server.js) & [`srv/server.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/server.js) | `importJobs` Map & Dọn dẹp TTL | Bảng băm `Map` lưu trữ thông tin job nền. Thiết lập timer `setInterval` mỗi 15 phút quét xóa các job có tuổi thọ trên 1 giờ để chống tràn RAM. |
 | [`srv/excel-import-service.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js) | `processExcelImport(fileSource, currentUser, options)` | **Trọng tâm Xử lý Logic**: Phân tích cú pháp Excel bằng `xlsx`, chạy thuật toán chuẩn hóa dữ liệu, kích hoạt callback `options.onProgress` định kỳ, và thực hiện ghi dữ liệu dạng chunk vào Database. |
 | [`srv/excel-import-service.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js) | `findEntity(name)` | Hàm cầu nối tương thích: Định danh chính xác entity schema (như `sap.cap.maintenance.MaintenanceOrders`) bảo đảm chạy đồng nhất trên cả SQLite cục bộ lẫn SAP HANA Cloud mà không bị lỗi đối tượng CSN chưa liên kết. |
-| [`srv/excel-import-service.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js) | `batchInsert(entity, entries, batchSize)` | Hàm chèn dữ liệu theo từng gói (mặc định 500 bản ghi/lô), tránh vượt quá số lượng tham số tối đa của SQL engine. |
-| [`srv/excel-template-sample-data.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-template-sample-data.js) | `getExcelTemplateSampleData()` | Cung cấp dữ liệu mẫu sạch cho file Template: 5 đơn hàng mẫu (tách biệt mẫu đa sheet và mẫu inline), 7 công việc, 6 dòng vật tư và 26 dòng Master Data tham chiếu. |
+| [`srv/excel-import-service.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js) | `batchInsert(entity, entries, batchSize = 500)` | Hàm chèn dữ liệu theo từng gói (mặc định 500 bản ghi/lô), tránh vượt quá số lượng tham số tối đa của SQL engine. |
+| [`srv/excel-import-service.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js) | `normalizeDate(rawDate)` | Chuẩn hóa mọi định dạng ngày: Date object, ISO string, định dạng có dấu gạch chéo (`DD/MM/YYYY`), và số serial của Excel. |
+| [`srv/excel-import-service.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js) | `normalizeMaintenanceType(raw)` | Chuẩn hóa loại bảo trì tiếng Việt / tiếng Anh về `PREVENTIVE`, `CORRECTIVE`, `EMERGENCY`. |
+| [`srv/excel-import-service.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-import-service.js) | `normalizePriority(raw)` | Chuẩn hóa mức ưu tiên về `LOW`, `MEDIUM`, `HIGH`, `CRITICAL` và gán trạng thái màu sắc UI tương ứng. |
+| [`srv/excel-template-sample-data.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/srv/excel-template-sample-data.js) | `getExcelTemplateSampleData()` | Cung cấp dữ liệu mẫu sạch cho file Template: 5 đơn hàng mẫu, 7 công việc, 6 dòng vật tư và 26 dòng Master Data tham chiếu. |
 
 ---
 
@@ -144,7 +157,7 @@ Dưới đây là chi tiết tất cả các trang, tệp mã nguồn và tên h
 
 | # | Trường hợp Ngoại lệ (Edge Case) | Biểu hiện dữ liệu đầu vào | Rủi ro trước đây | Cơ chế xử lý Thông minh Hiện tại |
 |---|---|---|---|---|
-| **1** | **File lớn gây Timeout (50.000 dòng)** | File Excel dung lượng 10MB - 30MB, xử lý mất trên 30 giây. | `HTTP 504 Gateway Timeout`, frontend đơ, người dùng tưởng lỗi nên nhấn gửi lặp lại. | **Async Background Worker + Polling**: Server phản hồi ngay `202 Accepted` trong < 300ms kèm `jobId`. Frontend kích hoạt polling mỗi 1s theo dõi thanh phần trăm tiến độ, không bao giờ gặp timeout. |
+| **1** | **File lớn gây Timeout (50.000 dòng)** | File Excel dung lượng 10MB - 30MB, xử lý mất trên 30 giây. | `HTTP 504 Gateway Timeout`, frontend đơ, người dùng tưởng lỗi nên nhấn gửi lặp lại. | **Async Background Worker + Polling**: Server phản hồi ngay `202 Accepted` trong < 300ms kèm `jobId`. Frontend kích hoạt polling mỗi 1.5s theo dõi thanh phần trăm tiến độ, không bao giờ gặp timeout. |
 | **2** | **Trùng mã Operation No trong cùng 1 đơn** | Sheet `Operations` có 2 dòng cùng `no = "10"` cho đơn `MO-1001`, hoặc kết hợp giữa Inline Ops và Sheet Ops. | Lỗi `UNIQUE constraint failed: MaintenanceOperations.order_no, no` làm hủy toàn bộ transaction. | **Resequencing Engine**: Tự động kiểm tra trùng `no`; nếu đã tồn tại, tự động tăng tuần tự sang bước nhảy tiếp theo (`"10"`, `"20"`, `"30"`...). Đồng thời xóa triệt để công việc cũ trước khi ghi mới. |
 | **3** | **Order ID đã tồn tại trong DB** | File chứa `MO-1001` (đã có trong DB). | Lỗi trùng khóa chính (Duplicate Key Collision) hoặc tự nhảy sang mã mới làm mất liên kết. | **Smart Upsert**: Chuyển sang lệnh `UPDATE`, cập nhật thông tin Header, xóa sạch Operations/Materials cũ liên quan, nạp danh sách mới, tăng `updatedCount`. |
 | **4** | **Cùng 1 Order ID xuất hiện nhiều dòng trong file** | Dòng 2: `MO-1001` (Task 1); Dòng 3: `MO-1001` (Task 2). | Dòng 3 bị xem là đơn trùng và bị đổi tên thành mã khác ngoài ý muốn. | **In-File Deduplication**: `seenOrderNosInFile` theo dõi các mã đã duyệt; nếu cùng mã trong một file thì tự động gộp hoặc cấp phát mã tăng kế tiếp tránh va chạm. |
@@ -466,83 +479,168 @@ Dưới đây là chi tiết tất cả các trang, tệp mã nguồn và tên h
 
 ---
 
-## 8. Tích hợp Giao diện SAP Fiori (UI5 Controller & Fragment)
+## 8. Tích hợp Giao diện SAP Fiori (UI5 Controller, Fragment & Service)
 
-### 8.1. Khai báo Fragment XML ([`ImportOrdersDialog.fragment.xml`](file:///d:/ĐỒ%20ÁN%20ĐI%20LÀM/FPT/maintenance-cockpit2/app/webapp/view/fragment/ImportOrdersDialog.fragment.xml))
+Dưới đây là các đoạn mã nguồn thực tế đang hoạt động 100% trong dự án:
+
+### 8.1. Khai báo Fragment XML ([`ImportOrdersDialog.fragment.xml`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/app/webapp/view/fragment/ImportOrdersDialog.fragment.xml))
 ```xml
-<VBox class="sapUiMediumMarginTop" visible="{importDialog>/isImporting}">
-    <Label text="Tiến độ xử lý tác vụ nền:" design="Bold" class="sapUiTinyMarginBottom" />
+<!-- Thông báo trạng thái động -->
+<MessageStrip
+    id="importOrdersMessageStrip"
+    text="{importModel>/statusMessage}"
+    type="{importModel>/statusType}"
+    showIcon="true"
+    showCloseButton="false"
+    visible="{= !!${importModel>/statusMessage} }"
+    class="sapUiSmallMarginTop"
+/>
+
+<!-- Thanh đo tiến độ khi đang xử lý ngầm (isProcessing === true) -->
+<VBox visible="{= !!${importModel>/isProcessing} }" class="sapUiSmallMarginTop">
+    <HBox justifyContent="SpaceBetween" alignItems="Center" class="sapUiTinyMarginBottom">
+        <Label text="Background Processing Progress:" design="Bold" />
+        <Text text="{importModel>/progressPercent}%" class="sapUiTinyMarginEnd" />
+    </HBox>
     <ProgressIndicator
         id="importProgressIndicator"
-        percentValue="{importDialog>/progressPercent}"
-        displayValue="{importDialog>/progressPercent}%"
+        percentValue="{importModel>/progressPercent}"
+        displayValue="{importModel>/progressPercent}%"
+        state="{importModel>/progressState}"
         showValue="true"
-        state="{importDialog>/progressState}"
-        width="100%" />
-    <Text
-        text="{importDialog>/progressMessage}"
-        class="sapUiTinyMarginTop sapUiTinyMarginBottom" />
+        height="1.5rem"
+    />
 </VBox>
 ```
 
-### 8.2. Xử lý Logic Controller ([`MaintenanceOrders.controller.js`](file:///d:/ĐỒ%20ÁN%20ĐI%20LÀM/FPT/maintenance-cockpit2/app/webapp/controller/MaintenanceOrders.controller.js))
+### 8.2. Xử lý Controller ([`MaintenanceOrders.controller.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/app/webapp/controller/MaintenanceOrders.controller.js))
 ```javascript
-onUploadExcel: function () {
-    var oFileUploader = this.byId("excelFileUploader");
-    var oFile = oFileUploader.getFocusDomRef().files[0];
-    if (!oFile) {
-        MessageToast.show("Vui lòng chọn file Excel");
-        return;
+/**
+ * Uploads the selected workbook and refreshes imported orders.
+ * Gửi file Excel và nhận tiến độ cập nhật liên tục từ Polling Worker.
+ */
+async onConfirmImportOrders() {
+  if (!this._oSelectedImportFile) {
+    MessageToast.show("Please select an Excel file to import.");
+    return;
+  }
+
+  const oImportModel = this.getView().getModel("importModel");
+  oImportModel.setProperty("/canImport", false);
+  oImportModel.setProperty("/isProcessing", true);
+  oImportModel.setProperty("/progressPercent", 5);
+  oImportModel.setProperty("/progressState", "Information");
+  oImportModel.setProperty(
+    "/statusMessage",
+    "Uploading file and initiating background processing...",
+  );
+  oImportModel.setProperty("/statusType", "Information");
+
+  try {
+    const result = await CAPService.importOrdersExcel(
+      this._oSelectedImportFile,
+      (progressInfo) => {
+        // Callback cập nhật trực tiếp tiến độ lên thanh ProgressIndicator theo thời gian thực
+        const currentModel = this.getView().getModel("importModel");
+        if (currentModel) {
+          currentModel.setProperty("/progressPercent", progressInfo.progress || 0);
+          if (progressInfo.message) {
+            currentModel.setProperty("/statusMessage", progressInfo.message);
+          }
+          if (progressInfo.progress >= 100) {
+            currentModel.setProperty("/progressState", "Success");
+          }
+        }
+      }
+    );
+
+    // Đóng dialog sau khi hoàn tất
+    this.onCancelImportOrders();
+
+    // Tự động tải lại danh sách đơn hàng & làm mới các chỉ số KPI
+    await this._reloadOrdersFromBackend();
+
+    // Xóa bộ lọc tìm kiếm để hiển thị các đơn mới import
+    this.onFilterClear();
+
+    // Thông báo kết quả chi tiết
+    let sMsg =
+      `Import completed in ${result.durationSec || "1s"}!\n\n` +
+      `• Total Orders Processed: ${result.totalRows}\n` +
+      `• Total Imported / Synced: ${result.importedCount} maintenance order(s)\n`;
+    if (result.createdCount !== undefined || result.updatedCount !== undefined) {
+      sMsg += `  - Newly Created Orders: ${result.createdCount || 0}\n` +
+              `  - Updated (Upserted) Existing Orders: ${result.updatedCount || 0}\n`;
     }
+    sMsg +=
+      `• Operations Synced: ${result.operationsCount || result.importedCount} operation(s)\n` +
+      `• Materials Linked: ${result.materialsCount || 0} item(s)\n`;
 
-    var oDialogModel = this.getView().getModel("importDialog");
-    oDialogModel.setProperty("/isImporting", true);
-    oDialogModel.setProperty("/progressPercent", 5);
-    oDialogModel.setProperty("/progressState", "Information");
-    oDialogModel.setProperty("/progressMessage", "Đang tải file lên máy chủ...");
+    MessageBox.information(sMsg, { title: "Excel Import Successful" });
+  } catch (err) {
+    oImportModel.setProperty("/isProcessing", false);
+    oImportModel.setProperty("/canImport", true);
+    oImportModel.setProperty("/progressState", "Error");
+    oImportModel.setProperty("/statusMessage", "Import failed: " + err.message);
+    oImportModel.setProperty("/statusType", "Error");
+    MessageBox.error("Failed to import Excel file:\n" + err.message);
+  }
+}
+```
 
-    CAPService.importOrdersExcelAsync(oFile).then(function (oRes) {
-        var sJobId = oRes.jobId;
-        this._startJobPolling(sJobId);
-    }.bind(this)).catch(function (oErr) {
-        oDialogModel.setProperty("/isImporting", false);
-        MessageBox.error("Không thể khởi động tiến trình import: " + oErr.message);
+### 8.3. Tầng Service Polling ([`CAPService.js`](file:///d:/%C4%90%E1%BB%92%20%C3%81N%20%C4%90I%20L%C3%80M/FPT/maintenance-cockpit2/app/webapp/model/CAPService.js))
+```javascript
+/**
+ * Asynchronously uploads an Excel file and polls job status until completion.
+ */
+async importOrdersExcelAsync(oFile, fnOnProgress) {
+  const formData = new FormData();
+  formData.append("file", oFile, oFile.name);
+
+  // 1. Gửi file lên endpoint tiếp nhận nhanh (trả về 202 Accepted trong < 300ms)
+  const res = await fetch(`${getApiUrl()}/import-excel-async`, {
+    method: "POST",
+    body: formData
+  });
+
+  const initData = await res.json();
+  const jobId = initData.jobId;
+
+  if (typeof fnOnProgress === "function") {
+    fnOnProgress({
+      progress: initData.progress || 5,
+      message: initData.message || "File uploaded. Starting processing in background...",
+      status: "RUNNING"
     });
-},
+  }
 
-_startJobPolling: function (sJobId) {
-    var that = this;
-    var oDialogModel = this.getView().getModel("importDialog");
+  // 2. Bắt đầu vòng lặp Polling mỗi 1.5 giây (1500ms)
+  const jobUrl = `${getApiUrl()}/import-job/${jobId}`;
+  return new Promise((resolve, reject) => {
+    const pollInterval = setInterval(async () => {
+      try {
+        const jobRes = await fetch(jobUrl);
+        const job = await jobRes.json();
 
-    this._importPollTimer = setInterval(function () {
-        CAPService.getImportJobStatus(sJobId).then(function (oJob) {
-            oDialogModel.setProperty("/progressPercent", oJob.progress || 5);
-            oDialogModel.setProperty("/progressMessage", oJob.message || "Đang xử lý...");
+        if (typeof fnOnProgress === "function") {
+          fnOnProgress({
+            progress: job.progress || 0,
+            message: job.message || "Processing...",
+            status: job.status
+          });
+        }
 
-            if (oJob.status === "COMPLETED") {
-                that._clearJobPollingTimer();
-                oDialogModel.setProperty("/isImporting", false);
-                that._getImportDialog().close();
-                that._refreshOrders();
-                that._loadKpis();
-                
-                MessageBox.success(
-                    "Nhập Excel thành công!\n" +
-                    "- Tạo mới: " + oJob.result.createdCount + " đơn\n" +
-                    "- Cập nhật: " + oJob.result.updatedCount + " đơn\n" +
-                    "- Công việc: " + oJob.result.operationsCount + " bước\n" +
-                    "- Thời gian: " + oJob.result.durationSec
-                );
-            } else if (oJob.status === "FAILED") {
-                that._clearJobPollingTimer();
-                oDialogModel.setProperty("/isImporting", false);
-                MessageBox.error("Xử lý thất bại: " + (oJob.error || oJob.message));
-            }
-        }).catch(function (err) {
-            that._clearJobPollingTimer();
-            oDialogModel.setProperty("/isImporting", false);
-            MessageBox.error("Lỗi khi theo dõi tiến độ: " + err.message);
-        });
-    }, 1000);
+        if (job.status === "COMPLETED") {
+          clearInterval(pollInterval);
+          return resolve(job.result || { success: true, message: "Import completed" });
+        } else if (job.status === "FAILED") {
+          clearInterval(pollInterval);
+          return reject(new Error(job.error || job.message || "Import job failed"));
+        }
+      } catch (pollErr) {
+        console.warn("[CAPService] Error polling import job:", pollErr);
+      }
+    }, 1500);
+  });
 }
 ```
