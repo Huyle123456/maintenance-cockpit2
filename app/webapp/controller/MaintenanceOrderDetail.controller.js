@@ -13,19 +13,32 @@ sap.ui.define(
     "com/fsoft/zpmmaintenancecockpit/model/CAPService",
     "com/fsoft/zpmmaintenancecockpit/model/AuthService",
   ],
-  (e, t, o, r, i, n, a, s, d, c, l, u) => {
+  (
+    Controller,
+    JSONModel,
+    Filter,
+    FilterOperator,
+    Fragment,
+    MessageToast,
+    AuditHistoryService,
+    formatter,
+    OrderRepository,
+    constants,
+    CAPService,
+    AuthService,
+  ) => {
     "use strict";
-    return e.extend(
+    return Controller.extend(
       "com.fsoft.zpmmaintenancecockpit.controller.MaintenanceOrderDetail",
       {
-        formatter: s,
+        formatter: formatter,
         /**
          * Initializes route handling for the maintenance order detail page.
          *
          * @returns {void}
          */
         onInit() {
-          const e = new t({
+          const e = new JSONModel({
             order: "",
             description: "",
             equipment: "",
@@ -53,18 +66,18 @@ sap.ui.define(
             canComplete: false,
           });
           this.getView().setModel(e, "orderDetail");
-          l.getMasterData()
+          CAPService.getMasterData()
             .then((e) => {
-              this.getView().setModel(new t(e), "masterData");
+              this.getView().setModel(new JSONModel(e), "masterData");
             })
             .catch((e) => {
               console.error("Failed to load master data from CAP:", e);
             });
-          l.getTechnicians()
+          CAPService.getTechnicians()
             .then((e) => {
-              this.getView().setModel(new t(e), "technicianData");
+              this.getView().setModel(new JSONModel(e), "technicianData");
               this.getView().setModel(
-                new t(e.technicianCatalog || []),
+                new JSONModel(e.technicianCatalog || []),
                 "techCatalog",
               );
             })
@@ -95,9 +108,9 @@ sap.ui.define(
          * @returns {void}
          */
         async onEdit() {
-          const oUser = u.getCurrentUser();
+          const oUser = AuthService.getCurrentUser();
           if (oUser && !oUser.permissions?.editOrder) {
-            n.show(
+            MessageToast.show(
               this.getView()
                 .getModel("i18n")
                 .getResourceBundle()
@@ -111,20 +124,18 @@ sap.ui.define(
           try {
             const e = this.getView();
             if (!this._pEditOrderDialog) {
-              this._pEditOrderDialog = i
-                .load({
-                  id: e.getId(),
-                  name: "com.fsoft.zpmmaintenancecockpit.view.fragment.EditOrderDialog",
-                  controller: this,
-                })
-                .then((t) => {
-                  e.addDependent(t);
-                  return t;
-                });
+              this._pEditOrderDialog = Fragment.load({
+                id: e.getId(),
+                name: "com.fsoft.zpmmaintenancecockpit.view.fragment.EditOrderDialog",
+                controller: this,
+              }).then((t) => {
+                e.addDependent(t);
+                return t;
+              });
             }
             const oDialog = await this._pEditOrderDialog;
             const o = this.getView().getModel("orderDetail").getData();
-            const r = new t({
+            const r = new JSONModel({
               planner: o.planner,
               priority: o.priority,
               scheduledFrom: o.scheduledFrom || "",
@@ -160,7 +171,7 @@ sap.ui.define(
               t.priority === "CRITICAL" &&
               t.scheduledFrom !== t.scheduledTo
             ) {
-              n.show(
+              MessageToast.show(
                 this.getView()
                   .getModel("i18n")
                   .getResourceBundle()
@@ -169,7 +180,7 @@ sap.ui.define(
               return;
             }
             try {
-              await l.updateOrder(r, {
+              await CAPService.updateOrder(r, {
                 planner: t.planner,
                 priority: t.priority,
                 scheduled_from: t.scheduledFrom,
@@ -192,8 +203,8 @@ sap.ui.define(
                 "Current User",
                 "sap-icon://edit",
               );
-              a.addEntry(r, "UPDATE", i, "Current User");
-              n.show(
+              AuditHistoryService.addEntry(r, "UPDATE", i, "Current User");
+              MessageToast.show(
                 this.getView()
                   .getModel("i18n")
                   .getResourceBundle()
@@ -202,7 +213,7 @@ sap.ui.define(
               e.close();
             } catch (e) {
               console.error("Failed to update order on CAP:", e);
-              n.show("Update failed: " + e.message);
+              MessageToast.show("Update failed: " + e.message);
             }
           });
         },
@@ -212,9 +223,9 @@ sap.ui.define(
          * @returns {Promise<void>} Resolves after submission is processed.
          */
         async onSubmit() {
-          const oUser = u.getCurrentUser();
+          const oUser = AuthService.getCurrentUser();
           if (oUser && !oUser.permissions?.editOrder) {
-            n.show(
+            MessageToast.show(
               this.getView()
                 .getModel("i18n")
                 .getResourceBundle()
@@ -226,8 +237,8 @@ sap.ui.define(
 
           const e = this.getView().getModel("orderDetail");
           const t = e.getProperty("/order");
-          if (e.getProperty("/status") !== c.STATUS.OPEN) {
-            n.show(
+          if (e.getProperty("/status") !== constants.STATUS.OPEN) {
+            MessageToast.show(
               this.getView()
                 .getModel("i18n")
                 .getResourceBundle()
@@ -236,31 +247,31 @@ sap.ui.define(
             return;
           }
           try {
-            await l.updateOrder(t, {
-              status: c.STATUS.IN_PROCESS,
+            await CAPService.updateOrder(t, {
+              status: constants.STATUS.IN_PROCESS,
               status_state: "Warning",
             });
-            e.setProperty("/status", c.STATUS.IN_PROCESS);
+            e.setProperty("/status", constants.STATUS.IN_PROCESS);
             e.setProperty("/canSubmit", false);
             e.setProperty("/canComplete", true);
-            const o = d.getOrderById(t);
+            const o = OrderRepository.getOrderById(t);
             if (o) {
-              o.status = c.STATUS.IN_PROCESS;
-              o.statusLabel = c.STATUS.IN_PROCESS;
+              o.status = constants.STATUS.IN_PROCESS;
+              o.statusLabel = constants.STATUS.IN_PROCESS;
             }
             this._addHistoryLog(
-              `Status changed to ${c.STATUS.IN_PROCESS}`,
+              `Status changed to ${constants.STATUS.IN_PROCESS}`,
               "Maintenance order submitted for execution",
               "Current User",
               "sap-icon://activate",
             );
-            a.addEntry(
+            AuditHistoryService.addEntry(
               t,
               "UPDATE",
-              `Status changed from ${c.STATUS.OPEN} to ${c.STATUS.IN_PROCESS}`,
+              `Status changed from ${constants.STATUS.OPEN} to ${constants.STATUS.IN_PROCESS}`,
               "Current User",
             );
-            n.show(
+            MessageToast.show(
               this.getView()
                 .getModel("i18n")
                 .getResourceBundle()
@@ -268,7 +279,7 @@ sap.ui.define(
             );
           } catch (e) {
             console.error("Failed to submit order to CAP:", e);
-            n.show("Submit failed: " + e.message);
+            MessageToast.show("Submit failed: " + e.message);
           }
         },
         /**
@@ -277,9 +288,9 @@ sap.ui.define(
          * @returns {Promise<void>} Resolves after completion is processed.
          */
         async onComplete() {
-          const oUser = u.getCurrentUser();
+          const oUser = AuthService.getCurrentUser();
           if (oUser && !oUser.permissions?.completeOrder) {
-            n.show(
+            MessageToast.show(
               this.getView()
                 .getModel("i18n")
                 .getResourceBundle()
@@ -292,12 +303,13 @@ sap.ui.define(
           const e = this.getView().getModel("orderDetail");
           const t = e.getProperty("/operations") || [];
           const o =
-            t.length > 0 && t.every((e) => e.status === c.STATUS.COMPLETED);
+            t.length > 0 &&
+            t.every((e) => e.status === constants.STATUS.COMPLETED);
           const r = Number(e.getProperty("/actualHours")) || 0;
           const i = Number(e.getProperty("/plannedHours")) || 0;
           const s = r <= i * 2;
           let g = true;
-          if (e.getProperty("/priority") === c.PRIORITY.CRITICAL) {
+          if (e.getProperty("/priority") === constants.PRIORITY.CRITICAL) {
             const t = e.getProperty("/scheduledFrom");
             const o = e.getProperty("/scheduledTo");
             if (t && o) {
@@ -331,27 +343,27 @@ sap.ui.define(
           }
           const p = e.getProperty("/order");
           try {
-            await l.completeOrder(p);
-            e.setProperty("/status", c.STATUS.COMPLETED);
+            await CAPService.completeOrder(p);
+            e.setProperty("/status", constants.STATUS.COMPLETED);
             e.setProperty("/canComplete", false);
-            const t = d.getOrderById(p);
+            const t = OrderRepository.getOrderById(p);
             if (t) {
-              t.status = c.STATUS.COMPLETED;
-              t.statusLabel = c.STATUS.COMPLETED;
+              t.status = constants.STATUS.COMPLETED;
+              t.statusLabel = constants.STATUS.COMPLETED;
             }
             this._addHistoryLog(
-              `Status changed to ${c.STATUS.COMPLETED}`,
+              `Status changed to ${constants.STATUS.COMPLETED}`,
               "All maintenance tasks completed",
               "Current User",
               "sap-icon://complete",
             );
-            a.addEntry(
+            AuditHistoryService.addEntry(
               p,
               "COMPLETE",
               `Order marked as COMPLETED`,
               "Current User",
             );
-            n.show(
+            MessageToast.show(
               this.getView()
                 .getModel("i18n")
                 .getResourceBundle()
@@ -359,7 +371,7 @@ sap.ui.define(
             );
           } catch (e) {
             console.error("Failed to complete order on CAP:", e);
-            n.show("Complete order failed: " + e.message);
+            MessageToast.show("Complete order failed: " + e.message);
           }
         },
         /**
@@ -378,9 +390,9 @@ sap.ui.define(
          * @returns {void}
          */
         async onCancel() {
-          const oUser = u.getCurrentUser();
+          const oUser = AuthService.getCurrentUser();
           if (oUser && !oUser.permissions?.cancelOrder) {
-            n.show(
+            MessageToast.show(
               this.getView()
                 .getModel("i18n")
                 .getResourceBundle()
@@ -394,19 +406,17 @@ sap.ui.define(
           try {
             const e = this.getView();
             if (!this._pCancelOrderDialog) {
-              this._pCancelOrderDialog = i
-                .load({
-                  id: e.getId(),
-                  name: "com.fsoft.zpmmaintenancecockpit.view.fragment.CancelOrderDialog",
-                  controller: this,
-                })
-                .then((t) => {
-                  e.addDependent(t);
-                  return t;
-                });
+              this._pCancelOrderDialog = Fragment.load({
+                id: e.getId(),
+                name: "com.fsoft.zpmmaintenancecockpit.view.fragment.CancelOrderDialog",
+                controller: this,
+              }).then((t) => {
+                e.addDependent(t);
+                return t;
+              });
             }
             const oDialog = await this._pCancelOrderDialog;
-            const o = new t({ reason: "" });
+            const o = new JSONModel({ reason: "" });
             this.getView().setModel(o, "cancelOrder");
             oDialog.open();
           } finally {
@@ -436,28 +446,28 @@ sap.ui.define(
               this.getView().getModel("cancelOrder").getProperty("/reason") ||
               "Order cancelled by user";
             try {
-              await l.cancelOrder(o, r);
-              t.setProperty("/status", c.STATUS.CANCELLED);
+              await CAPService.cancelOrder(o, r);
+              t.setProperty("/status", constants.STATUS.CANCELLED);
               t.setProperty("/canSubmit", false);
               t.setProperty("/canComplete", false);
-              const i = d.getOrderById(o);
+              const i = OrderRepository.getOrderById(o);
               if (i) {
-                i.status = c.STATUS.CANCELLED;
-                i.statusLabel = c.STATUS.CANCELLED;
+                i.status = constants.STATUS.CANCELLED;
+                i.statusLabel = constants.STATUS.CANCELLED;
               }
               this._addHistoryLog(
-                `Status changed to ${c.STATUS.CANCELLED}`,
+                `Status changed to ${constants.STATUS.CANCELLED}`,
                 r,
                 "Current User",
                 "sap-icon://cancel",
               );
-              a.addEntry(
+              AuditHistoryService.addEntry(
                 o,
                 "CANCEL",
-                `Status changed to ${c.STATUS.CANCELLED}. Reason: ${r}`,
+                `Status changed to ${constants.STATUS.CANCELLED}. Reason: ${r}`,
                 "Current User",
               );
-              n.show(
+              MessageToast.show(
                 this.getView()
                   .getModel("i18n")
                   .getResourceBundle()
@@ -466,7 +476,7 @@ sap.ui.define(
               e.close();
             } catch (e) {
               console.error("Failed to cancel order on CAP:", e);
-              n.show("Cancel order failed: " + e.message);
+              MessageToast.show("Cancel order failed: " + e.message);
             }
           });
         },
@@ -476,9 +486,9 @@ sap.ui.define(
          * @returns {void}
          */
         async onAddOperation() {
-          const oUser = u.getCurrentUser();
+          const oUser = AuthService.getCurrentUser();
           if (oUser && !oUser.permissions?.addOperation) {
-            n.show(
+            MessageToast.show(
               this.getView()
                 .getModel("i18n")
                 .getResourceBundle()
@@ -492,16 +502,14 @@ sap.ui.define(
           try {
             const e = this.getView();
             if (!this._pAddOperationDialog) {
-              this._pAddOperationDialog = i
-                .load({
-                  id: e.getId(),
-                  name: "com.fsoft.zpmmaintenancecockpit.view.fragment.AddOperationDialog",
-                  controller: this,
-                })
-                .then((t) => {
-                  e.addDependent(t);
-                  return t;
-                });
+              this._pAddOperationDialog = Fragment.load({
+                id: e.getId(),
+                name: "com.fsoft.zpmmaintenancecockpit.view.fragment.AddOperationDialog",
+                controller: this,
+              }).then((t) => {
+                e.addDependent(t);
+                return t;
+              });
             }
             const oDialog = await this._pAddOperationDialog;
             const o =
@@ -514,13 +522,13 @@ sap.ui.define(
                 ?.getProperty("/technicians") || [];
             const iKey = o.length > 0 ? o[0].key : "";
             const nKey = r.length > 0 ? r[0].key : "";
-            const a = new t({
+            const a = new JSONModel({
               no: "",
               description: "",
               workCenter: iKey,
               technician: nKey,
               plannedHours: 1,
-              status: c.STATUS.OPEN,
+              status: constants.STATUS.OPEN,
             });
             this.getView().setModel(a, "newOperation");
             oDialog.open();
@@ -565,7 +573,7 @@ sap.ui.define(
               "Current User",
               "sap-icon://add",
             );
-            n.show(
+            MessageToast.show(
               this.getView()
                 .getModel("i18n")
                 .getResourceBundle()
@@ -581,9 +589,9 @@ sap.ui.define(
          * @returns {void}
          */
         onDeleteOperation(e) {
-          const oUser = u.getCurrentUser();
+          const oUser = AuthService.getCurrentUser();
           if (oUser && !oUser.permissions?.deleteOperation) {
-            n.show(
+            MessageToast.show(
               this.getView()
                 .getModel("i18n")
                 .getResourceBundle()
@@ -608,7 +616,7 @@ sap.ui.define(
             "Current User",
             "sap-icon://delete",
           );
-          n.show(
+          MessageToast.show(
             this.getView()
               .getModel("i18n")
               .getResourceBundle()
@@ -622,9 +630,9 @@ sap.ui.define(
          * @returns {void}
          */
         async onEditOperation(e) {
-          const oUser = u.getCurrentUser();
+          const oUser = AuthService.getCurrentUser();
           if (oUser && !oUser.permissions?.editOrder) {
-            n.show(
+            MessageToast.show(
               this.getView()
                 .getModel("i18n")
                 .getResourceBundle()
@@ -641,19 +649,17 @@ sap.ui.define(
           sap.ui.core.BusyIndicator.show(0);
           try {
             if (!this._pEditOperationDialog) {
-              this._pEditOperationDialog = i
-                .load({
-                  id: a.getId(),
-                  name: "com.fsoft.zpmmaintenancecockpit.view.fragment.EditOperationDialog",
-                  controller: this,
-                })
-                .then((e) => {
-                  a.addDependent(e);
-                  return e;
-                });
+              this._pEditOperationDialog = Fragment.load({
+                id: a.getId(),
+                name: "com.fsoft.zpmmaintenancecockpit.view.fragment.EditOperationDialog",
+                controller: this,
+              }).then((e) => {
+                a.addDependent(e);
+                return e;
+              });
             }
             const oDialog = await this._pEditOperationDialog;
-            const oModel = new t(nObj);
+            const oModel = new JSONModel(nObj);
             this.getView().setModel(oModel, "editOperation");
             this._sEditOperationPath = r;
             oDialog.open();
@@ -683,7 +689,7 @@ sap.ui.define(
             const r = Number(t.plannedHours) || 0;
             const i = Number(t.actualHours) || 0;
             if (i > r * 2) {
-              n.show(
+              MessageToast.show(
                 this.getView()
                   .getModel("i18n")
                   .getResourceBundle()
@@ -699,7 +705,7 @@ sap.ui.define(
               "Current User",
               "sap-icon://edit",
             );
-            n.show(
+            MessageToast.show(
               this.getView()
                 .getModel("i18n")
                 .getResourceBundle()
@@ -714,9 +720,9 @@ sap.ui.define(
          * @returns {void}
          */
         async onBatchEditOperations() {
-          const oUser = u.getCurrentUser();
+          const oUser = AuthService.getCurrentUser();
           if (oUser && !oUser.permissions?.batchEditOperations) {
-            n.show(
+            MessageToast.show(
               this.getView()
                 .getModel("i18n")
                 .getResourceBundle()
@@ -729,7 +735,7 @@ sap.ui.define(
           const e = this.byId("mod_operationsTable");
           const o = e.getSelectedItems();
           if (o.length === 0) {
-            n.show(
+            MessageToast.show(
               this.getView()
                 .getModel("i18n")
                 .getResourceBundle()
@@ -740,10 +746,10 @@ sap.ui.define(
           const r = o.some(
             (e) =>
               e.getBindingContext("orderDetail").getProperty("status") ===
-              c.STATUS.CANCELLED,
+              constants.STATUS.CANCELLED,
           );
           if (r) {
-            n.show(
+            MessageToast.show(
               this.getView()
                 .getModel("i18n")
                 .getResourceBundle()
@@ -755,19 +761,17 @@ sap.ui.define(
           sap.ui.core.BusyIndicator.show(0);
           try {
             if (!this._pBatchEditDialog) {
-              this._pBatchEditDialog = i
-                .load({
-                  id: a.getId(),
-                  name: "com.fsoft.zpmmaintenancecockpit.view.fragment.BatchEditOperationsDialog",
-                  controller: this,
-                })
-                .then((e) => {
-                  a.addDependent(e);
-                  return e;
-                });
+              this._pBatchEditDialog = Fragment.load({
+                id: a.getId(),
+                name: "com.fsoft.zpmmaintenancecockpit.view.fragment.BatchEditOperationsDialog",
+                controller: this,
+              }).then((e) => {
+                a.addDependent(e);
+                return e;
+              });
             }
             const oDialog = await this._pBatchEditDialog;
-            const oModel = new t({ status: c.STATUS.OPEN });
+            const oModel = new JSONModel({ status: constants.STATUS.OPEN });
             this.getView().setModel(oModel, "batchEdit");
             oDialog.open();
           } finally {
@@ -812,7 +816,7 @@ sap.ui.define(
               "Current User",
               "sap-icon://multi-select",
             );
-            n.show(
+            MessageToast.show(
               this.getView()
                 .getModel("i18n")
                 .getResourceBundle()
@@ -827,9 +831,9 @@ sap.ui.define(
          * @returns {void}
          */
         async onAddMaterial() {
-          const oUser = u.getCurrentUser();
+          const oUser = AuthService.getCurrentUser();
           if (oUser && !oUser.permissions?.addMaterial) {
-            n.show(
+            MessageToast.show(
               this.getView()
                 .getModel("i18n")
                 .getResourceBundle()
@@ -843,22 +847,20 @@ sap.ui.define(
           sap.ui.core.BusyIndicator.show(0);
           try {
             if (!this._pAddMaterialDialog) {
-              this._pAddMaterialDialog = i
-                .load({
-                  id: e.getId(),
-                  name: "com.fsoft.zpmmaintenancecockpit.view.fragment.AddMaterialDialog",
-                  controller: this,
-                })
-                .then((t) => {
-                  e.addDependent(t);
-                  return t;
-                });
+              this._pAddMaterialDialog = Fragment.load({
+                id: e.getId(),
+                name: "com.fsoft.zpmmaintenancecockpit.view.fragment.AddMaterialDialog",
+                controller: this,
+              }).then((t) => {
+                e.addDependent(t);
+                return t;
+              });
             }
             const oDialog = await this._pAddMaterialDialog;
             const o =
               this.getView().getModel("materialCatalog").getData() || [];
             const r = o.length > 0 ? o[0].key : "";
-            const iMat = new t({ material: r, qty: 1 });
+            const iMat = new JSONModel({ material: r, qty: 1 });
             this.getView().setModel(iMat, "newMaterial");
             oDialog.open();
           } finally {
@@ -893,7 +895,7 @@ sap.ui.define(
               this.getView().getModel("materialCatalog").getData() || [];
             const r = o.find((e) => e.key === t.material);
             if (!r) {
-              n.show(
+              MessageToast.show(
                 this.getView()
                   .getModel("i18n")
                   .getResourceBundle()
@@ -903,7 +905,7 @@ sap.ui.define(
             }
             const i = parseInt(t.qty, 10);
             if (!i || i <= 0) {
-              n.show(
+              MessageToast.show(
                 this.getView()
                   .getModel("i18n")
                   .getResourceBundle()
@@ -916,7 +918,7 @@ sap.ui.define(
             const d = s.find((e) => e.material === r.key);
             const c = d ? d.qty : 0;
             if (i + c > r.availableStock) {
-              n.show(
+              MessageToast.show(
                 this.getView()
                   .getModel("i18n")
                   .getResourceBundle()
@@ -947,7 +949,7 @@ sap.ui.define(
               "Current User",
               "sap-icon://product",
             );
-            n.show(
+            MessageToast.show(
               this.getView()
                 .getModel("i18n")
                 .getResourceBundle()
@@ -962,9 +964,9 @@ sap.ui.define(
          * @returns {void}
          */
         async onAssignTechnician() {
-          const oUser = u.getCurrentUser();
+          const oUser = AuthService.getCurrentUser();
           if (oUser && !oUser.permissions?.assignTechnician) {
-            n.show(
+            MessageToast.show(
               this.getView()
                 .getModel("i18n")
                 .getResourceBundle()
@@ -981,7 +983,7 @@ sap.ui.define(
           const a = e.getModel("techCatalog").getData() || [];
           const s = a.filter((e) => !r.includes(e.key));
           if (s.length === 0) {
-            n.show(
+            MessageToast.show(
               this.getView()
                 .getModel("i18n")
                 .getResourceBundle()
@@ -989,22 +991,20 @@ sap.ui.define(
             );
             return;
           }
-          const d = new t(s);
+          const d = new JSONModel(s);
           e.setModel(d, "techCatalog");
 
           sap.ui.core.BusyIndicator.show(0);
           try {
             if (!this._pAssignTechDialog) {
-              this._pAssignTechDialog = i
-                .load({
-                  id: e.getId(),
-                  name: "com.fsoft.zpmmaintenancecockpit.view.fragment.AssignTechnicianDialog",
-                  controller: this,
-                })
-                .then((t) => {
-                  e.addDependent(t);
-                  return t;
-                });
+              this._pAssignTechDialog = Fragment.load({
+                id: e.getId(),
+                name: "com.fsoft.zpmmaintenancecockpit.view.fragment.AssignTechnicianDialog",
+                controller: this,
+              }).then((t) => {
+                e.addDependent(t);
+                return t;
+              });
             }
             const oDialog = await this._pAssignTechDialog;
             oDialog.open();
@@ -1020,11 +1020,11 @@ sap.ui.define(
          */
         onSearchAssignTechnician(e) {
           const t = e.getParameter("value");
-          const i = new o({
+          const i = new Filter({
             filters: [
-              new o("name", r.Contains, t),
-              new o("key", r.Contains, t),
-              new o("skill", r.Contains, t),
+              new Filter("name", FilterOperator.Contains, t),
+              new Filter("key", FilterOperator.Contains, t),
+              new Filter("skill", FilterOperator.Contains, t),
             ],
             and: false,
           });
@@ -1044,7 +1044,7 @@ sap.ui.define(
           const o = t.getBindingContext("techCatalog");
           const r = o.getObject();
           if (r.available === "NO") {
-            n.show(
+            MessageToast.show(
               this.getView()
                 .getModel("i18n")
                 .getResourceBundle()
@@ -1062,7 +1062,7 @@ sap.ui.define(
           });
           i.setProperty("/assignedTechnicians", s);
           const c = i.getProperty("/order");
-          const l = d.getOrderById(c);
+          const l = OrderRepository.getOrderById(c);
           if (l) {
             l.assignedTechnicians = s;
           }
@@ -1072,13 +1072,13 @@ sap.ui.define(
             "Current User",
             "sap-icon://employee",
           );
-          a.addEntry(
+          AuditHistoryService.addEntry(
             c,
             "UPDATE",
             "Assigned technician: " + r.name,
             "Current User",
           );
-          n.show(
+          MessageToast.show(
             this.getView()
               .getModel("i18n")
               .getResourceBundle()
@@ -1109,14 +1109,14 @@ sap.ui.define(
          */
         async _loadOrder(e) {
           sap.ui.core.BusyIndicator.show(0);
-          const o = d.getOrderById(e);
+          const o = OrderRepository.getOrderById(e);
           try {
             let r = o;
             if (!r) {
               try {
-                r = await l.getOrderById(e);
+                r = await CAPService.getOrderById(e);
               } catch (t) {
-                const o = await l.getMaintenanceOrders();
+                const o = await CAPService.getMaintenanceOrders();
                 r = o.find((t) => t.order_no === e) || o[0];
               }
             }
@@ -1131,7 +1131,7 @@ sap.ui.define(
               plant: r.plant || "",
               type: r.maintenance_type || r.type || "",
               priority: r.priority || "",
-              status: r.status || r.statusLabel || c.STATUS.OPEN,
+              status: r.status || r.statusLabel || constants.STATUS.OPEN,
               planner: r.planner || "",
               scheduledFrom: r.scheduled_from || r.scheduledFrom || "",
               scheduledTo: r.scheduled_to || r.scheduledTo || "",
@@ -1154,10 +1154,11 @@ sap.ui.define(
               estimatedCost: r.estimated_cost ?? r.estimatedCost ?? 0,
               currency: r.currency || "USD",
               canSubmit:
-                (r.status || r.statusLabel || c.STATUS.OPEN) === c.STATUS.OPEN,
+                (r.status || r.statusLabel || constants.STATUS.OPEN) ===
+                constants.STATUS.OPEN,
               canComplete:
-                (r.status || r.statusLabel || c.STATUS.OPEN) ===
-                c.STATUS.IN_PROCESS,
+                (r.status || r.statusLabel || constants.STATUS.OPEN) ===
+                constants.STATUS.IN_PROCESS,
               assignedTechnicians:
                 r.assignedTechnicians !== undefined
                   ? r.assignedTechnicians
@@ -1172,9 +1173,9 @@ sap.ui.define(
                 ...i,
               });
             const [n, a, s] = await Promise.all([
-              l.getOperations(e),
-              l.getMaterials(),
-              l.getOrderHistory(e),
+              CAPService.getOperations(e),
+              CAPService.getMaterials(),
+              CAPService.getOrderHistory(e),
             ]);
             let d =
               r.operations && r.operations.length > 0
@@ -1185,7 +1186,7 @@ sap.ui.define(
                     technician: e.technician || "T-001",
                     plannedHours: e.plannedHours,
                     actualHours: e.actualHours || "0",
-                    status: e.status || c.STATUS.OPEN,
+                    status: e.status || constants.STATUS.OPEN,
                   }))
                 : n.length > 0
                   ? n
@@ -1241,7 +1242,7 @@ sap.ui.define(
               .setProperty("/operations", d);
             this.getView().getModel("orderDetail").setProperty("/materials", g);
             this._updateOrderSummary();
-            const p = new t(a.materialCatalog || []);
+            const p = new JSONModel(a.materialCatalog || []);
             this.getView().setModel(p, "materialCatalog");
             let u = (s || []).filter((t) => t.order_no === e);
             if (u.length === 0) {
@@ -1287,19 +1288,19 @@ sap.ui.define(
             return;
           }
           const o = e.getProperty("/status");
-          if (o === c.STATUS.CANCELLED) {
+          if (o === constants.STATUS.CANCELLED) {
             return;
           }
           const r = t.every(
             (e) =>
-              e.status === c.STATUS.COMPLETED ||
-              e.status === c.STATUS.CANCELLED,
+              e.status === constants.STATUS.COMPLETED ||
+              e.status === constants.STATUS.CANCELLED,
           );
-          if (!r && o === c.STATUS.COMPLETED) {
-            e.setProperty("/status", c.STATUS.IN_PROCESS);
+          if (!r && o === constants.STATUS.COMPLETED) {
+            e.setProperty("/status", constants.STATUS.IN_PROCESS);
             e.setProperty("/canComplete", true);
             this._addHistoryLog(
-              `Status changed to ${c.STATUS.IN_PROCESS}`,
+              `Status changed to ${constants.STATUS.IN_PROCESS}`,
               "Reverted automatically due to incomplete operations",
               "System workflow",
               "sap-icon://workflow-tasks",
@@ -1322,8 +1323,8 @@ sap.ui.define(
             o += Number(e.plannedHours) || 0;
             r += Number(e.actualHours) || 0;
             if (
-              e.status === c.STATUS.COMPLETED ||
-              e.status === c.STATUS.CANCELLED
+              e.status === constants.STATUS.COMPLETED ||
+              e.status === constants.STATUS.CANCELLED
             ) {
               i++;
             }

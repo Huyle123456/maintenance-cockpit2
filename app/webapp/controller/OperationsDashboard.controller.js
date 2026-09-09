@@ -7,14 +7,19 @@ sap.ui.define(
     "com/fsoft/zpmmaintenancecockpit/model/constants",
     "com/fsoft/zpmmaintenancecockpit/model/CAPService",
   ],
-  function (Controller, UIComponent, JSONModel, formatter, constants, CAPService) {
+  function (
+    Controller,
+    UIComponent,
+    JSONModel,
+    formatter,
+    constants,
+    CAPService,
+  ) {
     "use strict";
-
     return Controller.extend(
       "com.fsoft.zpmmaintenancecockpit.controller.OperationsDashboard",
       {
-        formatter: formatter,
-
+        formatter,
         /**
          * Loads maintenance order data and calculates dashboard metrics.
          *
@@ -22,56 +27,56 @@ sap.ui.define(
          */
         async onInit() {
           try {
-            const aOrders = (await CAPService.getMaintenanceOrders()) || [];
-            let iOpenCount = 0;
-            let iInProcessCount = 0;
-            let iCompletedCount = 0;
-            let iCancelledCount = 0;
-            let iCriticalCount = 0;
-            const aCriticalOrders = [];
-
-            aOrders.forEach((oOrder) => {
-              if (oOrder.status === constants.STATUS.OPEN) {
-                iOpenCount++;
-              } else if (oOrder.status === constants.STATUS.IN_PROCESS) {
-                iInProcessCount++;
-              } else if (oOrder.status === constants.STATUS.COMPLETED) {
-                iCompletedCount++;
-              } else if (oOrder.status === constants.STATUS.CANCELLED) {
-                iCancelledCount++;
-              }
-
-              if (oOrder.priority === constants.PRIORITY.CRITICAL) {
-                iCriticalCount++;
-                aCriticalOrders.push(oOrder);
+            const orders = await CAPService.getMaintenanceOrders();
+            let openCount = 0;
+            let inProcessCount = 0;
+            let completedCount = 0;
+            let cancelledCount = 0;
+            let criticalCount = 0;
+            const criticalOrders = [];
+            orders.forEach((order) => {
+              if (order.status === constants.STATUS.OPEN) openCount++;
+              else if (order.status === constants.STATUS.IN_PROCESS)
+                inProcessCount++;
+              else if (order.status === constants.STATUS.COMPLETED)
+                completedCount++;
+              else if (order.status === constants.STATUS.CANCELLED)
+                cancelledCount++;
+              if (order.priority === constants.PRIORITY.CRITICAL) {
+                criticalCount++;
+                criticalOrders.push(order);
               }
             });
-
-            const iTotal = aOrders.length;
-            const oDashboardData = {
+            const totalOrders = orders.length;
+            const dashboardData = {
               kpi: {
-                open: iOpenCount,
-                inProcess: iInProcessCount,
-                critical: iCriticalCount,
-                completed: iCompletedCount,
+                open: openCount,
+                inProcess: inProcessCount,
+                critical: criticalCount,
+                completed: completedCount,
               },
               statusDistribution: {
-                openPercent: iTotal ? (iOpenCount / iTotal) * 100 : 0,
-                openCount: iOpenCount,
-                inProcessPercent: iTotal ? (iInProcessCount / iTotal) * 100 : 0,
-                inProcessCount: iInProcessCount,
-                completedPercent: iTotal ? (iCompletedCount / iTotal) * 100 : 0,
-                completedCount: iCompletedCount,
-                cancelledPercent: iTotal ? (iCancelledCount / iTotal) * 100 : 0,
-                cancelledCount: iCancelledCount,
+                openPercent: totalOrders ? (openCount / totalOrders) * 100 : 0,
+                openCount,
+                inProcessPercent: totalOrders
+                  ? (inProcessCount / totalOrders) * 100
+                  : 0,
+                inProcessCount,
+                completedPercent: totalOrders
+                  ? (completedCount / totalOrders) * 100
+                  : 0,
+                completedCount,
+                cancelledPercent: totalOrders
+                  ? (cancelledCount / totalOrders) * 100
+                  : 0,
+                cancelledCount,
               },
-              criticalOrders: aCriticalOrders,
+              criticalOrders,
             };
-
-            const oModel = new JSONModel(oDashboardData);
-            this.getView().setModel(oModel, "dashboard");
-          } catch (err) {
-            console.error("Failed to load dashboard data from CAP:", err);
+            const dashboardModel = new JSONModel(dashboardData);
+            this.getView().setModel(dashboardModel, "dashboard");
+          } catch (error) {
+            console.error("Failed to load dashboard data from CAP:", error);
           }
         },
 
@@ -81,16 +86,14 @@ sap.ui.define(
          * @param {sap.ui.base.Event} oEvent List item title press event.
          * @returns {void}
          */
-        onCriticalOrderPress(oEvent) {
-          const sOrderNo = oEvent
+        onCriticalOrderPress(event) {
+          const orderId = event
             .getSource()
             .getBindingContext("dashboard")
             .getProperty("order_no");
 
           sap.ui.core.BusyIndicator.show(0);
-          UIComponent.getRouterFor(this).navTo("RouteOrderDetail", {
-            orderId: sOrderNo,
-          });
+          UIComponent.getRouterFor(this).navTo("RouteOrderDetail", { orderId });
           setTimeout(() => {
             sap.ui.core.BusyIndicator.hide();
           }, 80);
