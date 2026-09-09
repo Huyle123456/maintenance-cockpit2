@@ -1283,25 +1283,43 @@ sap.ui.define(
               "pagination",
             );
 
+            // Load KPI metrics directly from database
+            const oKpiDbData = await CAPService.getKpiMetrics();
+
             // Create KPI dashboard model
             this.getView().setModel(
               new JSONModel({
-                openCount: this._countOrdersByStatus(
-                  aOrderRows,
-                  constants.STATUS.OPEN,
-                ),
-                inProcessCount: this._countOrdersByStatus(
-                  aOrderRows,
-                  constants.STATUS.IN_PROCESS_DISPLAY,
-                ),
-                criticalCount: this._countOrdersByFlag(
-                  aOrderRows,
-                  "isCritical",
-                ),
-                overdueCount: this._countOrdersByFlag(aOrderRows, "isOverdue"),
-                estimatedCost: formatter.calculateEstimatedCost(aOrderRows),
+                openCount:
+                  oKpiDbData && typeof oKpiDbData.openCount === "number"
+                    ? oKpiDbData.openCount
+                    : this._countOrdersByStatus(
+                        aOrderRows,
+                        constants.STATUS.OPEN,
+                      ),
+                inProcessCount:
+                  oKpiDbData && typeof oKpiDbData.inProcessCount === "number"
+                    ? oKpiDbData.inProcessCount
+                    : this._countOrdersByStatus(
+                        aOrderRows,
+                        constants.STATUS.IN_PROCESS_DISPLAY,
+                      ),
+                criticalCount:
+                  oKpiDbData && typeof oKpiDbData.criticalCount === "number"
+                    ? oKpiDbData.criticalCount
+                    : this._countOrdersByFlag(aOrderRows, "isCritical"),
+                overdueCount:
+                  oKpiDbData && typeof oKpiDbData.overdueCount === "number"
+                    ? oKpiDbData.overdueCount
+                    : this._countOrdersByFlag(aOrderRows, "isOverdue"),
+                estimatedCost:
+                  oKpiDbData && oKpiDbData.estimatedCost
+                    ? oKpiDbData.estimatedCost
+                    : formatter.calculateEstimatedCost(aOrderRows),
                 activeFilterKey: "",
-                visibleOrderCount: aOrderRows.length,
+                visibleOrderCount:
+                  oKpiDbData && typeof oKpiDbData.totalOrders === "number"
+                    ? oKpiDbData.totalOrders
+                    : aOrderRows.length,
               }),
               "kpi",
             );
@@ -1594,10 +1612,13 @@ sap.ui.define(
           const oKpiModel = this.getView().getModel("kpi");
           if (oKpiModel) {
             oKpiModel.setProperty("/visibleOrderCount", iTotalItems);
-            oKpiModel.setProperty(
-              "/estimatedCost",
-              formatter.calculateEstimatedCost(aFiltered),
-            );
+            // Only override estimatedCost if a specific filter is currently active
+            if (this._sActiveKpiKey || (this._aAllOrders && aFiltered && aFiltered.length < this._aAllOrders.length)) {
+              oKpiModel.setProperty(
+                "/estimatedCost",
+                formatter.calculateEstimatedCost(aFiltered),
+              );
+            }
           }
 
           setTimeout(() => {
@@ -1608,23 +1629,38 @@ sap.ui.define(
         },
 
         /**
-         * Refreshes KPI counters after order data changes.
+         * Refreshes KPI counters after order data changes by querying backend DB.
          *
-         * @param {object[]} [aExplicitRows] Optional order collection to calculate.
-         * @returns {void}
+         * @param {object[]} [aExplicitRows] Optional order collection for local fallback.
+         * @returns {Promise<void>}
          */
-        _refreshKpiCounts(aExplicitRows) {
+        async _refreshKpiCounts(aExplicitRows) {
+          const oKpiModel = this.getView().getModel("kpi");
+          if (!oKpiModel) {
+            return;
+          }
+
+          try {
+            const oKpiDbData = await CAPService.getKpiMetrics();
+            if (oKpiDbData && typeof oKpiDbData.openCount === "number") {
+              oKpiModel.setProperty("/openCount", oKpiDbData.openCount);
+              oKpiModel.setProperty("/inProcessCount", oKpiDbData.inProcessCount);
+              oKpiModel.setProperty("/criticalCount", oKpiDbData.criticalCount);
+              oKpiModel.setProperty("/overdueCount", oKpiDbData.overdueCount);
+              oKpiModel.setProperty("/estimatedCost", oKpiDbData.estimatedCost);
+              oKpiModel.setProperty("/visibleOrderCount", oKpiDbData.totalOrders);
+              return;
+            }
+          } catch (e) {
+            console.warn("[MaintenanceOrders] Could not refresh KPI from DB, falling back to local calculation:", e);
+          }
+
           const aRows =
             aExplicitRows ||
             (this.getView().getModel("orders")
               ? this.getView().getModel("orders").getProperty("/rows")
               : []) ||
             [];
-
-          const oKpiModel = this.getView().getModel("kpi");
-          if (!oKpiModel) {
-            return;
-          }
 
           oKpiModel.setProperty(
             "/openCount",

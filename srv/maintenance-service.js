@@ -55,6 +55,83 @@ module.exports = cds.service.impl(async function () {
   });
 
   /**
+   * Directly queries the database to calculate real-time KPI metrics for all maintenance orders.
+   * Works consistently on both SAP HANA and SQLite.
+   *
+   * @param {import('@sap/cds').Request} req CAP request.
+   * @returns {Promise<{openCount: number, inProcessCount: number, criticalCount: number, overdueCount: number, totalOrders: number, rawEstimatedCost: number, estimatedCost: string}>} KPI metrics summary.
+   */
+  this.on("getKpiMetrics", async (req) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const db = await cds.connect.to("db");
+
+    const sql = `
+      SELECT 
+        count(case when UPPER(status) = 'OPEN' then 1 end) as "openCount",
+        count(case when UPPER(status) in ('IN_PROCESS', 'IN PROCESS', 'IN-PROCESS') then 1 end) as "inProcessCount",
+        count(case when UPPER(priority) in ('CRITICAL', '1-VERY HIGH', 'VERY HIGH', '1') then 1 end) as "criticalCount",
+        count(case when scheduled_to < '${today}' and UPPER(status) not in ('COMPLETED', 'CANCELLED') then 1 end) as "overdueCount",
+        count(1) as "totalOrders",
+        sum(case 
+          when estimated_cost is not null and estimated_cost > 0 then estimated_cost
+          when UPPER(priority) in ('CRITICAL', '1-VERY HIGH', 'VERY HIGH', '1') then 15000
+          when UPPER(priority) in ('HIGH', '2-HIGH', '2') then 8000
+          when UPPER(priority) in ('MEDIUM', '3-MEDIUM', '3') then 3000
+          when UPPER(priority) in ('LOW', '4-LOW', '4') then 1000
+          else 0
+        end) as "rawEstimatedCost"
+      FROM sap_cap_maintenance_MaintenanceOrders
+    `;
+
+    try {
+      let res;
+      try {
+        res = await db.run(sql);
+      } catch (tableErr) {
+        console.warn("[MaintenanceService] Table query failed, trying view...", tableErr.message);
+        const viewSql = sql.replace('sap_cap_maintenance_MaintenanceOrders', 'MaintenanceService_MaintenanceOrders');
+        res = await db.run(viewSql);
+      }
+
+      const row = (Array.isArray(res) ? res[0] : res) || {};
+      const openCount = Number(row.openCount ?? row.OPENCOUNT ?? 0);
+      const inProcessCount = Number(row.inProcessCount ?? row.INPROCESSCOUNT ?? 0);
+      const criticalCount = Number(row.criticalCount ?? row.CRITICALCOUNT ?? 0);
+      const overdueCount = Number(row.overdueCount ?? row.OVERDUECOUNT ?? 0);
+      const totalOrders = Number(row.totalOrders ?? row.TOTALORDERS ?? 0);
+      const rawEstimatedCost = Number(row.rawEstimatedCost ?? row.RAWESTIMATEDCOST ?? 0);
+
+      let estimatedCost = `$${rawEstimatedCost.toFixed(0)}`;
+      if (rawEstimatedCost >= 1000000) {
+        estimatedCost = `$${(rawEstimatedCost / 1000000).toFixed(1)}M`;
+      } else if (rawEstimatedCost >= 1000) {
+        estimatedCost = `$${(rawEstimatedCost / 1000).toFixed(1)}K`;
+      }
+
+      return {
+        openCount,
+        inProcessCount,
+        criticalCount,
+        overdueCount,
+        totalOrders,
+        rawEstimatedCost,
+        estimatedCost,
+      };
+    } catch (err) {
+      console.error("[MaintenanceService] Failed to query getKpiMetrics from DB:", err);
+      return {
+        openCount: 0,
+        inProcessCount: 0,
+        criticalCount: 0,
+        overdueCount: 0,
+        totalOrders: 0,
+        rawEstimatedCost: 0,
+        estimatedCost: "$0",
+      };
+    }
+  });
+
+  /**
    * Applies default values before a maintenance order is created.
    *
    * @param {import('@sap/cds').Request} req Create request containing order data.

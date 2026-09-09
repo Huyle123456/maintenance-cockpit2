@@ -66,6 +66,11 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
   let _oAuthModel = null;
   let _oLoginModel = null;
 
+  /**
+   * Resolves the application namespace base URL using sap.ui.require.
+   *
+   * @returns {string} Application root URL path or empty string.
+   */
   function _getBaseUrl() {
     const sPath = sap.ui.require.toUrl("com/fsoft/zpmmaintenancecockpit");
     if (!sPath || sPath === "." || sPath === "./") {
@@ -74,6 +79,12 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
     return sPath.replace(/\/$/, "");
   }
 
+  /**
+   * Generates 2-character uppercase avatar initials from a full name.
+   *
+   * @param {string} name - User's full or display name.
+   * @returns {string} 2-character uppercase initials (e.g., 'AD', 'US').
+   */
   function _generateInitials(name) {
     if (!name) return "US";
     const parts = name.trim().split(/\s+/);
@@ -83,6 +94,12 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   }
 
+  /**
+   * Retrieves the previously persisted user account ID from localStorage.
+   * Defaults to 'admin' if nothing is saved or the ID is invalid.
+   *
+   * @returns {string} Saved account ID ('admin' or 'user').
+   */
   function _getSavedAccountId() {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -95,6 +112,11 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
     return "admin";
   }
 
+  /**
+   * Checks whether the user is marked as logged in within localStorage.
+   *
+   * @returns {boolean} True if logged in flag is set, false otherwise.
+   */
   function _getSavedLoggedIn() {
     try {
       const saved = localStorage.getItem(LOGGED_IN_KEY);
@@ -104,6 +126,13 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
     }
   }
 
+  /**
+   * Finds a preset account definition by its ID.
+   * Falls back to the default admin account if not found.
+   *
+   * @param {string} accountId - Account identifier ('admin' or 'user').
+   * @returns {object} Account definition object.
+   */
   function _findAccount(accountId) {
     return (
       DEFAULT_ACCOUNTS.find((acc) => acc.id === accountId) || DEFAULT_ACCOUNTS[0]
@@ -232,7 +261,9 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
     },
 
     /**
-     * Log out current user
+     * Logs out the current user by updating localStorage and reactive auth model state.
+     *
+     * @returns {void}
      */
     logout: function () {
       try {
@@ -245,7 +276,11 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
     },
 
     /**
-     * Fetch authenticated user info from SAP Approuter, Work Zone, or CAP service
+     * Fetches authenticated user identity from SAP Build Work Zone Container,
+     * SAP Approuter `/user-api/currentUser`, or CAP security context.
+     * Automatically establishes role privileges and applies user profile to auth model.
+     *
+     * @returns {Promise<void>}
      */
     async fetchSapUser() {
       const lpUser = (function () {
@@ -293,6 +328,13 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
       } catch (e) {}
     },
 
+    /**
+     * Constructs and sets user profile and role permissions from an Approuter user-api payload.
+     *
+     * @param {object} sapUser - User identity object from /user-api/currentUser.
+     * @param {object|null} [lpUser] - Optional Launchpad user container context.
+     * @returns {void}
+     */
     _applySapUser(sapUser, lpUser) {
       const displayName =
         (lpUser && lpUser.name) ||
@@ -347,6 +389,13 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
       }
     },
 
+    /**
+     * Constructs and sets user profile and role permissions from a CAP service getUserInfo response.
+     *
+     * @param {object} capUser - User identity object from CAP backend.
+     * @param {object|null} [lpUser] - Optional Launchpad user container context.
+     * @returns {void}
+     */
     _applyCapUser(capUser, lpUser) {
       const isAdmin = capUser.isAdmin !== undefined ? !!capUser.isAdmin : true;
       const displayName = (lpUser && lpUser.name) || capUser.name || (isAdmin ? "Administrator" : "Standard User");
@@ -388,6 +437,13 @@ sap.ui.define(["sap/ui/model/json/JSONModel"], function (JSONModel) {
       }
     },
 
+    /**
+     * Constructs and sets user profile and role permissions from SAP Build Work Zone / Fiori Launchpad container.
+     * Identifies administrator privileges by matching known administrator emails or 'admin' identifier.
+     *
+     * @param {object} lpUser - User container profile ({id, email, name}).
+     * @returns {void}
+     */
     _applyLaunchpadUser(lpUser) {
       const displayName = lpUser.name || "SAP User";
       const rawEmail = (lpUser.email || "").trim().toLowerCase();

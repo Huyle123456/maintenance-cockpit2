@@ -94,4 +94,17 @@ service MaintenanceService @(path: '/odata/v4/maintenance') {
   };
 
   function getUserInfo() returns CurrentUserProfile;
+
+  // KPI Metrics direct database aggregation summary
+  type KpiSummary {
+    openCount: Integer;
+    inProcessCount: Integer;
+    criticalCount: Integer;
+    overdueCount: Integer;
+    totalOrders: Integer;
+    rawEstimatedCost: Decimal(15, 2);
+    estimatedCost: String;
+  };
+
+  function getKpiMetrics() returns KpiSummary;
 }

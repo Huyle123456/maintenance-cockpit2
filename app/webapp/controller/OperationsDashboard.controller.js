@@ -27,27 +27,35 @@ sap.ui.define(
          */
         async onInit() {
           try {
-            const orders = await CAPService.getMaintenanceOrders();
-            let openCount = 0;
-            let inProcessCount = 0;
+            const [orders, kpiData] = await Promise.all([
+              CAPService.getMaintenanceOrders(),
+              CAPService.getKpiMetrics(),
+            ]);
+            let openCount = kpiData?.openCount ?? 0;
+            let inProcessCount = kpiData?.inProcessCount ?? 0;
+            let criticalCount = kpiData?.criticalCount ?? 0;
             let completedCount = 0;
             let cancelledCount = 0;
-            let criticalCount = 0;
             const criticalOrders = [];
-            orders.forEach((order) => {
-              if (order.status === constants.STATUS.OPEN) openCount++;
-              else if (order.status === constants.STATUS.IN_PROCESS)
-                inProcessCount++;
-              else if (order.status === constants.STATUS.COMPLETED)
+
+            (orders || []).forEach((order) => {
+              if (!kpiData) {
+                if (order.status === constants.STATUS.OPEN) openCount++;
+                else if (order.status === constants.STATUS.IN_PROCESS)
+                  inProcessCount++;
+                if (order.priority === constants.PRIORITY.CRITICAL) {
+                  criticalCount++;
+                }
+              }
+              if (order.status === constants.STATUS.COMPLETED)
                 completedCount++;
               else if (order.status === constants.STATUS.CANCELLED)
                 cancelledCount++;
               if (order.priority === constants.PRIORITY.CRITICAL) {
-                criticalCount++;
                 criticalOrders.push(order);
               }
             });
-            const totalOrders = orders.length;
+            const totalOrders = kpiData?.totalOrders || orders.length;
             const dashboardData = {
               kpi: {
                 open: openCount,

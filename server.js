@@ -214,6 +214,69 @@ cds.on('bootstrap', (app) => {
       return res.status(500).json({ error: err.message || 'Failed to import Excel file' });
     }
   });
+
+  // REST API Endpoint to query KPI Metrics directly from DB
+  app.get('/api/maintenance/kpi-metrics', async (req, res) => {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const db = await cds.connect.to('db');
+
+      const sql = `
+        SELECT 
+          count(case when UPPER(status) = 'OPEN' then 1 end) as "openCount",
+          count(case when UPPER(status) in ('IN_PROCESS', 'IN PROCESS', 'IN-PROCESS') then 1 end) as "inProcessCount",
+          count(case when UPPER(priority) in ('CRITICAL', '1-VERY HIGH', 'VERY HIGH', '1') then 1 end) as "criticalCount",
+          count(case when scheduled_to < '${today}' and UPPER(status) not in ('COMPLETED', 'CANCELLED') then 1 end) as "overdueCount",
+          count(1) as "totalOrders",
+          sum(case 
+            when estimated_cost is not null and estimated_cost > 0 then estimated_cost
+            when UPPER(priority) in ('CRITICAL', '1-VERY HIGH', 'VERY HIGH', '1') then 15000
+            when UPPER(priority) in ('HIGH', '2-HIGH', '2') then 8000
+            when UPPER(priority) in ('MEDIUM', '3-MEDIUM', '3') then 3000
+            when UPPER(priority) in ('LOW', '4-LOW', '4') then 1000
+            else 0
+          end) as "rawEstimatedCost"
+        FROM sap_cap_maintenance_MaintenanceOrders
+      `;
+
+      let queryResult;
+      try {
+        queryResult = await db.run(sql);
+      } catch (tableErr) {
+        console.warn('[server.js] Table query failed, trying view...', tableErr.message);
+        const viewSql = sql.replace('sap_cap_maintenance_MaintenanceOrders', 'MaintenanceService_MaintenanceOrders');
+        queryResult = await db.run(viewSql);
+      }
+
+      const row = (Array.isArray(queryResult) ? queryResult[0] : queryResult) || {};
+      const openCount = Number(row.openCount ?? row.OPENCOUNT ?? 0);
+      const inProcessCount = Number(row.inProcessCount ?? row.INPROCESSCOUNT ?? 0);
+      const criticalCount = Number(row.criticalCount ?? row.CRITICALCOUNT ?? 0);
+      const overdueCount = Number(row.overdueCount ?? row.OVERDUECOUNT ?? 0);
+      const totalOrders = Number(row.totalOrders ?? row.TOTALORDERS ?? 0);
+      const rawEstimatedCost = Number(row.rawEstimatedCost ?? row.RAWESTIMATEDCOST ?? 0);
+
+      let estimatedCost = `$${rawEstimatedCost.toFixed(0)}`;
+      if (rawEstimatedCost >= 1000000) {
+        estimatedCost = `$${(rawEstimatedCost / 1000000).toFixed(1)}M`;
+      } else if (rawEstimatedCost >= 1000) {
+        estimatedCost = `$${(rawEstimatedCost / 1000).toFixed(1)}K`;
+      }
+
+      res.json({
+        openCount,
+        inProcessCount,
+        criticalCount,
+        overdueCount,
+        totalOrders,
+        rawEstimatedCost,
+        estimatedCost,
+      });
+    } catch (err) {
+      console.error('[server.js] Error querying kpi metrics:', err);
+      res.status(500).json({ error: 'Failed to query KPI metrics' });
+    }
+  });
 });
 
 module.exports = cds.server;

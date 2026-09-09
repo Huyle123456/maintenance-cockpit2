@@ -10,6 +10,11 @@ sap.ui.define([
     let _aHistory = [];
     const _oListeners = [];
 
+    /**
+     * Formats current date and time as 'YYYY-MM-DD HH:mm'.
+     *
+     * @returns {string} Formatted timestamp string.
+     */
     function _now() {
         const d = new Date();
         return d.getFullYear() + "-" +
@@ -19,6 +24,11 @@ sap.ui.define([
             String(d.getMinutes()).padStart(2, "0");
     }
 
+    /**
+     * Notifies all registered listener callbacks with a shallow copy of the audit history list.
+     *
+     * @returns {void}
+     */
     function _notify() {
         _oListeners.forEach(fn => fn([..._aHistory]));
     }
@@ -33,11 +43,13 @@ sap.ui.define([
 
     return {
         /**
-         * Add a new entry at the top of the history list and persist to CAP backend.
-         * @param {string} sObject  - e.g. "MO-1010"
-         * @param {string} sAction  - e.g. "CREATE" | "UPDATE"
-         * @param {string} sDetails - e.g. "Maintenance order created"
-         * @param {string} [sUser]  - defaults to current user
+         * Adds a new entry at the top of the history list and persists it to the CAP backend.
+         *
+         * @param {string} sObject - Target object identifier (e.g. "MO-1010").
+         * @param {string} sAction - Performed action type (e.g. "CREATE" | "UPDATE" | "DELETE").
+         * @param {string} sDetails - Detailed description of the operation (e.g. "Maintenance order created").
+         * @param {string} [sUser] - User who executed the action, defaults to current authenticated user.
+         * @returns {void}
          */
         addEntry: function (sObject, sAction, sDetails, sUser) {
             const currentUserName = (AuthService.getCurrentUser() && AuthService.getCurrentUser().name) || "Administrator";
@@ -57,15 +69,18 @@ sap.ui.define([
         },
 
         /**
-         * Get a copy of the full history array.
-         * @returns {Array}
+         * Retrieves a shallow copy of the entire in-memory audit history records.
+         *
+         * @returns {Array<object>} Copy of the audit history list.
          */
         getHistory: function () {
             return [..._aHistory];
         },
 
         /**
-         * Refresh audit history from CAP backend.
+         * Refreshes audit history records by re-querying the CAP backend service.
+         *
+         * @returns {Promise<Array<object>>} Updated audit history array.
          */
         async refresh() {
             try {
@@ -80,8 +95,10 @@ sap.ui.define([
         },
 
         /**
-         * Register a callback that fires whenever the history changes.
-         * @param {function} fnCallback
+         * Registers an event callback listener that triggers whenever the history list changes.
+         *
+         * @param {Function} fnCallback - Listener callback receiving updated history array.
+         * @returns {void}
          */
         onChange: function (fnCallback) {
             if (typeof fnCallback === "function") {
