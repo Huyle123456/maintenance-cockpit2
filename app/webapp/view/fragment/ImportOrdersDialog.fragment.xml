@@ -92,22 +92,38 @@
                     visible="{= !!${importModel>/statusMessage} }"
                     class="sapUiSmallMarginTop"
                 />
+
+                <!-- Progress Indicator for Background Async Processing -->
+                <VBox visible="{= !!${importModel>/isProcessing} }" class="sapUiSmallMarginTop">
+                    <HBox justifyContent="SpaceBetween" alignItems="Center" class="sapUiTinyMarginBottom">
+                        <Label text="Background Processing Progress:" design="Bold" />
+                        <Text text="{importModel>/progressPercent}%" class="sapUiTinyMarginEnd" />
+                    </HBox>
+                    <ProgressIndicator
+                        id="importProgressIndicator"
+                        percentValue="{importModel>/progressPercent}"
+                        displayValue="{importModel>/progressPercent}%"
+                        state="{importModel>/progressState}"
+                        showValue="true"
+                        height="1.5rem"
+                    />
+                </VBox>
             </VBox>
         </content>
         <beginButton>
             <Button
                 id="btnConfirmImport"
-                text="Upload &amp; Process on Backend"
+                text="{= ${importModel>/isProcessing} ? 'Processing in Background...' : 'Upload &amp; Process on Backend' }"
                 type="Emphasized"
-                icon="sap-icon://upload"
-                enabled="{importModel>/canImport}"
+                icon="{= ${importModel>/isProcessing} ? 'sap-icon://synchronize' : 'sap-icon://upload' }"
+                enabled="{= ${importModel>/canImport} &amp;&amp; !${importModel>/isProcessing} }"
                 press=".onConfirmImportOrders"
             />
         </beginButton>
         <endButton>
             <Button
                 id="btnCancelImport"
-                text="{i18n>commonCancel}"
+                text="{= ${importModel>/isProcessing} ? 'Run in Background (Close)' : ${i18n>commonCancel} }"
                 press=".onCancelImportOrders"
             />
         </endButton>

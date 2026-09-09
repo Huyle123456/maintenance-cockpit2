@@ -949,6 +949,9 @@ sap.ui.define(
               statusText: "Waiting for file",
               statusState: "None",
               canImport: false,
+              isProcessing: false,
+              progressPercent: 0,
+              progressState: "Information",
               statusMessage:
                 "Please choose a .xlsx or .csv file to import to Backend.",
               statusType: "Information",
@@ -1065,20 +1068,33 @@ sap.ui.define(
 
           const oImportModel = this.getView().getModel("importModel");
           oImportModel.setProperty("/canImport", false);
+          oImportModel.setProperty("/isProcessing", true);
+          oImportModel.setProperty("/progressPercent", 5);
+          oImportModel.setProperty("/progressState", "Information");
           oImportModel.setProperty(
             "/statusMessage",
-            "Uploading file and streaming data to Backend via ExcelJS...",
+            "Uploading file and initiating background processing...",
           );
           oImportModel.setProperty("/statusType", "Information");
-
-          sap.ui.core.BusyIndicator.show(0);
 
           try {
             const result = await CAPService.importOrdersExcel(
               this._oSelectedImportFile,
+              (progressInfo) => {
+                const currentModel = this.getView().getModel("importModel");
+                if (currentModel) {
+                  currentModel.setProperty("/progressPercent", progressInfo.progress || 0);
+                  if (progressInfo.message) {
+                    currentModel.setProperty("/statusMessage", progressInfo.message);
+                  }
+                  if (progressInfo.progress >= 100) {
+                    currentModel.setProperty("/progressState", "Success");
+                  }
+                }
+              }
             );
 
-            // Automatically close the import dialog immediately after upload
+            // Automatically close the import dialog immediately after completion
             this.onCancelImportOrders();
 
             // Automatically reload the orders list & refresh KPIs
@@ -1138,20 +1154,23 @@ sap.ui.define(
               }
             } else {
               MessageBox.success(sMsg, {
-                title: "Backend Excel Import Summary",
+                title: "Excel Import Successful",
               });
             }
           } catch (err) {
             console.error("Backend Excel import error:", err);
-            oImportModel.setProperty(
-              "/statusMessage",
-              "Import failed: " + err.message,
-            );
-            oImportModel.setProperty("/statusType", "Error");
-            oImportModel.setProperty("/canImport", true);
-            MessageBox.error("Backend Excel import failed: " + err.message);
-          } finally {
-            sap.ui.core.BusyIndicator.hide();
+            const currentModel = this.getView().getModel("importModel");
+            if (currentModel) {
+              currentModel.setProperty("/isProcessing", false);
+              currentModel.setProperty("/progressState", "Error");
+              currentModel.setProperty(
+                "/statusMessage",
+                "Import failed: " + (err.message || err),
+              );
+              currentModel.setProperty("/statusType", "Error");
+              currentModel.setProperty("/canImport", true);
+            }
+            MessageBox.error("Backend Excel import failed: " + (err.message || err));
           }
         },
 

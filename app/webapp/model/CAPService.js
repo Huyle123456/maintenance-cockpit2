@@ -381,36 +381,132 @@ sap.ui.define([], function () {
     },
 
     /**
-     * Uploads and imports an Excel file directly to the backend using streaming multipart form data.
+     * Uploads an Excel file asynchronously and polls the background job until completion.
+     * Prevents HTTP 504 Gateway Timeout on large files.
      *
      * @param {File} oFile - Excel spreadsheet file (.xlsx / .xls).
+     * @param {Function} [fnOnProgress] - Optional callback receiving { progress, message, status }.
      * @returns {Promise<object>} Import result summary containing processed order statistics.
      */
-    async importOrdersExcel(oFile) {
+    async importOrdersExcelAsync(oFile, fnOnProgress) {
       const formData = new FormData();
       formData.append("file", oFile, oFile.name);
 
       let res;
+      const asyncUrl = `${getApiUrl()}/import-excel-async`;
+      const directAsyncUrl = _getDirectUrl(asyncUrl);
+
       try {
-        res = await fetch(`${getApiUrl()}/import-excel`, {
-          method: "POST",
-          body: formData
-        });
+        res = await fetch(asyncUrl, { method: "POST", body: formData });
         if (!res.ok && res.status >= 500) {
-          const directUrl = _getDirectUrl(`${getApiUrl()}/import-excel`);
-          res = await fetch(directUrl, { method: "POST", body: formData });
+          res = await fetch(directAsyncUrl, { method: "POST", body: formData });
         }
       } catch (e) {
-        const directUrl = _getDirectUrl(`${getApiUrl()}/import-excel`);
-        res = await fetch(directUrl, { method: "POST", body: formData });
+        res = await fetch(directAsyncUrl, { method: "POST", body: formData });
       }
 
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({ error: res.statusText }));
-        throw new Error(errJson.error || `Import failed with status [${res.status}]`);
+        throw new Error(errJson.error || `Failed to initiate async import [status ${res.status}]`);
       }
 
-      return await res.json();
+      const initData = await res.json();
+      const jobId = initData.jobId;
+      if (!jobId) {
+        throw new Error("No jobId returned from backend.");
+      }
+
+      if (typeof fnOnProgress === "function") {
+        fnOnProgress({
+          progress: initData.progress || 5,
+          message: initData.message || "File uploaded. Starting processing in background...",
+          status: "RUNNING"
+        });
+      }
+
+      // Poll every 1.5 seconds until job finishes
+      const jobUrl = `${getApiUrl()}/import-job/${jobId}`;
+      const directJobUrl = _getDirectUrl(jobUrl);
+
+      return new Promise((resolve, reject) => {
+        const pollInterval = setInterval(async () => {
+          try {
+            let jobRes;
+            try {
+              jobRes = await fetch(jobUrl);
+              if (!jobRes.ok && jobRes.status >= 500) {
+                jobRes = await fetch(directJobUrl);
+              }
+            } catch (netErr) {
+              jobRes = await fetch(directJobUrl);
+            }
+
+            if (!jobRes.ok) {
+              clearInterval(pollInterval);
+              return reject(new Error(`Failed to check import job status [status ${jobRes.status}]`));
+            }
+
+            const job = await jobRes.json();
+
+            if (typeof fnOnProgress === "function") {
+              fnOnProgress({
+                progress: job.progress || 0,
+                message: job.message || "Processing...",
+                status: job.status
+              });
+            }
+
+            if (job.status === "COMPLETED") {
+              clearInterval(pollInterval);
+              return resolve(job.result || { success: true, message: "Import completed" });
+            } else if (job.status === "FAILED") {
+              clearInterval(pollInterval);
+              return reject(new Error(job.error || job.message || "Import job failed"));
+            }
+          } catch (pollErr) {
+            console.warn("[CAPService] Error polling import job:", pollErr);
+          }
+        }, 1500);
+      });
+    },
+
+    /**
+     * Uploads and imports an Excel file with async job polling by default, with automatic fallback.
+     *
+     * @param {File} oFile - Excel spreadsheet file (.xlsx / .xls).
+     * @param {Function} [fnOnProgress] - Optional progress notification callback.
+     * @returns {Promise<object>} Import result summary.
+     */
+    async importOrdersExcel(oFile, fnOnProgress) {
+      try {
+        return await this.importOrdersExcelAsync(oFile, fnOnProgress);
+      } catch (asyncErr) {
+        console.warn("[CAPService] Async import failed, falling back to legacy sync endpoint...", asyncErr.message);
+        const formData = new FormData();
+        formData.append("file", oFile, oFile.name);
+
+        let res;
+        try {
+          res = await fetch(`${getApiUrl()}/import-excel`, {
+            method: "POST",
+            body: formData
+          });
+          if (!res.ok && res.status >= 500) {
+            const directUrl = _getDirectUrl(`${getApiUrl()}/import-excel`);
+            res = await fetch(directUrl, { method: "POST", body: formData });
+          }
+        } catch (e) {
+          const directUrl = _getDirectUrl(`${getApiUrl()}/import-excel`);
+          res = await fetch(directUrl, { method: "POST", body: formData });
+        }
+
+        if (!res.ok) {
+          const errJson = await res.json().catch(() => ({ error: res.statusText }));
+          throw new Error(errJson.error || `Import failed with status [${res.status}]`);
+        }
+
+        return await res.json();
+      }
     }
   };
 });

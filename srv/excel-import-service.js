@@ -193,22 +193,47 @@ async function processExcelImport(
   options = {},
 ) {
   const startTime = Date.now();
+  const notifyProgress = (percent, message) => {
+    if (typeof options.onProgress === "function") {
+      try {
+        options.onProgress({ percent, message });
+      } catch (e) {
+        console.warn("[ExcelImport] onProgress handler error:", e.message);
+      }
+    }
+  };
+
+  notifyProgress(5, "Loading master data cache...");
+
   const db = await cds.connect.to("db");
-  const entities = typeof cds.entities === "function" ? cds.entities("sap.cap.maintenance") : (cds.model ? cds.model.entities : {});
-  const {
-    MaintenanceOrders,
-    Equipments,
-    Plants,
-    MaintenanceTypes,
-    Priorities,
-    Planners,
-    WorkCenters,
-    MaterialCatalog,
-    MaintenanceOperations,
-    OrderMaterials,
-    AuditHistory,
-    OrderHistory,
-  } = entities;
+  if (!cds.model) {
+    cds.model = await cds.load("*");
+  }
+
+  const findEntity = (name) => {
+    if (typeof cds.entities === "function") {
+      try {
+        const e = cds.entities("sap.cap.maintenance");
+        if (e && e[name] && typeof e[name] === "object" && typeof e[name]._target4 === "function") {
+          return e[name];
+        }
+      } catch (err) {}
+    }
+    return `sap.cap.maintenance.${name}`;
+  };
+
+  const MaintenanceOrders = findEntity("MaintenanceOrders");
+  const Equipments = findEntity("Equipments");
+  const Plants = findEntity("Plants");
+  const MaintenanceTypes = findEntity("MaintenanceTypes");
+  const Priorities = findEntity("Priorities");
+  const Planners = findEntity("Planners");
+  const WorkCenters = findEntity("WorkCenters");
+  const MaterialCatalog = findEntity("MaterialCatalog");
+  const MaintenanceOperations = findEntity("MaintenanceOperations");
+  const OrderMaterials = findEntity("OrderMaterials");
+  const AuditHistory = findEntity("AuditHistory");
+  const OrderHistory = findEntity("OrderHistory");
 
   // Step 1: Pre-fetch master data cache for validation and fallbacks
   const [
@@ -266,6 +291,7 @@ async function processExcelImport(
   let nextOrderNum = maxOrderSeq + 1;
 
   // Step 2: Read Excel buffer using high-speed SheetJS parser
+  notifyProgress(15, "Reading Excel workbook...");
   let buffer = fileSource;
   if (!Buffer.isBuffer(fileSource)) {
     const chunks = [];
@@ -442,8 +468,13 @@ async function processExcelImport(
     .replace("T", " ")
     .substring(0, 16);
   const laborRatePerHour = 50.0;
+  const seenOrderNosInFile = new Set();
 
   for (let idx = 0; idx < orderRowsRaw.length; idx++) {
+    if (idx % 100 === 0 || idx === orderRowsRaw.length - 1) {
+      const pct = Math.min(65, Math.round(20 + ((idx + 1) / orderRowsRaw.length) * 45));
+      notifyProgress(pct, `Validating order row ${idx + 1} of ${orderRowsRaw.length}...`);
+    }
     const row = orderRowsRaw[idx];
     const rowNumber = idx + 2;
     const norm = normalizeRowKeys(row);
@@ -539,9 +570,11 @@ async function processExcelImport(
       }
     }
 
-    if (!finalOrderNo) {
+    if (!finalOrderNo || seenOrderNosInFile.has(finalOrderNo)) {
       finalOrderNo = `MO-${nextOrderNum++}`;
+      isUpdate = false;
     }
+    seenOrderNosInFile.add(finalOrderNo);
 
     const description = rawDescription || `Maintenance for ${equipmentNo}`;
     let plant = rawPlant ? rawPlant.trim().toUpperCase() : "1000";
@@ -644,8 +677,35 @@ async function processExcelImport(
       ...rowMats,
     ];
 
-    if (combinedOps.length === 0) {
-      combinedOps.push({
+    // Deduplicate and resequence operations to guarantee unique (order_no, no)
+    const opMap = new Map();
+    let opSeq = 10;
+    const finalOps = [];
+
+    for (const op of combinedOps) {
+      let opNo = op.no ? String(op.no).trim() : "";
+      if (!opNo || opMap.has(opNo)) {
+        while (opMap.has(String(opSeq))) {
+          opSeq += 10;
+        }
+        opNo = String(opSeq);
+        opSeq += 10;
+      }
+      opMap.set(opNo, true);
+      finalOps.push({
+        order_no: finalOrderNo,
+        no: opNo,
+        description: op.description || "Maintenance Operation",
+        workCenter: op.workCenter || "WC-001",
+        technician: op.technician || "T-001",
+        plannedHours: Number(op.plannedHours) || 2.0,
+        actualHours: Number(op.actualHours) || 0.0,
+        status: op.status || "OPEN",
+      });
+    }
+
+    if (finalOps.length === 0) {
+      finalOps.push({
         order_no: finalOrderNo,
         no: "10",
         description: "Standard Maintenance & Inspection",
@@ -657,12 +717,37 @@ async function processExcelImport(
       });
     }
 
+    // Deduplicate materials by (order_no, material) and merge quantities
+    const matMap = new Map();
+    for (const mat of combinedMats) {
+      const matKey = String(mat.material).trim().toUpperCase();
+      if (!matKey) continue;
+      if (matMap.has(matKey)) {
+        const existing = matMap.get(matKey);
+        existing.qty = Number((existing.qty + (Number(mat.qty) || 1.0)).toFixed(2));
+        existing.value = Number((existing.qty * existing.unitPrice).toFixed(2));
+      } else {
+        const unitPrice = Number(mat.unitPrice) || 25.0;
+        const qty = Number(mat.qty) || 1.0;
+        matMap.set(matKey, {
+          order_no: finalOrderNo,
+          material: matKey,
+          description: mat.description || matKey,
+          qty: qty,
+          unit: mat.unit || "EA",
+          unitPrice: unitPrice,
+          value: Number((qty * unitPrice).toFixed(2)),
+        });
+      }
+    }
+    const finalMats = Array.from(matMap.values());
+
     // Aggregations
-    const totalPlannedHours = combinedOps.reduce(
+    const totalPlannedHours = finalOps.reduce(
       (sum, o) => sum + (Number(o.plannedHours) || 0),
       0,
     );
-    const totalMaterialCost = combinedMats.reduce(
+    const totalMaterialCost = finalMats.reduce(
       (sum, m) => sum + (Number(m.value) || 0),
       0,
     );
@@ -688,7 +773,7 @@ async function processExcelImport(
       planner: planner,
       scheduled_from: scheduledFrom,
       scheduled_to: scheduledTo,
-      operation_count: combinedOps.length,
+      operation_count: finalOps.length,
       completed_operation_count: 0,
       planned_hours: totalPlannedHours,
       actual_hours: 0.0,
@@ -705,27 +790,42 @@ async function processExcelImport(
       createdCount++;
     }
 
-    combinedOps.forEach((op) => operationsToSave.push(op));
-    combinedMats.forEach((mat) => materialsToSave.push(mat));
+    finalOps.forEach((op) => operationsToSave.push(op));
+    finalMats.forEach((mat) => materialsToSave.push(mat));
 
     // Keep history records compact for large bulk imports
     if (ordersToInsert.length + ordersToUpdate.length <= 5000) {
       historyToInsert.push({
+        ID: cds.utils?.uuid ? cds.utils.uuid() : require("crypto").randomUUID(),
         order_no: finalOrderNo,
         title: isUpdate ? "Order updated via import" : "Order created",
         dateTime: timestampStr,
         userName: currentUser,
-        text: `Maintenance order synced with ${combinedOps.length} op(s).`,
+        text: `Maintenance order synced with ${finalOps.length} op(s).`,
         icon: isUpdate ? "sap-icon://synchronize" : "sap-icon://create",
       });
     }
 
-    totalOpsImported += combinedOps.length;
-    totalMatsImported += combinedMats.length;
+    totalOpsImported += finalOps.length;
+    totalMatsImported += finalMats.length;
   }
 
   // Step 6: Chunked Database Transactions (prevents SQLite/HANA parameter limits)
+  notifyProgress(70, `Saving ${ordersToInsert.length + ordersToUpdate.length} orders to database...`);
   await cds.tx(async () => {
+    // 0. Clean any pre-existing operations and materials for all orders being processed
+    const allProcessedOrderNos = [
+      ...ordersToInsert.map((o) => o.order_no),
+      ...ordersToUpdate.map((o) => o.order_no),
+    ];
+    if (allProcessedOrderNos.length > 0) {
+      for (let i = 0; i < allProcessedOrderNos.length; i += 200) {
+        const chunk = allProcessedOrderNos.slice(i, i + 200);
+        await DELETE.from(MaintenanceOperations).where({ order_no: { in: chunk } });
+        await DELETE.from(OrderMaterials).where({ order_no: { in: chunk } });
+      }
+    }
+
     // 1. Insert new orders in batches of 500
     await batchInsert(MaintenanceOrders, ordersToInsert, 500);
 
@@ -748,17 +848,36 @@ async function processExcelImport(
           estimated_cost: ord.estimated_cost,
           etag: ord.etag,
         });
-      await DELETE.from(MaintenanceOperations).where({
-        order_no: ord.order_no,
-      });
-      await DELETE.from(OrderMaterials).where({ order_no: ord.order_no });
     }
 
-    // 3. Batch save operations
-    await batchInsert(MaintenanceOperations, operationsToSave, 500);
+    notifyProgress(85, "Saving operations and materials...");
+    // 3. Batch save operations (safeguard deduplication by order_no + no)
+    const uniqueOpsMap = new Map();
+    const cleanOperations = [];
+    for (const op of operationsToSave) {
+      const key = `${op.order_no}#${op.no}`;
+      if (!uniqueOpsMap.has(key)) {
+        uniqueOpsMap.set(key, true);
+        cleanOperations.push(op);
+      }
+    }
+    await batchInsert(MaintenanceOperations, cleanOperations, 500);
 
-    // 4. Batch save materials
-    await batchInsert(OrderMaterials, materialsToSave, 500);
+    // 4. Batch save materials (safeguard deduplication by order_no + material)
+    const uniqueMatsMap = new Map();
+    const cleanMaterials = [];
+    for (const mat of materialsToSave) {
+      const key = `${mat.order_no}#${mat.material}`;
+      if (!uniqueMatsMap.has(key)) {
+        uniqueMatsMap.set(key, mat);
+        cleanMaterials.push(mat);
+      } else {
+        const existing = uniqueMatsMap.get(key);
+        existing.qty = Number((existing.qty + (Number(mat.qty) || 1.0)).toFixed(2));
+        existing.value = Number((existing.qty * existing.unitPrice).toFixed(2));
+      }
+    }
+    await batchInsert(OrderMaterials, cleanMaterials, 500);
 
     // 5. Batch save history
     await batchInsert(OrderHistory, historyToInsert, 500);
@@ -769,8 +888,10 @@ async function processExcelImport(
   const importedCount = createdCount + updatedCount;
 
   // Step 7: Record summary audit log
+  notifyProgress(95, "Recording audit history...");
   if (importedCount > 0) {
     await INSERT.into(AuditHistory).entries({
+      ID: cds.utils?.uuid ? cds.utils.uuid() : require("crypto").randomUUID(),
       timestamp: timestampStr,
       user: currentUser,
       object: `Bulk Import (${importedCount} orders)`,
@@ -778,6 +899,8 @@ async function processExcelImport(
       details: `Imported ${importedCount} orders (${createdCount} created, ${updatedCount} updated), ${totalOpsImported} operations in ${durationSec}s.`,
     });
   }
+
+  notifyProgress(100, `Completed processing ${orderRowsRaw.length} rows.`);
 
   return {
     success: true,

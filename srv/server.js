@@ -1,8 +1,22 @@
+const path = require("path");
 const cds = require("@sap/cds");
 const multer = require("multer");
 const ExcelJS = require("exceljs");
-const { processExcelImport } = require("./excel-import-service");
-const { getExcelTemplateSampleData } = require("./excel-template-sample-data");
+
+function resolveLocalModule(name) {
+  try {
+    return require(`./${name}`);
+  } catch (e1) {
+    try {
+      return require(`./srv/${name}`);
+    } catch (e2) {
+      return require(path.join(__dirname, name));
+    }
+  }
+}
+
+const { processExcelImport } = resolveLocalModule("excel-import-service");
+const { getExcelTemplateSampleData } = resolveLocalModule("excel-template-sample-data");
 
 // Configure multer for file uploads in memory buffer
 const upload = multer({
@@ -208,8 +222,102 @@ cds.on("bootstrap", (app) => {
     }
   });
 
+  // In-memory registry for asynchronous background import jobs
+  const importJobs = new Map();
+
+  // Periodically clean up jobs older than 1 hour to prevent memory leaks
+  setInterval(() => {
+    const oneHourAgo = Date.now() - 60 * 60 * 1000;
+    for (const [id, job] of importJobs.entries()) {
+      if (job.createdAt < oneHourAgo) {
+        importJobs.delete(id);
+      }
+    }
+  }, 15 * 60 * 1000);
+
   /**
-   * Imports maintenance orders from an uploaded Excel workbook.
+   * Asynchronous Excel Import Endpoint.
+   * Immediately returns HTTP 202 Accepted with a jobId (< 500ms) to prevent HTTP 504 timeout.
+   * Processes the file in the background while updating the job's progress.
+   */
+  app.post("/api/maintenance/import-excel-async", upload.single("file"), (req, res) => {
+    try {
+      if (!req.file || !req.file.buffer) {
+        return res.status(400).json({ error: "No Excel file uploaded" });
+      }
+
+      const jobId = `job-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+      const currentUser = req.user?.id || "Administrator";
+      const fileBuffer = req.file.buffer;
+
+      const jobRecord = {
+        jobId,
+        status: "RUNNING",
+        progress: 5,
+        message: "File received. Starting background worker...",
+        result: null,
+        error: null,
+        createdAt: Date.now()
+      };
+      importJobs.set(jobId, jobRecord);
+
+      // Execute import in the background without blocking the HTTP response
+      setImmediate(async () => {
+        try {
+          const result = await processExcelImport(fileBuffer, currentUser, {
+            onProgress: ({ percent, message }) => {
+              const current = importJobs.get(jobId);
+              if (current && current.status === "RUNNING") {
+                current.progress = percent;
+                current.message = message;
+              }
+            }
+          });
+          const current = importJobs.get(jobId);
+          if (current) {
+            current.status = "COMPLETED";
+            current.progress = 100;
+            current.message = "Import completed successfully.";
+            current.result = result;
+          }
+        } catch (err) {
+          console.error(`[AsyncImport] Job ${jobId} failed:`, err);
+          const current = importJobs.get(jobId);
+          if (current) {
+            current.status = "FAILED";
+            current.message = err.message || "Import failed";
+            current.error = err.message || "Import failed";
+          }
+        }
+      });
+
+      // Immediate 202 Accepted response
+      return res.status(202).json({
+        jobId,
+        status: "RUNNING",
+        progress: 5,
+        message: "File uploaded successfully. Processing in background."
+      });
+    } catch (err) {
+      console.error("Error initiating async Excel import:", err);
+      return res.status(500).json({ error: err.message || "Failed to start import job" });
+    }
+  });
+
+  /**
+   * Polling Endpoint to retrieve the status and progress of an import job.
+   */
+  app.get("/api/maintenance/import-job/:jobId", (req, res) => {
+    const { jobId } = req.params;
+    const job = importJobs.get(jobId);
+    if (!job) {
+      return res.status(404).json({ error: "Import job not found or has expired" });
+    }
+    return res.status(200).json(job);
+  });
+
+  /**
+   * Imports maintenance orders from an uploaded Excel workbook (synchronous legacy endpoint).
    *
    * @param {import('express').Request} req HTTP request containing the uploaded file.
    * @param {import('express').Response} res HTTP response.
@@ -235,6 +343,71 @@ cds.on("bootstrap", (app) => {
       }
     },
   );
+
+  /**
+   * REST API Endpoint to query KPI Metrics directly from DB.
+   */
+  app.get("/api/maintenance/kpi-metrics", async (req, res) => {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const db = await cds.connect.to("db");
+
+      const sql = `
+        SELECT 
+          count(case when UPPER(status) = 'OPEN' then 1 end) as "openCount",
+          count(case when UPPER(status) in ('IN_PROCESS', 'IN PROCESS', 'IN-PROCESS') then 1 end) as "inProcessCount",
+          count(case when UPPER(priority) in ('CRITICAL', '1-VERY HIGH', 'VERY HIGH', '1') then 1 end) as "criticalCount",
+          count(case when scheduled_to < '${today}' and UPPER(status) not in ('COMPLETED', 'CANCELLED') then 1 end) as "overdueCount",
+          count(1) as "totalOrders",
+          sum(case 
+            when estimated_cost is not null and estimated_cost > 0 then estimated_cost
+            when UPPER(priority) in ('CRITICAL', '1-VERY HIGH', 'VERY HIGH', '1') then 15000
+            when UPPER(priority) in ('HIGH', '2-HIGH', '2') then 8000
+            when UPPER(priority) in ('MEDIUM', '3-MEDIUM', '3') then 3000
+            when UPPER(priority) in ('LOW', '4-LOW', '4') then 1000
+            else 0
+          end) as "rawEstimatedCost"
+        FROM sap_cap_maintenance_MaintenanceOrders
+      `;
+
+      let queryResult;
+      try {
+        queryResult = await db.run(sql);
+      } catch (tableErr) {
+        console.warn("[server.js] Table query failed, trying view...", tableErr.message);
+        const viewSql = sql.replace("sap_cap_maintenance_MaintenanceOrders", "MaintenanceService_MaintenanceOrders");
+        queryResult = await db.run(viewSql);
+      }
+
+      const row = (Array.isArray(queryResult) ? queryResult[0] : queryResult) || {};
+      const openCount = Number(row.openCount ?? row.OPENCOUNT ?? 0);
+      const inProcessCount = Number(row.inProcessCount ?? row.INPROCESSCOUNT ?? 0);
+      const criticalCount = Number(row.criticalCount ?? row.CRITICALCOUNT ?? 0);
+      const overdueCount = Number(row.overdueCount ?? row.OVERDUECOUNT ?? 0);
+      const totalOrders = Number(row.totalOrders ?? row.TOTALORDERS ?? 0);
+      const rawEstimatedCost = Number(row.rawEstimatedCost ?? row.RAWESTIMATEDCOST ?? 0);
+
+      let estimatedCost = `$${rawEstimatedCost.toFixed(0)}`;
+      if (rawEstimatedCost >= 1000000) {
+        estimatedCost = `$${(rawEstimatedCost / 1000000).toFixed(1)}M`;
+      } else if (rawEstimatedCost >= 1000) {
+        estimatedCost = `$${(rawEstimatedCost / 1000).toFixed(1)}K`;
+      }
+
+      res.json({
+        openCount,
+        inProcessCount,
+        criticalCount,
+        overdueCount,
+        totalOrders,
+        rawEstimatedCost,
+        estimatedCost,
+      });
+    } catch (err) {
+      console.error("[server.js] Error querying kpi metrics:", err);
+      res.status(500).json({ error: "Failed to query KPI metrics" });
+    }
+  });
 });
 
 module.exports = cds.server;

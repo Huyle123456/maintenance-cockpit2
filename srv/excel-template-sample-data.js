@@ -15,8 +15,8 @@ function getExcelTemplateSampleData() {
         planner: "JOHN",
         scheduledFrom: "2026-09-10",
         scheduledTo: "2026-09-15",
-        operations: "10:Visual pump inspection:2; 20:Dismantle housing:3.5; 30:Reassemble & test:2",
-        materials: "MAT-001:2; MAT-003:5",
+        operations: "",
+        materials: "",
       },
       {
         equipment: "EQ-002",
@@ -27,8 +27,8 @@ function getExcelTemplateSampleData() {
         planner: "SARAH",
         scheduledFrom: "2026-09-12",
         scheduledTo: "2026-09-18",
-        operations: "10:Measure bearing temp:1.5; 20:Grease motor bearings:1",
-        materials: "MAT-001:1; MAT-003:2",
+        operations: "",
+        materials: "",
       },
       {
         equipment: "EQ-003",
@@ -39,8 +39,8 @@ function getExcelTemplateSampleData() {
         planner: "ALEX",
         scheduledFrom: "2026-09-05",
         scheduledTo: "2026-09-05",
-        operations: "10:Isolate valve:1; 20:Replace valve core & seals:4",
-        materials: "MAT-002:1; MAT-005:8",
+        operations: "",
+        materials: "",
       },
       {
         equipment: "EQ-004",

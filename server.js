@@ -1,7 +1,22 @@
+const path = require('path');
 const cds = require('@sap/cds');
 const multer = require('multer');
 const ExcelJS = require('exceljs');
-const { processExcelImport } = require('./srv/excel-import-service');
+
+function resolveLocalModule(name) {
+  try {
+    return require(`./${name}`);
+  } catch (e1) {
+    try {
+      return require(`./srv/${name}`);
+    } catch (e2) {
+      return require(path.join(__dirname, name));
+    }
+  }
+}
+
+const { processExcelImport } = resolveLocalModule('excel-import-service');
+const { getExcelTemplateSampleData } = resolveLocalModule('excel-template-sample-data');
 
 // Configure multer for file uploads in memory buffer
 const upload = multer({
@@ -41,6 +56,7 @@ cds.on('bootstrap', (app) => {
       const workbook = new ExcelJS.Workbook();
       workbook.creator = 'SAP Maintenance Cockpit';
       workbook.created = new Date();
+      const sampleData = getExcelTemplateSampleData();
 
       // ==========================================
       // Sheet 1: Maintenance Orders (Header)
@@ -126,14 +142,7 @@ cds.on('bootstrap', (app) => {
       headerMats.height = 24;
       headerMats.alignment = { vertical: 'middle', horizontal: 'center' };
 
-      wsMaterials.addRows([
-        { order: 'MO-2001', material: 'MAT-001', qty: 2, unit: 'EA' },
-        { order: 'MO-2001', material: 'MAT-003', qty: 5, unit: 'L' },
-        { order: 'MO-2002', material: 'MAT-001', qty: 1, unit: 'EA' },
-        { order: 'MO-2002', material: 'MAT-003', qty: 2, unit: 'L' },
-        { order: 'MO-2003', material: 'MAT-002', qty: 1, unit: 'EA' },
-        { order: 'MO-2003', material: 'MAT-005', qty: 8, unit: 'SET' }
-      ]);
+      wsMaterials.addRows(sampleData.materials);
 
       // ==========================================
       // Sheet 4: Master Data Reference
@@ -159,34 +168,7 @@ cds.on('bootstrap', (app) => {
       headerRef.height = 24;
       headerRef.alignment = { vertical: 'middle', horizontal: 'center' };
 
-      wsRef.addRows([
-        { category: 'Equipment', key: 'EQ-001', details: 'Centrifugal Pump A1 (Plant 1000)', price: '' },
-        { category: 'Equipment', key: 'EQ-002', details: 'Hydraulic Motor B2 (Plant 2000)', price: '' },
-        { category: 'Equipment', key: 'EQ-003', details: 'Safety Valve C3 (Plant 3000)', price: '' },
-        { category: 'Equipment', key: 'EQ-004', details: 'Belt Conveyor D4 (Plant 1000)', price: '' },
-        { category: 'Equipment', key: 'EQ-005', details: 'Gas Turbine E5 (Plant 2000)', price: '' },
-        { category: 'Plant', key: '1000', details: 'Main Production Plant', price: '' },
-        { category: 'Plant', key: '2000', details: 'Chemical Processing Plant', price: '' },
-        { category: 'Plant', key: '3000', details: 'Assembly & Packaging Plant', price: '' },
-        { category: 'Maintenance Type', key: 'PREVENTIVE', details: 'Planned preventive maintenance', price: '' },
-        { category: 'Maintenance Type', key: 'CORRECTIVE', details: 'Corrective maintenance after fault', price: '' },
-        { category: 'Maintenance Type', key: 'EMERGENCY', details: 'Immediate emergency breakdown fix', price: '' },
-        { category: 'Priority', key: 'LOW', details: 'Low priority (normal SLA)', price: '' },
-        { category: 'Priority', key: 'MEDIUM', details: 'Medium standard priority', price: '' },
-        { category: 'Priority', key: 'HIGH', details: 'High priority maintenance', price: '' },
-        { category: 'Priority', key: 'CRITICAL', details: 'Critical (Same-day schedule mandatory)', price: '' },
-        { category: 'Planner', key: 'JOHN', details: 'John Doe (Mechanical Lead)', price: '' },
-        { category: 'Planner', key: 'SARAH', details: 'Sarah Connor (Automation Lead)', price: '' },
-        { category: 'Planner', key: 'ALEX', details: 'Alex Smith (Electrical Lead)', price: '' },
-        { category: 'Work Center', key: 'WC-001', details: 'Mechanical Workshop 1', price: '' },
-        { category: 'Work Center', key: 'WC-002', details: 'Electrical Workshop 2', price: '' },
-        { category: 'Work Center', key: 'WC-003', details: 'Hydraulics Workshop 3', price: '' },
-        { category: 'Material Master', key: 'MAT-001', details: 'Heavy Duty Ball Bearing (EA)', price: '25.00' },
-        { category: 'Material Master', key: 'MAT-002', details: 'High Pressure Seal Kit (EA)', price: '40.00' },
-        { category: 'Material Master', key: 'MAT-003', details: 'Synthetic Industrial Lubricant (L)', price: '25.00' },
-        { category: 'Material Master', key: 'MAT-004', details: 'Flexible Motor Coupling (EA)', price: '150.00' },
-        { category: 'Material Master', key: 'MAT-005', details: 'Stainless Steel Bolts & Nuts (SET)', price: '10.00' }
-      ]);
+      wsRef.addRows(sampleData.masterData);
 
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', 'attachment; filename="MaintenanceOrders_Template.xlsx"');
@@ -199,7 +181,101 @@ cds.on('bootstrap', (app) => {
     }
   });
 
-  // Backend Excel Import Endpoint via ExcelJS
+  // In-memory registry for asynchronous background import jobs
+  const importJobs = new Map();
+
+  // Periodically clean up jobs older than 1 hour to prevent memory leaks
+  setInterval(() => {
+    const oneHourAgo = Date.now() - 60 * 60 * 1000;
+    for (const [id, job] of importJobs.entries()) {
+      if (job.createdAt < oneHourAgo) {
+        importJobs.delete(id);
+      }
+    }
+  }, 15 * 60 * 1000);
+
+  /**
+   * Asynchronous Excel Import Endpoint.
+   * Immediately returns HTTP 202 Accepted with a jobId (< 500ms) to prevent HTTP 504 timeout.
+   * Processes the file in the background while updating the job's progress.
+   */
+  app.post('/api/maintenance/import-excel-async', upload.single('file'), (req, res) => {
+    try {
+      if (!req.file || !req.file.buffer) {
+        return res.status(400).json({ error: 'No Excel file uploaded' });
+      }
+
+      const jobId = `job-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+      const currentUser = req.user?.id || 'Administrator';
+      const fileBuffer = req.file.buffer;
+
+      const jobRecord = {
+        jobId,
+        status: 'RUNNING',
+        progress: 5,
+        message: 'File received. Starting background worker...',
+        result: null,
+        error: null,
+        createdAt: Date.now()
+      };
+      importJobs.set(jobId, jobRecord);
+
+      // Execute import in the background without blocking the HTTP response
+      setImmediate(async () => {
+        try {
+          const result = await processExcelImport(fileBuffer, currentUser, {
+            onProgress: ({ percent, message }) => {
+              const current = importJobs.get(jobId);
+              if (current && current.status === 'RUNNING') {
+                current.progress = percent;
+                current.message = message;
+              }
+            }
+          });
+          const current = importJobs.get(jobId);
+          if (current) {
+            current.status = 'COMPLETED';
+            current.progress = 100;
+            current.message = 'Import completed successfully.';
+            current.result = result;
+          }
+        } catch (err) {
+          console.error(`[AsyncImport] Job ${jobId} failed:`, err);
+          const current = importJobs.get(jobId);
+          if (current) {
+            current.status = 'FAILED';
+            current.message = err.message || 'Import failed';
+            current.error = err.message || 'Import failed';
+          }
+        }
+      });
+
+      // Immediate 202 Accepted response
+      return res.status(202).json({
+        jobId,
+        status: 'RUNNING',
+        progress: 5,
+        message: 'File uploaded successfully. Processing in background.'
+      });
+    } catch (err) {
+      console.error('Error initiating async Excel import:', err);
+      return res.status(500).json({ error: err.message || 'Failed to start import job' });
+    }
+  });
+
+  /**
+   * Polling Endpoint to retrieve the status and progress of an import job.
+   */
+  app.get('/api/maintenance/import-job/:jobId', (req, res) => {
+    const { jobId } = req.params;
+    const job = importJobs.get(jobId);
+    if (!job) {
+      return res.status(404).json({ error: 'Import job not found or has expired' });
+    }
+    return res.status(200).json(job);
+  });
+
+  // Backend Excel Import Endpoint via ExcelJS (synchronous legacy endpoint)
   app.post('/api/maintenance/import-excel', upload.single('file'), async (req, res) => {
     try {
       if (!req.file || !req.file.buffer) {
