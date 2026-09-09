@@ -73,11 +73,11 @@ module.exports = cds.service.impl(async function () {
         count(case when scheduled_to < '${today}' and UPPER(status) not in ('COMPLETED', 'CANCELLED') then 1 end) as "overdueCount",
         count(1) as "totalOrders",
         sum(case 
-          when estimated_cost is not null and estimated_cost > 0 then estimated_cost
           when UPPER(priority) in ('CRITICAL', '1-VERY HIGH', 'VERY HIGH', '1') then 15000
           when UPPER(priority) in ('HIGH', '2-HIGH', '2') then 8000
           when UPPER(priority) in ('MEDIUM', '3-MEDIUM', '3') then 3000
           when UPPER(priority) in ('LOW', '4-LOW', '4') then 1000
+          when estimated_cost is not null and estimated_cost > 0 then estimated_cost
           else 0
         end) as "rawEstimatedCost"
       FROM sap_cap_maintenance_MaintenanceOrders
@@ -102,7 +102,9 @@ module.exports = cds.service.impl(async function () {
       const rawEstimatedCost = Number(row.rawEstimatedCost ?? row.RAWESTIMATEDCOST ?? 0);
 
       let estimatedCost = `$${rawEstimatedCost.toFixed(0)}`;
-      if (rawEstimatedCost >= 1000000) {
+      if (rawEstimatedCost >= 1000000000) {
+        estimatedCost = `$${(rawEstimatedCost / 1000000000).toFixed(1)}B`;
+      } else if (rawEstimatedCost >= 1000000) {
         estimatedCost = `$${(rawEstimatedCost / 1000000).toFixed(1)}M`;
       } else if (rawEstimatedCost >= 1000) {
         estimatedCost = `$${(rawEstimatedCost / 1000).toFixed(1)}K`;

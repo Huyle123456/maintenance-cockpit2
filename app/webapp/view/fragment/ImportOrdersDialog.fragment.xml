@@ -16,7 +16,7 @@
                 <!-- Instruction & Mode Banner -->
                 <MessageStrip
                     id="importOrdersBackendBanner"
-                    text="Supports Multi-Sheet Excel: Sheet 1 (Orders), Sheet 2 (Operations), Sheet 3 (Materials), and Sheet 4 (Master Data Lookup). Single-sheet inline syntax is also supported."
+                    text="{i18n>importOrdersBannerText}"
                     type="Information"
                     showIcon="true"
                     class="sapUiSmallMarginBottom"
@@ -39,7 +39,7 @@
                             change=".onImportFileChange"
                             width="400px"
                             buttonOnly="false"
-                            buttonText="Browse Excel..."
+                            buttonText="{i18n>importOrdersBrowseButton}"
                             icon="sap-icon://attachment"
                             class="sapUiSmallMarginEnd"
                         />
@@ -56,7 +56,7 @@
                 <!-- Selected File Info Card -->
                 <Panel
                     id="pnlSelectedFileInfo"
-                    headerText="Selected File Summary"
+                    headerText="{i18n>importOrdersSelectedSummary}"
                     expandable="false"
                     expanded="true"
                     visible="{= !!${importModel>/fileName} }"
@@ -64,15 +64,15 @@
                 >
                     <VBox class="sapUiSmallMargin">
                         <HBox alignItems="Center" class="sapUiTinyMarginBottom">
-                            <Label text="File Name:" width="120px" design="Bold" />
+                            <Label text="{i18n>importOrdersFileName}" width="120px" design="Bold" />
                             <Text text="{importModel>/fileName}" />
                         </HBox>
                         <HBox alignItems="Center" class="sapUiTinyMarginBottom">
-                            <Label text="File Size:" width="120px" design="Bold" />
+                            <Label text="{i18n>importOrdersFileSize}" width="120px" design="Bold" />
                             <Text text="{importModel>/fileSize}" />
                         </HBox>
                         <HBox alignItems="Center">
-                            <Label text="Status:" width="120px" design="Bold" />
+                            <Label text="{i18n>importOrdersStatus}" width="120px" design="Bold" />
                             <ObjectStatus
                                 text="{importModel>/statusText}"
                                 state="{importModel>/statusState}"
@@ -96,7 +96,7 @@
                 <!-- Progress Indicator for Background Async Processing -->
                 <VBox visible="{= !!${importModel>/isProcessing} }" class="sapUiSmallMarginTop">
                     <HBox justifyContent="SpaceBetween" alignItems="Center" class="sapUiTinyMarginBottom">
-                        <Label text="Background Processing Progress:" design="Bold" />
+                        <Label text="{i18n>importOrdersProgressLabel}" design="Bold" />
                         <Text text="{importModel>/progressPercent}%" class="sapUiTinyMarginEnd" />
                     </HBox>
                     <ProgressIndicator
@@ -108,12 +108,29 @@
                         height="1.5rem"
                     />
                 </VBox>
+
+                <!-- Error Notice and Download Button if previous import had errors -->
+                <VBox visible="{= !!${importModel>/hasErrors} }" class="sapUiSmallMarginTop">
+                    <MessageStrip
+                        text="{i18n>importOrdersRecentErrorsNotice}"
+                        type="Warning"
+                        showIcon="true"
+                        class="sapUiTinyMarginBottom"
+                    />
+                    <Button
+                        id="btnDownloadLastErrors"
+                        text="{i18n>importOrdersRecentErrorsBtn}"
+                        icon="sap-icon://excel-attachment"
+                        type="Reject"
+                        press=".onDownloadErrorRowsFile"
+                    />
+                </VBox>
             </VBox>
         </content>
         <beginButton>
             <Button
                 id="btnConfirmImport"
-                text="{= ${importModel>/isProcessing} ? 'Processing in Background...' : 'Upload &amp; Process on Backend' }"
+                text="{= ${importModel>/isProcessing} ? ${i18n>importOrdersBtnProcessing} : ${i18n>importOrdersBtnUpload} }"
                 type="Emphasized"
                 icon="{= ${importModel>/isProcessing} ? 'sap-icon://synchronize' : 'sap-icon://upload' }"
                 enabled="{= ${importModel>/canImport} &amp;&amp; !${importModel>/isProcessing} }"
@@ -123,7 +140,7 @@
         <endButton>
             <Button
                 id="btnCancelImport"
-                text="{= ${importModel>/isProcessing} ? 'Run in Background (Close)' : ${i18n>commonCancel} }"
+                text="{= ${importModel>/isProcessing} ? ${i18n>importOrdersBtnCloseBackground} : ${i18n>commonCancel} }"
                 press=".onCancelImportOrders"
             />
         </endButton>

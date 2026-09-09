@@ -4,13 +4,12 @@
     xmlns="sap.uxap"
     xmlns:f="sap.f"
     xmlns:card="sap.f.cards"
-    xmlns:suite="sap.suite.ui.commons"
     xmlns:m="sap.m"
     xmlns:l="sap.ui.layout"
     height="100%"
 >
     <m:Page
-        id="page"
+        id="maintenanceOrderDetailPage"
         showNavButton="true"
         navButtonPress=".onBack"
         title="{i18n>maintenanceOrdersPageTitle}"
@@ -1199,27 +1198,22 @@
                                                     width="100%"
                                                     class="sapUiSmallMargin"
                                                 >
-                                                    <suite:Timeline
-                                                        id="mod_historyTimeline"
-                                                        content="{orderDetail>/history}"
-                                                        enableDoubleSided="false"
-                                                        growingThreshold="0"
-                                                        sortOldestFirst="false"
-                                                        showIcons="true"
-                                                        showFilterBar="false"
-                                                        axisOrientation="Vertical"
-                                                    >
-                                                        <suite:content>
-                                                            <suite:TimelineItem
-                                                                dateTime="{orderDetail>dateTime}"
-                                                                title="{orderDetail>title}"
-                                                                userName="{orderDetail>userName}"
-                                                                text="{orderDetail>text}"
-                                                                icon="{orderDetail>icon}"
-                                                                userNameClickable="false"
-                                                            />
-                                                        </suite:content>
-                                                    </suite:Timeline>
+                                                <m:List
+                                                    id="mod_historyList"
+                                                    items="{orderDetail>/history}"
+                                                    showSeparators="All"
+                                                    noDataText="{i18n>auditHistoryNoDataText}"
+                                                    class="sapUiSmallMargin"
+                                                >
+                                                    <m:FeedListItem
+                                                        id="mod_historyFeedItem"
+                                                        sender="{orderDetail>userName}"
+                                                        icon="{orderDetail>icon}"
+                                                        info="{orderDetail>title}"
+                                                        timestamp="{orderDetail>dateTime}"
+                                                        text="{orderDetail>text}"
+                                                    />
+                                                </m:List>
                                                 </m:VBox>
                                             </m:ScrollContainer>
                                         </f:content>

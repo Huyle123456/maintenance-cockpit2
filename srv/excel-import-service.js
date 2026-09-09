@@ -1,6 +1,7 @@
 const ExcelJS = require("exceljs");
 const XLSX = require("xlsx");
 const cds = global.cds || require("@sap/cds");
+const { getText } = require("./i18n");
 
 /**
  * Normalizes a date value to the YYYY-MM-DD format.
@@ -180,6 +181,163 @@ async function batchInsert(entity, entries, batchSize = 500) {
 }
 
 /**
+ * Validates and converts raw date value to YYYY-MM-DD format.
+ * Returns { valid: true, dateStr: 'YYYY-MM-DD' } or { valid: false, error: '...' }
+ *
+ * @param {*} rawDate
+ * @param {string} [locale="vi"]
+ * @returns {{ valid: boolean, dateStr?: string, error?: string }}
+ */
+function parseAndValidateDate(rawDate, locale = "vi") {
+  if (!rawDate) {
+    return { valid: true, dateStr: new Date().toISOString().slice(0, 10) };
+  }
+  if (rawDate instanceof Date) {
+    if (!isNaN(rawDate.getTime())) {
+      return { valid: true, dateStr: rawDate.toISOString().slice(0, 10) };
+    }
+    return { valid: false, error: getText("importExcelDateInvalidObject", [], locale) };
+  }
+
+  // Check Excel serial number
+  if (
+    typeof rawDate === "number" ||
+    (!isNaN(rawDate) &&
+      !isNaN(parseFloat(rawDate)) &&
+      String(rawDate).indexOf("-") === -1 &&
+      String(rawDate).indexOf("/") === -1)
+  ) {
+    const serial = parseFloat(rawDate);
+    if (serial > 1000 && serial < 100000) {
+      const utcDays = Math.floor(serial - 25569);
+      const utcValue = utcDays * 86400;
+      const dateInfo = new Date(utcValue * 1000);
+      if (!isNaN(dateInfo.getTime())) {
+        return { valid: true, dateStr: dateInfo.toISOString().slice(0, 10) };
+      }
+    }
+    return { valid: false, error: getText("importExcelDateSerialInvalid", [rawDate], locale) };
+  }
+
+  const s = String(rawDate).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const [y, m, d] = s.split("-").map(Number);
+    const dt = new Date(y, m - 1, d);
+    if (dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d) {
+      return { valid: true, dateStr: s };
+    }
+    return { valid: false, error: getText("importExcelDateNonExistent", [s], locale) };
+  }
+
+  const dmyMatch = s.match(/^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})$/);
+  if (dmyMatch) {
+    let day = parseInt(dmyMatch[1], 10);
+    let month = parseInt(dmyMatch[2], 10);
+    const year = parseInt(dmyMatch[3], 10);
+    if (month > 12 && day <= 12) {
+      const temp = day;
+      day = month;
+      month = temp;
+    }
+    const dt = new Date(year, month - 1, day);
+    if (dt.getFullYear() === year && dt.getMonth() === month - 1 && dt.getDate() === day) {
+      const mm = String(month).padStart(2, "0");
+      const dd = String(day).padStart(2, "0");
+      return { valid: true, dateStr: `${year}-${mm}-${dd}` };
+    }
+    return { valid: false, error: getText("importExcelDateInvalid", [s], locale) };
+  }
+
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) {
+    return { valid: true, dateStr: d.toISOString().slice(0, 10) };
+  }
+  return { valid: false, error: getText("importExcelDateUnrecognized", [s], locale) };
+}
+
+/**
+ * Generates an Excel workbook buffer containing failed rows with error reasons.
+ *
+ * @param {Array<object>} errorList Array of error items with { row, order, error, rawRow }
+ * @param {string} [locale="vi"]
+ * @returns {Promise<Buffer>} Excel buffer
+ */
+async function generateErrorWorkbookBuffer(errorList, locale = "vi") {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "SAP Maintenance Cockpit";
+  workbook.created = new Date();
+
+  const ws = workbook.addWorksheet("MaintenanceOrders_Errors", {
+    views: [{ showGridLines: true }]
+  });
+
+  ws.columns = [
+    { header: "Line", key: "row", width: 8 },
+    { header: "OrderNo", key: "order", width: 14 },
+    { header: "Equipment", key: "equipment", width: 16 },
+    { header: "Description", key: "description", width: 38 },
+    { header: "Plant", key: "plant", width: 12 },
+    { header: "Type", key: "type", width: 16 },
+    { header: "Priority", key: "priority", width: 14 },
+    { header: "Planner", key: "planner", width: 16 },
+    { header: "ScheduledFrom", key: "scheduledFrom", width: 16 },
+    { header: "ScheduledTo", key: "scheduledTo", width: 16 },
+    { header: "Operations", key: "operations", width: 35 },
+    { header: "Materials", key: "materials", width: 30 },
+    { header: getText("importExcelErrorColHeader", [], locale), key: "errorReason", width: 50 },
+  ];
+
+  const headerRow = ws.getRow(1);
+  headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
+  headerRow.height = 26;
+  headerRow.alignment = { vertical: "middle", horizontal: "center" };
+
+  for (let c = 1; c <= 12; c++) {
+    const cell = headerRow.getCell(c);
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF004B87" } // SAP Fiori Blue
+    };
+  }
+  const errorColCell = headerRow.getCell(13);
+  errorColCell.fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FFD32F2F" } // Danger Red
+  };
+
+  errorList.forEach((item) => {
+    const raw = item.rawRow || {};
+    const row = ws.addRow({
+      row: item.row,
+      order: raw.order || item.order || "",
+      equipment: raw.equipment || "",
+      description: raw.description || "",
+      plant: raw.plant || "",
+      type: raw.type || "",
+      priority: raw.priority || "",
+      planner: raw.planner || "",
+      scheduledFrom: raw.scheduledFrom || "",
+      scheduledTo: raw.scheduledTo || "",
+      operations: raw.operations || "",
+      materials: raw.materials || "",
+      errorReason: item.error || raw.errorReason || "",
+    });
+
+    const errCell = row.getCell(13);
+    errCell.font = { color: { argb: "FFC62828" }, bold: true };
+    errCell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFFFEBEE" }
+    };
+  });
+
+  return await workbook.xlsx.writeBuffer();
+}
+
+/**
  * High-performance Process Excel file buffer supporting 50,000+ rows.
  *
  * @param {Buffer|import('stream').Readable} fileSource File buffer or stream.
@@ -193,6 +351,9 @@ async function processExcelImport(
   options = {},
 ) {
   const startTime = Date.now();
+  const locale = options.locale || "vi";
+  const t = (key, args) => getText(key, args, locale);
+
   const notifyProgress = (percent, message) => {
     if (typeof options.onProgress === "function") {
       try {
@@ -203,9 +364,10 @@ async function processExcelImport(
     }
   };
 
-  notifyProgress(5, "Loading master data cache...");
+  notifyProgress(5, t("importExcelProgressLoadingMasterData"));
 
   const db = await cds.connect.to("db");
+  if (!cds.db) cds.db = db;
   if (!cds.model) {
     cds.model = await cds.load("*");
   }
@@ -291,7 +453,7 @@ async function processExcelImport(
   let nextOrderNum = maxOrderSeq + 1;
 
   // Step 2: Read Excel buffer using high-speed SheetJS parser
-  notifyProgress(15, "Reading Excel workbook...");
+  notifyProgress(15, t("importExcelProgressReadingWorkbook"));
   let buffer = fileSource;
   if (!Buffer.isBuffer(fileSource)) {
     const chunks = [];
@@ -309,7 +471,7 @@ async function processExcelImport(
 
   const sheetNames = workbook.SheetNames || [];
   if (sheetNames.length === 0) {
-    throw new Error("Uploaded workbook contains no sheets.");
+    throw new Error(t("importExcelNoSheets"));
   }
 
   // Identify worksheets
@@ -336,7 +498,7 @@ async function processExcelImport(
   );
 
   if (!orderRowsRaw || orderRowsRaw.length === 0) {
-    throw new Error("The uploaded Excel file has no order rows to process.");
+    throw new Error(t("importExcelNoOrderRows"));
   }
 
   // Step 3: Parse Operations sheet (if present)
@@ -366,7 +528,7 @@ async function processExcelImport(
       const rawDesc = getRowField(
         norm,
         ["description", "operationdescription", "task", "desc"],
-        "Inspection & Maintenance",
+        t("importExcelDefaultInspection"),
       );
       const rawWc = getRowField(norm, ["workcenter", "wc"], "WC-001");
       const rawTech = getRowField(
@@ -473,7 +635,7 @@ async function processExcelImport(
   for (let idx = 0; idx < orderRowsRaw.length; idx++) {
     if (idx % 100 === 0 || idx === orderRowsRaw.length - 1) {
       const pct = Math.min(65, Math.round(20 + ((idx + 1) / orderRowsRaw.length) * 45));
-      notifyProgress(pct, `Validating order row ${idx + 1} of ${orderRowsRaw.length}...`);
+      notifyProgress(pct, t("importExcelProgressValidatingRow", [idx + 1, orderRowsRaw.length]));
     }
     const row = orderRowsRaw[idx];
     const rowNumber = idx + 2;
@@ -524,11 +686,15 @@ async function processExcelImport(
     ]);
     const inlineOps = getRowField(norm, [
       "operations",
+      "operationsinlineoptional",
+      "operationsinline",
       "operationlist",
       "tasks",
     ]);
     const inlineMats = getRowField(norm, [
       "materials",
+      "materialsinlineoptional",
+      "materialsinline",
       "materiallist",
       "parts",
     ]);
@@ -546,13 +712,113 @@ async function processExcelImport(
 
     totalRows++;
 
-    // Equipment validation & fallback
+    const rowErrors = [];
+
+    // 1. Equipment validation (Mandatory & Must exist in master data)
     let equipmentNo = rawEquipment ? rawEquipment.trim().toUpperCase() : "";
-    if (
-      !equipmentNo ||
-      (setEquipments.size > 0 && !setEquipments.has(equipmentNo))
-    ) {
-      equipmentNo = "EQ-001";
+    if (!equipmentNo) {
+      rowErrors.push(t("importExcelEquipmentRequired"));
+    } else if (setEquipments.size > 0 && !setEquipments.has(equipmentNo)) {
+      rowErrors.push(t("importExcelEquipmentNotFound", [rawEquipment.trim()]));
+    }
+
+    // 2. Description validation (Mandatory)
+    const description = rawDescription ? rawDescription.trim() : "";
+    if (!description) {
+      rowErrors.push(t("importExcelDescriptionRequired"));
+    }
+
+    // 3. Plant validation
+    let plant = rawPlant ? rawPlant.trim().toUpperCase() : "";
+    if (!plant) {
+      plant = "1000"; // default plant if not provided
+    } else if (setPlants.size > 0 && !setPlants.has(plant)) {
+      rowErrors.push(t("importExcelPlantNotFound", [rawPlant.trim()]));
+    }
+
+    // 4. Date validation
+    let scheduledFrom = "";
+    let scheduledTo = "";
+    if (rawFrom) {
+      const vFrom = parseAndValidateDate(rawFrom, locale);
+      if (!vFrom.valid) {
+        rowErrors.push(vFrom.error || t("importExcelDateInvalid", [rawFrom]));
+      } else {
+        scheduledFrom = vFrom.dateStr;
+      }
+    } else {
+      scheduledFrom = new Date().toISOString().slice(0, 10);
+    }
+
+    if (rawTo) {
+      const vTo = parseAndValidateDate(rawTo, locale);
+      if (!vTo.valid) {
+        rowErrors.push(vTo.error || t("importExcelDateEndInvalid", [rawTo]));
+      } else {
+        scheduledTo = vTo.dateStr;
+      }
+    } else {
+      scheduledTo = scheduledFrom;
+    }
+
+    if (scheduledFrom && scheduledTo && scheduledFrom > scheduledTo) {
+      rowErrors.push(t("importExcelDateFromAfterTo", [scheduledFrom, scheduledTo]));
+    }
+
+    // 5. Inline Operations syntax validation
+    if (inlineOps) {
+      const parts = String(inlineOps).split(/[;,|]+/);
+      for (const p of parts) {
+        const segs = p.split(":");
+        if (segs.length > 2) {
+          const rawH = segs[2].trim();
+          const numH = parseFloat(rawH);
+          if (isNaN(numH) || numH < 0) {
+            rowErrors.push(t("importExcelOpHoursInvalid", [p.trim()]));
+            break;
+          }
+        }
+      }
+    }
+
+    // 6. Inline Materials syntax validation
+    if (inlineMats) {
+      const parts = String(inlineMats).split(/[;,|]+/);
+      for (const p of parts) {
+        const segs = p.split(":");
+        if (segs.length > 1) {
+          const rawQ = segs[1].trim();
+          const numQ = parseFloat(rawQ);
+          if (isNaN(numQ) || numQ <= 0) {
+            rowErrors.push(t("importExcelMatQtyInvalid", [p.trim()]));
+            break;
+          }
+        }
+      }
+    }
+
+    // If row has any errors, collect it into errors list and skip saving
+    if (rowErrors.length > 0) {
+      errors.push({
+        row: rowNumber,
+        order: rawOrderNo || t("importExcelLineFallback", [rowNumber]),
+        error: rowErrors.join("; "),
+        rawRow: {
+          order: rawOrderNo || "",
+          equipment: rawEquipment || "",
+          description: rawDescription || "",
+          plant: rawPlant || "",
+          type: rawType || "",
+          priority: rawPriority || "",
+          planner: rawPlanner || "",
+          scheduledFrom: rawFrom || "",
+          scheduledTo: rawTo || "",
+          operations: inlineOps || "",
+          materials: inlineMats || "",
+          errorReason: rowErrors.join("; ")
+        }
+      });
+      continue;
     }
 
     // Assign sequential MO- number if not an existing order
@@ -576,12 +842,6 @@ async function processExcelImport(
     }
     seenOrderNosInFile.add(finalOrderNo);
 
-    const description = rawDescription || `Maintenance for ${equipmentNo}`;
-    let plant = rawPlant ? rawPlant.trim().toUpperCase() : "1000";
-    if (setPlants.size > 0 && !setPlants.has(plant)) {
-      plant = "1000";
-    }
-
     const maintenanceType = normalizeMaintenanceType(rawType);
     const { priority, priorityState } = normalizePriority(rawPriority);
     let planner = rawPlanner ? rawPlanner.trim() : "";
@@ -590,26 +850,18 @@ async function processExcelImport(
         currentUser && currentUser !== "Current User" ? currentUser : "JOHN";
     }
 
-    let scheduledFrom = normalizeDate(rawFrom);
-    let scheduledTo = normalizeDate(rawTo || rawFrom);
-    if (scheduledFrom && scheduledTo && scheduledFrom > scheduledTo) {
-      const temp = scheduledFrom;
-      scheduledFrom = scheduledTo;
-      scheduledTo = temp;
-    }
-
     // Parse Inline Operations
     const rowOps = [];
     if (inlineOps) {
       const parts = String(inlineOps).split(/[;,|]+/);
       parts.forEach((p, pIdx) => {
-        const segs = p.split(/[:\-]/);
+        const segs = p.split(":");
         const opNo =
           segs.length > 1 ? segs[0].trim() : String((pIdx + 1) * 10);
         const opDesc = segs.length > 1 ? segs[1].trim() : segs[0].trim();
         const opHours =
           segs.length > 2
-            ? parseFloat(segs[2].replace(/[^\d.]/g, "")) || 2.0
+            ? parseFloat(segs[2].trim()) || 2.0
             : 2.0;
         if (opDesc) {
           rowOps.push({
@@ -631,11 +883,11 @@ async function processExcelImport(
     if (inlineMats) {
       const parts = String(inlineMats).split(/[;,|]+/);
       parts.forEach((p) => {
-        const segs = p.split(/[:\-xX\s*]+/);
+        const segs = p.split(":");
         const matKey = segs[0]?.trim()?.toUpperCase();
         const matQty =
           segs.length > 1
-            ? parseFloat(segs[1].replace(/[^\d.]/g, "")) || 1.0
+            ? parseFloat(segs[1].trim()) || 1.0
             : 1.0;
         if (matKey) {
           const catalogItem = mapMaterialsCatalog.get(matKey) || {
@@ -695,7 +947,7 @@ async function processExcelImport(
       finalOps.push({
         order_no: finalOrderNo,
         no: opNo,
-        description: op.description || "Maintenance Operation",
+        description: op.description || t("importExcelDefaultTask"),
         workCenter: op.workCenter || "WC-001",
         technician: op.technician || "T-001",
         plannedHours: Number(op.plannedHours) || 2.0,
@@ -708,7 +960,7 @@ async function processExcelImport(
       finalOps.push({
         order_no: finalOrderNo,
         no: "10",
-        description: "Standard Maintenance & Inspection",
+        description: t("importExcelDefaultOpDesc"),
         workCenter: "WC-001",
         technician: "T-001",
         plannedHours: 2.0,
@@ -798,10 +1050,10 @@ async function processExcelImport(
       historyToInsert.push({
         ID: cds.utils?.uuid ? cds.utils.uuid() : require("crypto").randomUUID(),
         order_no: finalOrderNo,
-        title: isUpdate ? "Order updated via import" : "Order created",
+        title: isUpdate ? t("importExcelHistoryOrderUpdated") : t("importExcelHistoryOrderCreated"),
         dateTime: timestampStr,
         userName: currentUser,
-        text: `Maintenance order synced with ${finalOps.length} op(s).`,
+        text: t("importExcelHistorySyncText", [finalOps.length]),
         icon: isUpdate ? "sap-icon://synchronize" : "sap-icon://create",
       });
     }
@@ -811,115 +1063,135 @@ async function processExcelImport(
   }
 
   // Step 6: Chunked Database Transactions (prevents SQLite/HANA parameter limits)
-  notifyProgress(70, `Saving ${ordersToInsert.length + ordersToUpdate.length} orders to database...`);
-  await cds.tx(async () => {
-    // 0. Clean any pre-existing operations and materials for all orders being processed
-    const allProcessedOrderNos = [
-      ...ordersToInsert.map((o) => o.order_no),
-      ...ordersToUpdate.map((o) => o.order_no),
-    ];
-    if (allProcessedOrderNos.length > 0) {
-      for (let i = 0; i < allProcessedOrderNos.length; i += 200) {
-        const chunk = allProcessedOrderNos.slice(i, i + 200);
-        await DELETE.from(MaintenanceOperations).where({ order_no: { in: chunk } });
-        await DELETE.from(OrderMaterials).where({ order_no: { in: chunk } });
+  notifyProgress(70, t("importExcelProgressSavingOrders", [ordersToInsert.length + ordersToUpdate.length]));
+  if (ordersToInsert.length > 0 || ordersToUpdate.length > 0) {
+    await cds.tx(async () => {
+      // 0. Clean any pre-existing operations and materials for all orders being processed
+      const allProcessedOrderNos = [
+        ...ordersToInsert.map((o) => o.order_no),
+        ...ordersToUpdate.map((o) => o.order_no),
+      ];
+      if (allProcessedOrderNos.length > 0) {
+        for (let i = 0; i < allProcessedOrderNos.length; i += 200) {
+          const chunk = allProcessedOrderNos.slice(i, i + 200);
+          await DELETE.from(MaintenanceOperations).where({ order_no: { in: chunk } });
+          await DELETE.from(OrderMaterials).where({ order_no: { in: chunk } });
+        }
       }
-    }
 
-    // 1. Insert new orders in batches of 500
-    await batchInsert(MaintenanceOrders, ordersToInsert, 500);
+      // 1. Insert new orders in batches of 500
+      await batchInsert(MaintenanceOrders, ordersToInsert, 500);
 
-    // 2. Update existing orders
-    for (const ord of ordersToUpdate) {
-      await UPDATE.entity(MaintenanceOrders)
-        .where({ order_no: ord.order_no })
-        .set({
-          equipment_no: ord.equipment_no,
-          description: ord.description,
-          plant: ord.plant,
-          maintenance_type: ord.maintenance_type,
-          priority: ord.priority,
-          priority_state: ord.priority_state,
-          planner: ord.planner,
-          scheduled_from: ord.scheduled_from,
-          scheduled_to: ord.scheduled_to,
-          operation_count: ord.operation_count,
-          planned_hours: ord.planned_hours,
-          estimated_cost: ord.estimated_cost,
-          etag: ord.etag,
-        });
-    }
-
-    notifyProgress(85, "Saving operations and materials...");
-    // 3. Batch save operations (safeguard deduplication by order_no + no)
-    const uniqueOpsMap = new Map();
-    const cleanOperations = [];
-    for (const op of operationsToSave) {
-      const key = `${op.order_no}#${op.no}`;
-      if (!uniqueOpsMap.has(key)) {
-        uniqueOpsMap.set(key, true);
-        cleanOperations.push(op);
+      // 2. Update existing orders
+      for (const ord of ordersToUpdate) {
+        await UPDATE.entity(MaintenanceOrders)
+          .where({ order_no: ord.order_no })
+          .set({
+            equipment_no: ord.equipment_no,
+            description: ord.description,
+            plant: ord.plant,
+            maintenance_type: ord.maintenance_type,
+            priority: ord.priority,
+            priority_state: ord.priority_state,
+            planner: ord.planner,
+            scheduled_from: ord.scheduled_from,
+            scheduled_to: ord.scheduled_to,
+            operation_count: ord.operation_count,
+            planned_hours: ord.planned_hours,
+            estimated_cost: ord.estimated_cost,
+            etag: ord.etag,
+          });
       }
-    }
-    await batchInsert(MaintenanceOperations, cleanOperations, 500);
 
-    // 4. Batch save materials (safeguard deduplication by order_no + material)
-    const uniqueMatsMap = new Map();
-    const cleanMaterials = [];
-    for (const mat of materialsToSave) {
-      const key = `${mat.order_no}#${mat.material}`;
-      if (!uniqueMatsMap.has(key)) {
-        uniqueMatsMap.set(key, mat);
-        cleanMaterials.push(mat);
-      } else {
-        const existing = uniqueMatsMap.get(key);
-        existing.qty = Number((existing.qty + (Number(mat.qty) || 1.0)).toFixed(2));
-        existing.value = Number((existing.qty * existing.unitPrice).toFixed(2));
+      notifyProgress(85, t("importExcelProgressSavingOpsAndMats"));
+      // 3. Batch save operations (safeguard deduplication by order_no + no)
+      const uniqueOpsMap = new Map();
+      const cleanOperations = [];
+      for (const op of operationsToSave) {
+        const key = `${op.order_no}#${op.no}`;
+        if (!uniqueOpsMap.has(key)) {
+          uniqueOpsMap.set(key, true);
+          cleanOperations.push(op);
+        }
       }
-    }
-    await batchInsert(OrderMaterials, cleanMaterials, 500);
+      await batchInsert(MaintenanceOperations, cleanOperations, 500);
 
-    // 5. Batch save history
-    await batchInsert(OrderHistory, historyToInsert, 500);
-  });
+      // 4. Batch save materials (safeguard deduplication by order_no + material)
+      const uniqueMatsMap = new Map();
+      const cleanMaterials = [];
+      for (const mat of materialsToSave) {
+        const key = `${mat.order_no}#${mat.material}`;
+        if (!uniqueMatsMap.has(key)) {
+          uniqueMatsMap.set(key, mat);
+          cleanMaterials.push(mat);
+        } else {
+          const existing = uniqueMatsMap.get(key);
+          existing.qty = Number((existing.qty + (Number(mat.qty) || 1.0)).toFixed(2));
+          existing.value = Number((existing.qty * existing.unitPrice).toFixed(2));
+        }
+      }
+      await batchInsert(OrderMaterials, cleanMaterials, 500);
+
+      // 5. Batch save history
+      await batchInsert(OrderHistory, historyToInsert, 500);
+    });
+  }
 
   const durationMs = Date.now() - startTime;
   const durationSec = (durationMs / 1000).toFixed(2);
   const importedCount = createdCount + updatedCount;
 
+  // Generate error workbook if there are failed rows
+  let errorFileBase64 = null;
+  let errorFileName = null;
+  if (errors.length > 0) {
+    try {
+      const errorBuffer = await generateErrorWorkbookBuffer(errors, locale);
+      errorFileBase64 = Buffer.from(errorBuffer).toString("base64");
+      errorFileName = `MaintenanceOrders_Errors_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    } catch (err) {
+      console.error("[ExcelImport] Error generating error workbook:", err);
+    }
+  }
+
   // Step 7: Record summary audit log
-  notifyProgress(95, "Recording audit history...");
+  notifyProgress(95, t("importExcelProgressRecordingAudit"));
   if (importedCount > 0) {
     await INSERT.into(AuditHistory).entries({
       ID: cds.utils?.uuid ? cds.utils.uuid() : require("crypto").randomUUID(),
       timestamp: timestampStr,
       user: currentUser,
-      object: `Bulk Import (${importedCount} orders)`,
+      object: t("importExcelAuditObject", [importedCount]),
       action: "IMPORT",
-      details: `Imported ${importedCount} orders (${createdCount} created, ${updatedCount} updated), ${totalOpsImported} operations in ${durationSec}s.`,
+      details: t("importExcelAuditDetails", [importedCount, createdCount, updatedCount, errors.length, durationSec]),
     });
   }
 
-  notifyProgress(100, `Completed processing ${orderRowsRaw.length} rows.`);
+  notifyProgress(100, t("importExcelProgressCompleted", [orderRowsRaw.length]));
 
   return {
-    success: true,
+    success: importedCount > 0 || totalRows === 0,
     totalRows,
     importedCount,
     createdCount,
     updatedCount,
     operationsCount: totalOpsImported,
     materialsCount: totalMatsImported,
-    failedCount: 0,
+    failedCount: errors.length,
     durationMs,
     durationSec: `${durationSec}s`,
     warnings,
     errors,
+    hasErrors: errors.length > 0,
+    errorFileName,
+    errorFileBase64,
   };
 }
 
 module.exports = {
   processExcelImport,
+  generateErrorWorkbookBuffer,
+  parseAndValidateDate,
   normalizeDate,
   normalizeMaintenanceType,
   normalizePriority,

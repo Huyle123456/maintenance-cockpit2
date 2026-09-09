@@ -83,7 +83,7 @@
                 "sap.ui.core": {},
                 "sap.ui.layout": {},
                 "sap.tnt": {},
-                "sap.suite.ui.commons": {}
+                "sap.uxap": {}
             }
         },
         "contentDensities": {
@@ -97,8 +97,7 @@
                     "bundleName": "com.fsoft.zpmmaintenancecockpit.i18n.i18n",
                     "supportedLocales": [
                         "",
-                        "en",
-                        "vi"
+                        "en"
                     ],
                     "fallbackLocale": "en"
                 }
@@ -133,33 +132,35 @@
                 },
                 {
                     "name": "RouteOrderDetail",
-                    "pattern": "orders/{orderId}",
-                    "target": "TargetOrderDetail"
+                    "pattern": "orders/{orderId}:?query:",
+                    "target": [
+                        "TargetOrderDetail"
+                    ]
                 },
                 {
                     "name": "RouteEquipment",
-                    "pattern": "equipment",
+                    "pattern": "equipment:?query:",
                     "target": [
                         "TargetEquipment"
                     ]
                 },
                 {
                     "name": "RouteOperationsDashboard",
-                    "pattern": "operations",
+                    "pattern": "operations:?query:",
                     "target": [
                         "TargetOperationsDashboard"
                     ]
                 },
                 {
                     "name": "RouteTechnicians",
-                    "pattern": "technicians",
+                    "pattern": "technicians:?query:",
                     "target": [
                         "TargetTechnicians"
                     ]
                 },
                 {
                     "name": "RouteAuditHistory",
-                    "pattern": "audit-history",
+                    "pattern": "audit-history:?query:",
                     "target": [
                         "TargetAuditHistory"
                     ]

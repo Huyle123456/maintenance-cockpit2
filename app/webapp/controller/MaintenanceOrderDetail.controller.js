@@ -1,6 +1,7 @@
 sap.ui.define(
   [
     "sap/ui/core/mvc/Controller",
+    "sap/ui/core/UIComponent",
     "sap/ui/model/json/JSONModel",
     "sap/ui/model/Filter",
     "sap/ui/model/FilterOperator",
@@ -15,6 +16,7 @@ sap.ui.define(
   ],
   (
     Controller,
+    UIComponent,
     JSONModel,
     Filter,
     FilterOperator,
@@ -84,10 +86,14 @@ sap.ui.define(
             .catch((e) => {
               console.error("Failed to load technician data from CAP:", e);
             });
-          const o = this.getOwnerComponent().getRouter();
-          const r = o.getRoute("RouteOrderDetail");
-          if (r) {
-            r.attachPatternMatched(this._onOrderMatched, this);
+          const o =
+            UIComponent.getRouterFor(this) ||
+            (typeof this.getOwnerComponent === "function" && this.getOwnerComponent()?.getRouter());
+          if (o) {
+            const r = o.getRoute("RouteOrderDetail");
+            if (r) {
+              r.attachPatternMatched(this._onOrderMatched, this);
+            }
           }
         },
         /**
@@ -97,7 +103,12 @@ sap.ui.define(
          */
         onBack() {
           sap.ui.core.BusyIndicator.show(0);
-          this.getOwnerComponent().getRouter().navTo("RouteMaintenanceOrders");
+          const oRouter =
+            UIComponent.getRouterFor(this) ||
+            (typeof this.getOwnerComponent === "function" && this.getOwnerComponent()?.getRouter());
+          if (oRouter) {
+            oRouter.navTo("RouteMaintenanceOrders");
+          }
           setTimeout(() => {
             sap.ui.core.BusyIndicator.hide();
           }, 80);
@@ -1172,8 +1183,11 @@ sap.ui.define(
                 ...this.getView().getModel("orderDetail").getData(),
                 ...i,
               });
-            const [n, a, s] = await Promise.all([
+            const [n, orderMats, a, s] = await Promise.all([
               CAPService.getOperations(e),
+              typeof CAPService.getOrderMaterials === "function"
+                ? CAPService.getOrderMaterials(e)
+                : Promise.resolve([]),
               CAPService.getMaterials(),
               CAPService.getOrderHistory(e),
             ]);
@@ -1219,24 +1233,25 @@ sap.ui.define(
                         status: "OPEN",
                       },
                     ];
-            let g =
+            const aOrderMaterialsRaw =
               r.materials && r.materials.length > 0
-                ? r.materials.map((e) => {
-                    const t = e.material || e.materialId;
-                    const o =
-                      (a.materialCatalog || []).find((e) => e.key === t) || {};
-                    return {
-                      material: t,
-                      description: e.description || o.description || "",
-                      qty: e.qty || e.quantity || 1,
-                      unit: e.unit || o.unit || "EA",
-                      availableStock: e.availableStock ?? o.availableStock ?? 0,
-                      value:
-                        e.value ||
-                        (e.qty || e.quantity || 1) * (o.unitPrice || 0),
-                    };
-                  })
-                : a.materials || [];
+                ? r.materials
+                : (orderMats && orderMats.length > 0 ? orderMats : a.materials || []);
+
+            let g = aOrderMaterialsRaw.map((item) => {
+              const t = item.material || item.materialId;
+              const o = (a.materialCatalog || []).find((c) => c.key === t) || {};
+              return {
+                material: t,
+                description: item.description || o.description || "",
+                qty: item.qty || item.quantity || 1,
+                unit: item.unit || o.unit || "EA",
+                availableStock: item.availableStock ?? o.availableStock ?? 0,
+                value:
+                  item.value ||
+                  (item.qty || item.quantity || 1) * (o.unitPrice || 0),
+              };
+            });
             this.getView()
               .getModel("orderDetail")
               .setProperty("/operations", d);

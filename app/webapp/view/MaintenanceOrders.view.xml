@@ -837,6 +837,8 @@
                                                                 <ColumnListItem
                                                                     id="ordersRowTemplate"
                                                                     vAlign="Middle"
+                                                                    type="Active"
+                                                                    press="onOrderPress"
                                                                 >
                                                                     <CheckBox
                                                                         id="rowSelectCheckBox"
@@ -912,7 +914,7 @@
                                                         <ToolbarSpacer id="spcPagination" />
                                                         <Label
                                                             id="lblPageSize"
-                                                            text="Rows per page:"
+                                                            text="{i18n>maintenanceOrdersRowsPerPage}"
                                                             labelFor="selPageSize"
                                                             class="sapUiTinyMarginEnd"
                                                         />
@@ -933,7 +935,7 @@
                                                         <Button
                                                             id="btnFirstPage"
                                                             icon="sap-icon://navigation-first-arrow"
-                                                            tooltip="First Page"
+                                                            tooltip="{i18n>maintenanceOrdersFirstPage}"
                                                             type="Transparent"
                                                             enabled="{pagination>/hasPrevious}"
                                                             press="onFirstPage"
@@ -941,7 +943,7 @@
                                                         <Button
                                                             id="btnPrevPage"
                                                             icon="sap-icon://navigation-left-arrow"
-                                                            tooltip="Previous Page"
+                                                            tooltip="{i18n>maintenanceOrdersPrevPage}"
                                                             type="Transparent"
                                                             enabled="{pagination>/hasPrevious}"
                                                             press="onPreviousPage"
@@ -962,7 +964,7 @@
                                                         <Button
                                                             id="btnNextPage"
                                                             icon="sap-icon://navigation-right-arrow"
-                                                            tooltip="Next Page"
+                                                            tooltip="{i18n>maintenanceOrdersNextPage}"
                                                             type="Transparent"
                                                             enabled="{pagination>/hasNext}"
                                                             press="onNextPage"
@@ -970,7 +972,7 @@
                                                         <Button
                                                             id="btnLastPage"
                                                             icon="sap-icon://navigation-last-arrow"
-                                                            tooltip="Last Page"
+                                                            tooltip="{i18n>maintenanceOrdersLastPage}"
                                                             type="Transparent"
                                                             enabled="{pagination>/hasNext}"
                                                             press="onLastPage"

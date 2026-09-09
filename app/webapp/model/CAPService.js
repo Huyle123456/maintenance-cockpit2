@@ -391,6 +391,8 @@ sap.ui.define([], function () {
     async importOrdersExcelAsync(oFile, fnOnProgress) {
       const formData = new FormData();
       formData.append("file", oFile, oFile.name);
+      const currentLocale = (typeof sap !== "undefined" && sap.ui?.getCore()?.getConfiguration()?.getLanguage()?.toLowerCase().startsWith("vi")) ? "vi" : "en";
+      formData.append("locale", currentLocale);
 
       let res;
       const asyncUrl = `${getApiUrl()}/import-excel-async`;
@@ -484,6 +486,8 @@ sap.ui.define([], function () {
         console.warn("[CAPService] Async import failed, falling back to legacy sync endpoint...", asyncErr.message);
         const formData = new FormData();
         formData.append("file", oFile, oFile.name);
+        const currentLocale = (typeof sap !== "undefined" && sap.ui?.getCore()?.getConfiguration()?.getLanguage()?.toLowerCase().startsWith("vi")) ? "vi" : "en";
+        formData.append("locale", currentLocale);
 
         let res;
         try {

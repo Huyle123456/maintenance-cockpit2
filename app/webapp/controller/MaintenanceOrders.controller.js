@@ -1,6 +1,7 @@
 sap.ui.define(
   [
     "sap/ui/core/mvc/Controller",
+    "sap/ui/core/UIComponent",
     "sap/ui/model/json/JSONModel",
     "sap/ui/model/Filter",
     "sap/ui/model/FilterOperator",
@@ -17,6 +18,7 @@ sap.ui.define(
   ],
   (
     Controller,
+    UIComponent,
     JSONModel,
     Filter,
     FilterOperator,
@@ -544,7 +546,7 @@ sap.ui.define(
               this.getView()
                 .getModel("i18n")
                 .getResourceBundle()
-                .getText("maintenanceOrdersExportNoData") || "No orders available to export.",
+                .getText("maintenanceOrdersExportNoData"),
             );
             return;
           }
@@ -792,30 +794,58 @@ sap.ui.define(
         /**
          * Navigates to the Maintenance Order Detail page with loading indicator.
          *
-         * @param {sap.ui.base.Event} oEvent Press event
+         * @param {sap.ui.base.Event|string} oEvent Press event or direct order ID string.
          * @returns {void}
          */
         onOrderPress(oEvent) {
-          const oObjectIdentifier = oEvent.getSource();
-          const oContext = oObjectIdentifier.getBindingContext("orders");
-
-          if (!oContext) {
-            return;
+          let sOrder = "";
+          if (typeof oEvent === "string") {
+            sOrder = oEvent;
+          } else if (oEvent && typeof oEvent.getParameter === "function" && oEvent.getParameter("orderId")) {
+            sOrder = oEvent.getParameter("orderId");
+          } else if (oEvent && typeof oEvent.getSource === "function") {
+            const oSource = oEvent.getSource();
+            const oContext = oSource.getBindingContext("orders") || oSource.getBindingContext();
+            if (oContext) {
+              sOrder = oContext.getProperty("order") || oContext.getProperty("order_no");
+            }
+            if (!sOrder && typeof oSource.getTitle === "function") {
+              sOrder = oSource.getTitle();
+            }
+            if (!sOrder && typeof oSource.getText === "function") {
+              const sText = oSource.getText();
+              if (sText && sText.startsWith("MO-")) {
+                sOrder = sText;
+              }
+            }
           }
 
-          const sOrder = oContext.getProperty("order");
           if (!sOrder) {
+            console.warn("[MaintenanceOrders] Could not resolve order ID for navigation:", oEvent);
             return;
           }
 
           sap.ui.core.BusyIndicator.show(0);
 
-          setTimeout(() => {
-            this.getOwnerComponent().getRouter().navTo("RouteOrderDetail", {
-              orderId: sOrder,
-            });
-            sap.ui.core.BusyIndicator.hide();
-          }, 60);
+          try {
+            const oRouter =
+              UIComponent.getRouterFor(this) ||
+              (typeof this.getOwnerComponent === "function" && this.getOwnerComponent()?.getRouter());
+
+            if (oRouter) {
+              oRouter.navTo("RouteOrderDetail", {
+                orderId: sOrder,
+              });
+            } else {
+              console.error("[MaintenanceOrders] Router not found for detail navigation");
+            }
+          } catch (err) {
+            console.error("[MaintenanceOrders] Failed to navigate to order detail:", err);
+          } finally {
+            setTimeout(() => {
+              sap.ui.core.BusyIndicator.hide();
+            }, 100);
+          }
         },
 
         /* =========================================================== */
@@ -920,12 +950,10 @@ sap.ui.define(
          * @returns {Promise<void>} Resolves after the dialog opens.
          */
         async onImportOrdersPress() {
+          const oI18n = this.getView().getModel("i18n").getResourceBundle();
           const oUser = AuthService.getCurrentUser();
           if (oUser && !oUser.permissions?.createOrder) {
-            MessageBox.warning(
-              this.getView().getModel("i18n").getResourceBundle().getText("roleAdminRequired") ||
-              "Action requires Administrator privileges."
-            );
+            MessageBox.warning(oI18n.getText("roleAdminRequired"));
             return;
           }
 
@@ -946,14 +974,13 @@ sap.ui.define(
             const oImportModel = new JSONModel({
               fileName: "",
               fileSize: "",
-              statusText: "Waiting for file",
+              statusText: oI18n.getText("importOrdersStatusWaitingForFile"),
               statusState: "None",
               canImport: false,
               isProcessing: false,
               progressPercent: 0,
               progressState: "Information",
-              statusMessage:
-                "Please choose a .xlsx or .csv file to import to Backend.",
+              statusMessage: oI18n.getText("importOrdersChooseFilePrompt"),
               statusType: "Information",
             });
             this.getView().setModel(oImportModel, "importModel");
@@ -1023,6 +1050,7 @@ sap.ui.define(
             sFileName.endsWith(".xls") ||
             sFileName.endsWith(".csv");
 
+          const oI18n = this.getView().getModel("i18n").getResourceBundle();
           if (!bIsExcel) {
             this._oSelectedImportFile = null;
             oImportModel.setProperty("/fileName", oFile.name);
@@ -1030,11 +1058,11 @@ sap.ui.define(
               "/fileSize",
               (oFile.size / 1024).toFixed(1) + " KB",
             );
-            oImportModel.setProperty("/statusText", "Unsupported format");
+            oImportModel.setProperty("/statusText", oI18n.getText("importOrdersUnsupportedFormat"));
             oImportModel.setProperty("/statusState", "Error");
             oImportModel.setProperty(
               "/statusMessage",
-              "Please select a valid .xlsx or .csv Excel file.",
+              oI18n.getText("importOrdersFileFormatError"),
             );
             oImportModel.setProperty("/statusType", "Error");
             oImportModel.setProperty("/canImport", false);
@@ -1045,11 +1073,11 @@ sap.ui.define(
           const sSize = (oFile.size / 1024).toFixed(1) + " KB";
           oImportModel.setProperty("/fileName", oFile.name);
           oImportModel.setProperty("/fileSize", sSize);
-          oImportModel.setProperty("/statusText", "Ready to process");
+          oImportModel.setProperty("/statusText", oI18n.getText("importOrdersReadyToProcess"));
           oImportModel.setProperty("/statusState", "Success");
           oImportModel.setProperty(
             "/statusMessage",
-            `File selected (${sSize}). Click "Upload & Process on Backend" to stream data.`,
+            oI18n.getText("importOrdersFileSelectedMsg", [sSize, oI18n.getText("importOrdersBtnUpload")]),
           );
           oImportModel.setProperty("/statusType", "Information");
           oImportModel.setProperty("/canImport", true);
@@ -1061,8 +1089,9 @@ sap.ui.define(
          * @returns {Promise<void>} Resolves after import processing completes.
          */
         async onConfirmImportOrders() {
+          const oI18n = this.getView().getModel("i18n").getResourceBundle();
           if (!this._oSelectedImportFile) {
-            MessageToast.show("Please select an Excel file to import.");
+            MessageToast.show(oI18n.getText("importOrdersSelectFilePrompt"));
             return;
           }
 
@@ -1073,7 +1102,7 @@ sap.ui.define(
           oImportModel.setProperty("/progressState", "Information");
           oImportModel.setProperty(
             "/statusMessage",
-            "Uploading file and initiating background processing...",
+            oI18n.getText("importOrdersUploadingMsg"),
           );
           oImportModel.setProperty("/statusType", "Information");
 
@@ -1097,64 +1126,86 @@ sap.ui.define(
             // Automatically close the import dialog immediately after completion
             this.onCancelImportOrders();
 
-            // Automatically reload the orders list & refresh KPIs
-            await this._reloadOrdersFromBackend();
-
-            // Clear any active search filters to show the fresh imported list
-            this.onFilterClear();
-
-            let sMsg =
-              `Import completed in ${result.durationSec || "1s"}!\n\n` +
-              `• Total Orders Processed: ${result.totalRows}\n` +
-              `• Total Imported / Synced: ${result.importedCount} maintenance order(s)\n`;
-
-            if (result.createdCount !== undefined || result.updatedCount !== undefined) {
-              sMsg += `  - Newly Created Orders: ${result.createdCount || 0}\n` +
-                      `  - Updated (Upserted) Existing Orders: ${result.updatedCount || 0}\n`;
-            }
-
-            sMsg +=
-              `• Operations Synced: ${result.operationsCount || result.importedCount} operation(s)\n` +
-              `• Materials Linked: ${result.materialsCount || 0} item(s)\n`;
-
-            if (result.warnings && result.warnings.length > 0) {
-              sMsg += `\nAuto-Correction Notices (${result.warnings.length}):\n`;
-              const maxDispWarn = Math.min(result.warnings.length, 5);
-              for (let i = 0; i < maxDispWarn; i++) {
-                const w = result.warnings[i];
-                sMsg += `  • Line ${w.row} (${w.order}): ${w.message}\n`;
-              }
-              if (result.warnings.length > 5) {
-                sMsg += `  ... and ${result.warnings.length - 5} more notice(s).\n`;
-              }
+            // Automatically reload the orders list & refresh KPIs if any rows were successfully imported
+            if (result.importedCount > 0) {
+              await this._reloadOrdersFromBackend();
+              this.onFilterClear();
             }
 
             if (result.failedCount > 0) {
-              sMsg += `\n• Failed / Invalid Rows: ${result.failedCount}\n\nRow-by-Row Error Details:\n`;
-              const maxDisplayErrors = Math.min(
-                (result.errors || []).length,
-                20,
-              );
-              for (let i = 0; i < maxDisplayErrors; i++) {
-                const errItem = result.errors[i];
-                sMsg += `  - Line ${errItem.row} (${errItem.order}): ${errItem.details || errItem.error}\n`;
-              }
-              if ((result.errors || []).length > 20) {
-                sMsg += `  ... and ${result.errors.length - 20} more invalid rows.\n`;
+              this._lastImportErrorData = {
+                base64: result.errorFileBase64,
+                fileName: result.errorFileName || "MaintenanceOrders_Errors.xlsx",
+                url: result.errorDownloadUrl,
+                errors: result.errors
+              };
+
+              const oModel = this.getView().getModel("importModel");
+              if (oModel) {
+                oModel.setProperty("/hasErrors", true);
+                oModel.setProperty("/failedCount", result.failedCount);
               }
 
+              let sMsg = "";
               if (result.importedCount > 0) {
-                MessageBox.warning(sMsg, {
-                  title: "Import Summary (Partial Success with Warnings)",
-                });
+                sMsg +=
+                  oI18n.getText("importOrdersPartialSuccessHeader") + "\n\n" +
+                  oI18n.getText("importOrdersSuccessSavedCount", [result.importedCount]) + "\n" +
+                  oI18n.getText("importOrdersCreatedCount", [result.createdCount || 0]) + "\n" +
+                  oI18n.getText("importOrdersUpdatedCount", [result.updatedCount || 0]) + "\n" +
+                  oI18n.getText("importOrdersOperationsCount", [result.operationsCount || 0]) + "\n" +
+                  oI18n.getText("importOrdersMaterialsCount", [result.materialsCount || 0]) + "\n\n" +
+                  oI18n.getText("importOrdersErrorRowsCount", [result.failedCount]) + "\n\n" +
+                  oI18n.getText("importOrdersErrorListSample") + "\n";
               } else {
-                MessageBox.error(sMsg, {
-                  title: "Import Failed (Validation Errors)",
-                });
+                sMsg +=
+                  oI18n.getText("importOrdersAllRowsFailed", [result.failedCount]) + "\n\n" +
+                  oI18n.getText("importOrdersErrorListSample") + "\n";
               }
+
+              const maxDisplay = Math.min((result.errors || []).length, 6);
+              for (let i = 0; i < maxDisplay; i++) {
+                const errItem = result.errors[i];
+                const sOrderRef = errItem.order && !String(errItem.order).startsWith("Line") && !String(errItem.order).startsWith("Dòng")
+                  ? ` [${errItem.order}]`
+                  : "";
+                sMsg += oI18n.getText("importOrdersErrorRowItem", [errItem.row, sOrderRef, errItem.error]) + "\n";
+              }
+              if ((result.errors || []).length > 6) {
+                sMsg += oI18n.getText("importOrdersMoreErrorsCount", [result.errors.length - 6]) + "\n";
+              }
+
+              sMsg += "\n" + oI18n.getText("importOrdersDownloadErrorFilePrompt", [result.failedCount]);
+
+              const sBtnDownload = oI18n.getText("importOrdersActionDownloadErrors");
+              const sTitle = result.importedCount > 0
+                ? oI18n.getText("importOrdersPartialSuccessTitle")
+                : oI18n.getText("importOrdersFailedTitle");
+
+              MessageBox.show(sMsg, {
+                icon: result.importedCount > 0 ? MessageBox.Icon.WARNING : MessageBox.Icon.ERROR,
+                title: sTitle,
+                actions: [sBtnDownload, MessageBox.Action.CLOSE],
+                emphasizedAction: sBtnDownload,
+                onClose: (sAction) => {
+                  if (sAction === sBtnDownload) {
+                    this.onDownloadErrorRowsFile();
+                  }
+                }
+              });
             } else {
+              // 100% success without errors
+              let sMsg =
+                oI18n.getText("importOrdersSuccessFullMsg", [result.importedCount, result.durationSec || "1s"]) + "\n\n" +
+                oI18n.getText("importOrdersTotalProcessed", [result.totalRows]) + "\n" +
+                oI18n.getText("importOrdersCreatedCount", [result.createdCount || 0]) + "\n" +
+                oI18n.getText("importOrdersUpdatedCount", [result.updatedCount || 0]) + "\n" +
+                oI18n.getText("importOrdersOperationsCount", [result.operationsCount || 0]) + "\n" +
+                oI18n.getText("importOrdersMaterialsCount", [result.materialsCount || 0]) + "\n\n" +
+                oI18n.getText("importOrdersAllDataSavedMsg");
+
               MessageBox.success(sMsg, {
-                title: "Excel Import Successful",
+                title: oI18n.getText("importOrdersSuccessTitle"),
               });
             }
           } catch (err) {
@@ -1165,12 +1216,62 @@ sap.ui.define(
               currentModel.setProperty("/progressState", "Error");
               currentModel.setProperty(
                 "/statusMessage",
-                "Import failed: " + (err.message || err),
+                oI18n.getText("importOrdersParsingError", [err.message || err]),
               );
               currentModel.setProperty("/statusType", "Error");
               currentModel.setProperty("/canImport", true);
             }
-            MessageBox.error("Backend Excel import failed: " + (err.message || err));
+            MessageBox.error(oI18n.getText("importOrdersParsingError", [err.message || err]));
+          }
+        },
+
+        /**
+         * Downloads an Excel spreadsheet containing only the error rows from the latest import.
+         */
+        onDownloadErrorRowsFile() {
+          const oI18n = this.getView().getModel("i18n").getResourceBundle();
+          if (!this._lastImportErrorData) {
+            MessageToast.show(oI18n.getText("importOrdersNoErrorsData"));
+            return;
+          }
+          const { base64, fileName, url } = this._lastImportErrorData;
+          const sTargetFileName = fileName || "MaintenanceOrders_Errors.xlsx";
+          if (base64) {
+            try {
+              const byteCharacters = atob(base64);
+              const byteNumbers = new Array(byteCharacters.length);
+              for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+              }
+              const byteArray = new Uint8Array(byteNumbers);
+              const blob = new Blob([byteArray], {
+                type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              });
+              const downloadUrl = window.URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.style.display = "none";
+              a.href = downloadUrl;
+              a.download = sTargetFileName;
+              document.body.appendChild(a);
+              a.click();
+              window.URL.revokeObjectURL(downloadUrl);
+              document.body.removeChild(a);
+              MessageToast.show(oI18n.getText("importOrdersErrorDownloadSuccess", [sTargetFileName]));
+              return;
+            } catch (err) {
+              console.warn("Base64 error download failed, fallback to url:", err);
+            }
+          }
+
+          if (url) {
+            const a = document.createElement("a");
+            a.style.display = "none";
+            a.href = url;
+            a.download = sTargetFileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            MessageToast.show(oI18n.getText("importOrdersDownloadingFromServer"));
           }
         },
 
@@ -1304,6 +1405,7 @@ sap.ui.define(
 
             // Load KPI metrics directly from database
             const oKpiDbData = await CAPService.getKpiMetrics();
+            this._oKpiDbData = oKpiDbData;
 
             // Create KPI dashboard model
             this.getView().setModel(
@@ -1613,9 +1715,21 @@ sap.ui.define(
             });
           }
 
+          const oKpiModel = this.getView().getModel("kpi");
+          const bHasCustomFilter = this._hasActiveCustomFilters();
+          const sActiveKpiKey = oKpiModel ? oKpiModel.getProperty("/activeFilterKey") : "";
+          const bIsDefaultState = !bHasCustomFilter && (!sActiveKpiKey || sActiveKpiKey === "");
+
+          const iDisplayTotal =
+            bIsDefaultState &&
+            this._oKpiDbData &&
+            typeof this._oKpiDbData.totalOrders === "number"
+              ? this._oKpiDbData.totalOrders
+              : iTotalItems;
+
           oPaginationModel.setProperty("/currentPage", iCurrentPage);
           oPaginationModel.setProperty("/totalPages", iTotalPages);
-          oPaginationModel.setProperty("/totalItems", iTotalItems);
+          oPaginationModel.setProperty("/totalItems", iDisplayTotal);
           oPaginationModel.setProperty("/startIndex", iStartIndex);
           oPaginationModel.setProperty("/endIndex", iEndIndex);
           oPaginationModel.setProperty("/hasPrevious", iCurrentPage > 1);
@@ -1628,11 +1742,48 @@ sap.ui.define(
             oOrdersModel.refresh(true);
           }
 
-          const oKpiModel = this.getView().getModel("kpi");
           if (oKpiModel) {
-            oKpiModel.setProperty("/visibleOrderCount", iTotalItems);
-            // Only override estimatedCost if a specific filter is currently active
-            if (this._sActiveKpiKey || (this._aAllOrders && aFiltered && aFiltered.length < this._aAllOrders.length)) {
+            if (bIsDefaultState) {
+              const iDbTotal =
+                this._oKpiDbData &&
+                typeof this._oKpiDbData.totalOrders === "number"
+                  ? this._oKpiDbData.totalOrders
+                  : iTotalItems;
+              oKpiModel.setProperty("/visibleOrderCount", iDbTotal);
+              if (this._oKpiDbData && this._oKpiDbData.estimatedCost) {
+                oKpiModel.setProperty(
+                  "/estimatedCost",
+                  this._oKpiDbData.estimatedCost,
+                );
+              }
+            } else if (!bHasCustomFilter && sActiveKpiKey) {
+              let iCount = iTotalItems;
+              let sCost = formatter.calculateEstimatedCost(aFiltered);
+              if (this._oKpiDbData) {
+                if (sActiveKpiKey === "STATUS_OPEN") {
+                  iCount = this._oKpiDbData.openCount ?? iTotalItems;
+                } else if (sActiveKpiKey === "STATUS_IN_PROCESS") {
+                  iCount = this._oKpiDbData.inProcessCount ?? iTotalItems;
+                } else if (sActiveKpiKey === "PRIORITY_CRITICAL") {
+                  iCount = this._oKpiDbData.criticalCount ?? iTotalItems;
+                  if (typeof this._oKpiDbData.criticalCount === "number") {
+                    const iCritTotal = this._oKpiDbData.criticalCount * 15000;
+                    if (iCritTotal >= 1000000000) {
+                      sCost = `$${(iCritTotal / 1000000000).toFixed(1)}B`;
+                    } else if (iCritTotal >= 1000000) {
+                      sCost = `$${(iCritTotal / 1000000).toFixed(1)}M`;
+                    } else {
+                      sCost = `$${(iCritTotal / 1000).toFixed(1)}K`;
+                    }
+                  }
+                } else if (sActiveKpiKey === "OVERDUE") {
+                  iCount = this._oKpiDbData.overdueCount ?? iTotalItems;
+                }
+              }
+              oKpiModel.setProperty("/visibleOrderCount", iCount);
+              oKpiModel.setProperty("/estimatedCost", sCost);
+            } else {
+              oKpiModel.setProperty("/visibleOrderCount", iTotalItems);
               oKpiModel.setProperty(
                 "/estimatedCost",
                 formatter.calculateEstimatedCost(aFiltered),
@@ -1645,6 +1796,51 @@ sap.ui.define(
               oTable.setBusy(false);
             }
           }, 80);
+        },
+
+        /**
+         * Checks whether any FilterBar filter or custom search query is actively applied.
+         *
+         * @returns {boolean} True if a custom filter condition is active.
+         */
+        _hasActiveCustomFilters() {
+          const sSearch = (this.byId("inpSearch")?.getValue() || "").trim();
+          const sPlant = this.byId("selPlant")?.getSelectedKey() || "All";
+          const sStatus = this.byId("selStatus")?.getSelectedKey() || "All";
+          const sPriority = this.byId("selPriority")?.getSelectedKey() || "All";
+          const sType =
+            this.byId("selMaintenanceType")?.getSelectedKey() || "All";
+          const sPlanner = this.byId("selPlanner")?.getSelectedKey() || "All";
+          const oDate = this.byId("dpScheduledDateFrom")?.getDateValue();
+          const sEqType = (
+            this.byId("inpEquipmentType")?.getValue() || ""
+          ).trim();
+          const sCrit = this.byId("selCriticality")?.getSelectedKey() || "All";
+          const sLoc = (this.byId("inpLocation")?.getValue() || "").trim();
+          const sCreated = (this.byId("inpCreatedBy")?.getValue() || "").trim();
+          const oActualStart = this.byId("dpActualStart")?.getDateValue();
+          const oActualEnd = this.byId("dpActualEnd")?.getDateValue();
+          const aSelectedEquipments =
+            this.getView()
+              .getModel("filters")
+              ?.getProperty("/selectedEquipments") || [];
+
+          return Boolean(
+            sSearch ||
+              sPlant !== "All" ||
+              sStatus !== "All" ||
+              sPriority !== "All" ||
+              sType !== "All" ||
+              sPlanner !== "All" ||
+              oDate ||
+              sEqType ||
+              sCrit !== "All" ||
+              sLoc ||
+              sCreated ||
+              oActualStart ||
+              oActualEnd ||
+              aSelectedEquipments.length > 0,
+          );
         },
 
         /**
@@ -1662,16 +1858,30 @@ sap.ui.define(
           try {
             const oKpiDbData = await CAPService.getKpiMetrics();
             if (oKpiDbData && typeof oKpiDbData.openCount === "number") {
+              this._oKpiDbData = oKpiDbData;
               oKpiModel.setProperty("/openCount", oKpiDbData.openCount);
-              oKpiModel.setProperty("/inProcessCount", oKpiDbData.inProcessCount);
+              oKpiModel.setProperty(
+                "/inProcessCount",
+                oKpiDbData.inProcessCount,
+              );
               oKpiModel.setProperty("/criticalCount", oKpiDbData.criticalCount);
               oKpiModel.setProperty("/overdueCount", oKpiDbData.overdueCount);
               oKpiModel.setProperty("/estimatedCost", oKpiDbData.estimatedCost);
-              oKpiModel.setProperty("/visibleOrderCount", oKpiDbData.totalOrders);
+              oKpiModel.setProperty(
+                "/visibleOrderCount",
+                oKpiDbData.totalOrders,
+              );
+              const oPagination = this.getView().getModel("pagination");
+              if (oPagination && !this._hasActiveCustomFilters()) {
+                oPagination.setProperty("/totalItems", oKpiDbData.totalOrders);
+              }
               return;
             }
           } catch (e) {
-            console.warn("[MaintenanceOrders] Could not refresh KPI from DB, falling back to local calculation:", e);
+            console.warn(
+              "[MaintenanceOrders] Could not refresh KPI from DB, falling back to local calculation:",
+              e,
+            );
           }
 
           const aRows =

@@ -1,7 +1,34 @@
 sap.ui.define([], function () {
   "use strict";
 
-  return {
+  /**
+   * Normalizes a status string to uppercase and replaces underscores with spaces.
+   *
+   * @param {string} sStatus Status text
+   * @returns {string} Normalized status string
+   */
+  function normalizeStatus(sStatus) {
+    return (sStatus || "")
+      .toString()
+      .trim()
+      .toUpperCase()
+      .replace(/_/g, " ");
+  }
+
+  /**
+   * Normalizes a priority string to uppercase.
+   *
+   * @param {string} sPriority Priority text
+   * @returns {string} Normalized priority string
+   */
+  function normalizePriority(sPriority) {
+    return (sPriority || "").toString().trim().toUpperCase();
+  }
+
+  const Formatter = {
+    normalizeStatus: normalizeStatus,
+    normalizePriority: normalizePriority,
+
     /**
      * Formats the scheduled date range display string.
      *
@@ -27,30 +54,6 @@ sap.ui.define([], function () {
     },
 
     /**
-     * Normalizes a status string to uppercase and replaces underscores with spaces.
-     *
-     * @param {string} sStatus Status text
-     * @returns {string} Normalized status string
-     */
-    normalizeStatus(sStatus) {
-      return (sStatus || "")
-        .toString()
-        .trim()
-        .toUpperCase()
-        .replace(/_/g, " ");
-    },
-
-    /**
-     * Normalizes a priority string to uppercase.
-     *
-     * @param {string} sPriority Priority text
-     * @returns {string} Normalized priority string
-     */
-    normalizePriority(sPriority) {
-      return (sPriority || "").toString().trim().toUpperCase();
-    },
-
-    /**
      * Determines whether an order is overdue based on scheduled end date and status.
      *
      * @param {string} sScheduledTo Scheduled end date
@@ -58,7 +61,7 @@ sap.ui.define([], function () {
      * @returns {boolean} True if overdue, false otherwise
      */
     isOverdue(sScheduledTo, sStatus) {
-      const sNormStatus = this.normalizeStatus(sStatus);
+      const sNormStatus = normalizeStatus(sStatus);
       const bIsCompleted =
         sNormStatus === "COMPLETED" || sNormStatus === "CANCELLED";
 
@@ -92,12 +95,16 @@ sap.ui.define([], function () {
       };
 
       const iTotal = (aOrders || []).reduce((acc, oOrder) => {
-        const sPriority = this.normalizePriority(oOrder.priority);
+        const sPriority = normalizePriority(oOrder.priority);
         const iCost = mCostByPriority[sPriority] || 0;
         return acc + iCost;
       }, 0);
 
-      if (iTotal >= 1000) {
+      if (iTotal >= 1000000000) {
+        return `$${(iTotal / 1000000000).toFixed(1)}B`;
+      } else if (iTotal >= 1000000) {
+        return `$${(iTotal / 1000000).toFixed(1)}M`;
+      } else if (iTotal >= 1000) {
         return `$${(iTotal / 1000).toFixed(1)}K`;
       }
       return `$${iTotal}`;
@@ -110,7 +117,7 @@ sap.ui.define([], function () {
      * @returns {string} SAPUI5 ValueState or Indication color string
      */
     formatStatusState(sStatus) {
-      const sNormStatus = this.normalizeStatus(sStatus);
+      const sNormStatus = normalizeStatus(sStatus);
       const mStateMap = {
         ACTIVE: "Success",
         INACTIVE: "Error",
@@ -135,7 +142,7 @@ sap.ui.define([], function () {
      * @returns {string} SAPUI5 ValueState (Error, Warning, Success, None)
      */
     formatPriorityState(sPriority) {
-      const sNormPriority = this.normalizePriority(sPriority);
+      const sNormPriority = normalizePriority(sPriority);
       switch (sNormPriority) {
         case "CRITICAL":
         case "HIGH":
@@ -172,4 +179,6 @@ sap.ui.define([], function () {
       return sAvailable === "YES" ? "Success" : "Error";
     },
   };
+
+  return Formatter;
 });

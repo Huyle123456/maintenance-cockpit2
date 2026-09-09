@@ -17,6 +17,7 @@ function resolveLocalModule(name) {
 
 const { processExcelImport } = resolveLocalModule("excel-import-service");
 const { getExcelTemplateSampleData } = resolveLocalModule("excel-template-sample-data");
+const { getText } = resolveLocalModule("i18n");
 
 // Configure multer for file uploads in memory buffer
 const upload = multer({
@@ -249,12 +250,14 @@ cds.on("bootstrap", (app) => {
       const jobId = `job-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
       const currentUser = req.user?.id || "Administrator";
       const fileBuffer = req.file.buffer;
+      const locale = req.headers["accept-language"]?.includes("en") ? "en" : (req.body?.locale || "vi");
+      const t = (key, args) => getText(key, args, locale);
 
       const jobRecord = {
         jobId,
         status: "RUNNING",
         progress: 5,
-        message: "File received. Starting background worker...",
+        message: t("importExcelJobReceived"),
         result: null,
         error: null,
         createdAt: Date.now()
@@ -265,6 +268,7 @@ cds.on("bootstrap", (app) => {
       setImmediate(async () => {
         try {
           const result = await processExcelImport(fileBuffer, currentUser, {
+            locale,
             onProgress: ({ percent, message }) => {
               const current = importJobs.get(jobId);
               if (current && current.status === "RUNNING") {
@@ -277,16 +281,22 @@ cds.on("bootstrap", (app) => {
           if (current) {
             current.status = "COMPLETED";
             current.progress = 100;
-            current.message = "Import completed successfully.";
+            current.message = (result.failedCount > 0)
+              ? t("importExcelJobPartialSuccess", [result.importedCount, result.failedCount])
+              : t("importExcelJobSuccess");
             current.result = result;
+            if (result.errorFileBase64) {
+              current.errorBuffer = Buffer.from(result.errorFileBase64, "base64");
+              current.result.errorDownloadUrl = `/api/maintenance/download-errors/${jobId}`;
+            }
           }
         } catch (err) {
           console.error(`[AsyncImport] Job ${jobId} failed:`, err);
           const current = importJobs.get(jobId);
           if (current) {
             current.status = "FAILED";
-            current.message = err.message || "Import failed";
-            current.error = err.message || "Import failed";
+            current.message = err.message || t("importExcelJobFailed");
+            current.error = err.message || t("importExcelJobFailed");
           }
         }
       });
@@ -296,7 +306,7 @@ cds.on("bootstrap", (app) => {
         jobId,
         status: "RUNNING",
         progress: 5,
-        message: "File uploaded successfully. Processing in background."
+        message: t("importExcelJobUploaded")
       });
     } catch (err) {
       console.error("Error initiating async Excel import:", err);
@@ -317,6 +327,24 @@ cds.on("bootstrap", (app) => {
   });
 
   /**
+   * Endpoint to download error rows Excel file for a specific import job.
+   */
+  app.get("/api/maintenance/download-errors/:jobId", (req, res) => {
+    const { jobId } = req.params;
+    const job = importJobs.get(jobId);
+    if (!job || !job.errorBuffer) {
+      return res.status(404).json({ error: "No error file found for this import job" });
+    }
+    const filename = job.result?.errorFileName || `MaintenanceOrders_Errors_${jobId}.xlsx`;
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    return res.send(job.errorBuffer);
+  });
+
+  /**
    * Imports maintenance orders from an uploaded Excel workbook (synchronous legacy endpoint).
    *
    * @param {import('express').Request} req HTTP request containing the uploaded file.
@@ -333,7 +361,8 @@ cds.on("bootstrap", (app) => {
         }
 
         const currentUser = req.user?.id || "Administrator";
-        const result = await processExcelImport(req.file.buffer, currentUser);
+        const locale = req.headers["accept-language"]?.includes("en") ? "en" : (req.body?.locale || "vi");
+        const result = await processExcelImport(req.file.buffer, currentUser, { locale });
         return res.status(200).json(result);
       } catch (err) {
         console.error("Error processing Excel import:", err);
@@ -360,11 +389,11 @@ cds.on("bootstrap", (app) => {
           count(case when scheduled_to < '${today}' and UPPER(status) not in ('COMPLETED', 'CANCELLED') then 1 end) as "overdueCount",
           count(1) as "totalOrders",
           sum(case 
-            when estimated_cost is not null and estimated_cost > 0 then estimated_cost
             when UPPER(priority) in ('CRITICAL', '1-VERY HIGH', 'VERY HIGH', '1') then 15000
             when UPPER(priority) in ('HIGH', '2-HIGH', '2') then 8000
             when UPPER(priority) in ('MEDIUM', '3-MEDIUM', '3') then 3000
             when UPPER(priority) in ('LOW', '4-LOW', '4') then 1000
+            when estimated_cost is not null and estimated_cost > 0 then estimated_cost
             else 0
           end) as "rawEstimatedCost"
         FROM sap_cap_maintenance_MaintenanceOrders
@@ -388,7 +417,9 @@ cds.on("bootstrap", (app) => {
       const rawEstimatedCost = Number(row.rawEstimatedCost ?? row.RAWESTIMATEDCOST ?? 0);
 
       let estimatedCost = `$${rawEstimatedCost.toFixed(0)}`;
-      if (rawEstimatedCost >= 1000000) {
+      if (rawEstimatedCost >= 1000000000) {
+        estimatedCost = `$${(rawEstimatedCost / 1000000000).toFixed(1)}B`;
+      } else if (rawEstimatedCost >= 1000000) {
         estimatedCost = `$${(rawEstimatedCost / 1000000).toFixed(1)}M`;
       } else if (rawEstimatedCost >= 1000) {
         estimatedCost = `$${(rawEstimatedCost / 1000).toFixed(1)}K`;
