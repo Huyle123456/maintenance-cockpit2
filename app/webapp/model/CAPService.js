@@ -127,6 +127,76 @@ sap.ui.define([], function () {
     },
 
     /**
+     * Searches maintenance orders from backend by order_no, equipment_no, or description.
+     * Supports exact order_no key lookup and OData substring filtering.
+     *
+     * @param {string} query - Search term (e.g. 'MO-59125', 'Pump', 'EQ-001').
+     * @param {number} [limit=50] - Maximum number of orders to return.
+     * @returns {Promise<Array<object>>} Matching order records from database.
+     */
+    async searchOrders(query, limit = 50) {
+      const s = (query || "").trim();
+      if (!s) return [];
+
+      const results = [];
+      const seen = new Set();
+
+      // 1. If query looks like an order number (e.g., 'MO-59125', 'MO 59125', '59125'), try direct key lookup first
+      const isOrderPattern = /^mo[\s-]?\d+$/i.test(s) || /^\d+$/.test(s);
+      if (isOrderPattern) {
+        const cleanNo = s.replace(/\s+/g, "").toUpperCase();
+        const orderNo = cleanNo.startsWith("MO-")
+          ? cleanNo
+          : cleanNo.startsWith("MO")
+            ? `MO-${cleanNo.substring(2)}`
+            : `MO-${cleanNo}`;
+
+        try {
+          const single = await _fetchJson(`${getODataUrl()}/MaintenanceOrders('${orderNo}')`);
+          if (single && single.order_no && !seen.has(single.order_no)) {
+            results.push(single);
+            seen.add(single.order_no);
+            // Exact order found by primary key lookup, return immediately
+            return results;
+          }
+        } catch (e) {
+          // Key lookup not found, continue to query filter
+        }
+      }
+
+      // 2. Query via OData V4 $filter for order_no, equipment_no, or description
+      try {
+        const escaped = s.replace(/'/g, "''");
+        let filterExpr;
+        if (isOrderPattern) {
+          const cleanNo = s.replace(/\s+/g, "").toUpperCase();
+          const exactNo = cleanNo.startsWith("MO-")
+            ? cleanNo
+            : cleanNo.startsWith("MO")
+              ? `MO-${cleanNo.substring(2)}`
+              : `MO-${cleanNo}`;
+          filterExpr = `order_no eq '${exactNo}' or contains(order_no, '${escaped}')`;
+        } else {
+          filterExpr = `contains(order_no, '${escaped}') or contains(equipment_no, '${escaped}') or contains(description, '${escaped}')`;
+        }
+
+        const data = await _fetchJson(`${getODataUrl()}/MaintenanceOrders?$filter=${encodeURIComponent(filterExpr)}&$top=${limit}`);
+        if (data && Array.isArray(data.value)) {
+          for (const item of data.value) {
+            if (item && item.order_no && !seen.has(item.order_no)) {
+              results.push(item);
+              seen.add(item.order_no);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("[CAPService] searchOrders filter query error:", err);
+      }
+
+      return results;
+    },
+
+    /**
      * Retrieves a single maintenance order by its order number with deep expansion of relations.
      *
      * @param {string} orderId - Maintenance order number (e.g., 'MO-1001').

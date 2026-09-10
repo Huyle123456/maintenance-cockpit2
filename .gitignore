@@ -12,3 +12,5 @@ gen/
 *.sqlite-shm
 *.sqlite-wal
 scripts/
+mtad.yaml
+bin/

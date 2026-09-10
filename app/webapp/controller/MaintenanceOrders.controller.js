@@ -164,7 +164,7 @@ sap.ui.define(
          * Maintenance Orders table.
          *
          * Supported Filters:
-         * - Search
+         * - Search (with automatic backend query fallback when ID/term is not in initial memory)
          * - Equipment
          * - Plant
          * - Status
@@ -173,11 +173,12 @@ sap.ui.define(
          * - Planner
          * - Scheduled Date
          *
-         * @returns {void}
+         * @returns {Promise<void>}
          */
-        onFilterGo() {
+        async onFilterGo() {
           // Step 1: Read filter values from the FilterBar
-          const sSearch = (this.byId("inpSearch")?.getValue() || "").trim().toLowerCase();
+          const sRawSearch = (this.byId("inpSearch")?.getValue() || "").trim();
+          const sSearch = sRawSearch.toLowerCase();
 
           const aSelectedEquipments =
             this.getView()
@@ -201,9 +202,8 @@ sap.ui.define(
           const oActualEnd = this.byId("dpActualEnd")?.getDateValue();
           const sActualEnd = oActualEnd ? oActualEnd.toISOString().split("T")[0] : null;
 
-          // Step 2: Filter the full dataset
-          const aAll = this._aAllOrders || [];
-          this._aFilteredOrders = aAll.filter((o) => {
+          // Step 2: Predicate filter function
+          const fnFilterPredicate = (o) => {
             if (sSearch) {
               const matchOrder = (o.order || "").toLowerCase().includes(sSearch);
               const matchEq = (o.equipment || "").toLowerCase().includes(sSearch);
@@ -229,9 +229,35 @@ sap.ui.define(
             if (sActualEnd && (o.actualEnd || o.scheduledTo) > sActualEnd) return false;
 
             return true;
-          });
+          };
 
-          // Step 3: Reset to page 1 and recalculate pagination
+          let aFiltered = (this._aAllOrders || []).filter(fnFilterPredicate);
+
+          // Step 3: If search query was entered and no local records matched, query backend database directly
+          if (sRawSearch && aFiltered.length === 0) {
+            sap.ui.core.BusyIndicator.show(0);
+            try {
+              const aFound = await CAPService.searchOrders(sRawSearch, 100);
+              if (aFound && aFound.length > 0) {
+                const aNewRows = aFound.map(this._transformOrderRow.bind(this)).filter(Boolean);
+                const existingOrderNos = new Set((this._aAllOrders || []).map((r) => r.order));
+                const aToInsert = aNewRows.filter((r) => !existingOrderNos.has(r.order));
+                if (aToInsert.length > 0) {
+                  this._aAllOrders = aToInsert.concat(this._aAllOrders || []);
+                  OrderRepository.setOrders(this._aAllOrders);
+                }
+                aFiltered = (this._aAllOrders || []).filter(fnFilterPredicate);
+              }
+            } catch (err) {
+              console.warn("[MaintenanceOrders] Backend searchOrders error:", err);
+            } finally {
+              sap.ui.core.BusyIndicator.hide();
+            }
+          }
+
+          this._aFilteredOrders = aFiltered;
+
+          // Step 4: Reset to page 1 and recalculate pagination
           const oPagination = this.getView().getModel("pagination");
           if (oPagination) {
             oPagination.setProperty("/currentPage", 1);
@@ -1294,6 +1320,40 @@ sap.ui.define(
         /* =========================================================== */
 
         /**
+         * Transforms a raw MaintenanceOrder backend entity into a UI table row object.
+         *
+         * @param {object} oOrderItem Raw maintenance order record from backend.
+         * @returns {object|null} Formatted row object for UI models.
+         */
+        _transformOrderRow(oOrderItem) {
+          if (!oOrderItem) return null;
+          return {
+            order: oOrderItem.order_no || oOrderItem.order,
+            equipment: oOrderItem.equipment_no || oOrderItem.equipment,
+            description: oOrderItem.description,
+            plant: oOrderItem.plant,
+            type: oOrderItem.maintenance_type || oOrderItem.type,
+            priority: oOrderItem.priority,
+            priorityState: oOrderItem.priority_state || oOrderItem.priorityState,
+            statusLabel: oOrderItem.status || oOrderItem.statusLabel,
+            statusKey: formatter.normalizeStatus(oOrderItem.status || oOrderItem.statusLabel),
+            statusState: formatter.formatStatusState(oOrderItem.status || oOrderItem.statusLabel),
+            planner: oOrderItem.planner,
+            scheduledFrom: oOrderItem.scheduled_from || oOrderItem.scheduledFrom,
+            scheduledTo: oOrderItem.scheduled_to || oOrderItem.scheduledTo,
+            scheduled: `${oOrderItem.scheduled_from || oOrderItem.scheduledFrom || ""} -> ${oOrderItem.scheduled_to || oOrderItem.scheduledTo || ""}`,
+            isCritical:
+              formatter.normalizePriority(oOrderItem.priority) ===
+              constants.PRIORITY.CRITICAL,
+            isOverdue: formatter.isOverdue(
+              oOrderItem.scheduled_to || oOrderItem.scheduledTo,
+              oOrderItem.status || oOrderItem.statusLabel,
+            ),
+            etag: oOrderItem.etag,
+          };
+        },
+
+        /**
          * Loads page data and initializes dependent view models.
          *
          * @returns {Promise<void>} Resolves after controller data is initialized.
@@ -1333,30 +1393,7 @@ sap.ui.define(
             ];
 
             // Transform maintenance order records
-            const aOrderRows = (aRawOrders || []).map((oOrderItem) => ({
-              order: oOrderItem.order_no,
-              equipment: oOrderItem.equipment_no,
-              description: oOrderItem.description,
-              plant: oOrderItem.plant,
-              type: oOrderItem.maintenance_type,
-              priority: oOrderItem.priority,
-              priorityState: oOrderItem.priority_state,
-              statusLabel: oOrderItem.status,
-              statusKey: formatter.normalizeStatus(oOrderItem.status),
-              statusState: formatter.formatStatusState(oOrderItem.status),
-              planner: oOrderItem.planner,
-              scheduledFrom: oOrderItem.scheduled_from,
-              scheduledTo: oOrderItem.scheduled_to,
-              scheduled: `${oOrderItem.scheduled_from} -> ${oOrderItem.scheduled_to}`,
-              isCritical:
-                formatter.normalizePriority(oOrderItem.priority) ===
-                constants.PRIORITY.CRITICAL,
-              isOverdue: formatter.isOverdue(
-                oOrderItem.scheduled_to,
-                oOrderItem.status,
-              ),
-              etag: oOrderItem.etag,
-            }));
+            const aOrderRows = (aRawOrders || []).map(this._transformOrderRow.bind(this)).filter(Boolean);
 
             this._aAllOrders = aOrderRows;
             this._aFilteredOrders = aOrderRows.slice();
@@ -2053,30 +2090,7 @@ sap.ui.define(
         async _reloadOrdersFromBackend() {
           try {
             const aRawOrders = await CAPService.getMaintenanceOrders();
-            const aOrderRows = (aRawOrders || []).map((oOrderItem) => ({
-              order: oOrderItem.order_no,
-              equipment: oOrderItem.equipment_no,
-              description: oOrderItem.description,
-              plant: oOrderItem.plant,
-              type: oOrderItem.maintenance_type,
-              priority: oOrderItem.priority,
-              priorityState: oOrderItem.priority_state,
-              statusLabel: oOrderItem.status,
-              statusKey: formatter.normalizeStatus(oOrderItem.status),
-              statusState: formatter.formatStatusState(oOrderItem.status),
-              planner: oOrderItem.planner,
-              scheduledFrom: oOrderItem.scheduled_from,
-              scheduledTo: oOrderItem.scheduled_to,
-              scheduled: `${oOrderItem.scheduled_from} -> ${oOrderItem.scheduled_to}`,
-              isCritical:
-                formatter.normalizePriority(oOrderItem.priority) ===
-                constants.PRIORITY.CRITICAL,
-              isOverdue: formatter.isOverdue(
-                oOrderItem.scheduled_to,
-                oOrderItem.status,
-              ),
-              etag: oOrderItem.etag,
-            }));
+            const aOrderRows = (aRawOrders || []).map(this._transformOrderRow.bind(this)).filter(Boolean);
 
             OrderRepository.setOrders(aOrderRows);
             this._aAllOrders = aOrderRows;

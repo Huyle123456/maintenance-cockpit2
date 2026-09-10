@@ -372,6 +372,7 @@
                                                                 id="inpSearch"
                                                                 width="100%"
                                                                 placeholder="{i18n>maintenanceOrdersFilterSearchPlaceholder}"
+                                                                submit="onFilterGo"
                                                             />
                                                         </VBox>
 
