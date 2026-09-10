@@ -30,6 +30,30 @@ entity MaintenanceOrders : managed {
       history                  : Composition of many OrderHistory on history.order_no = order_no;
 }
 
+entity StagingMaintenanceOrders {
+  key order_no                 : String(20);
+      equipment_no             : String(20);
+      description              : String(255);
+      plant                    : String(10);
+      maintenance_type         : String(50);
+      priority                 : String(20);
+      priority_state           : String(20);
+      status                   : String(20);
+      status_state             : String(20);
+      planner                  : String(100);
+      scheduled_from           : Date;
+      scheduled_to             : Date;
+      location                 : String(255);
+      work_center              : String(50);
+      operation_count          : Integer default 0;
+      completed_operation_count: Integer default 0;
+      planned_hours            : Decimal(10, 2) default 0.0;
+      actual_hours             : Decimal(10, 2) default 0.0;
+      estimated_cost           : Decimal(15, 2) default 0.0;
+      currency                 : String(5) default 'USD';
+      etag                     : String(50);
+}
+
 entity Equipments : managed {
   key equipment    : String(20);
       description  : String(255);
