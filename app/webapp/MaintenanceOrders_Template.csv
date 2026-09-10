@@ -1,6 +1,0 @@
-Order,Equipment,Description,Plant,Type,Priority,Planner,ScheduledFrom,ScheduledTo,Operations,Materials
-MO-2001,EQ-001,Pump A Monthly Overhaul & Inspection,1000,PREVENTIVE,HIGH,JOHN,2026-09-10,2026-09-15,"10:Vibration Test:2; 20:Check Seals:3.5; 30:Pressure Test:2","MAT-001:2; MAT-003:5"
-MO-2002,EQ-002,Motor Bearing Check & Alignment,2000,CORRECTIVE,MEDIUM,SARAH,2026-09-12,2026-09-18,"10:Measure Temp:1.5; 20:Grease Bearings:1","MAT-001:1; MAT-003:2"
-MO-2003,EQ-003,Emergency Valve Fix & Replacement,3000,EMERGENCY,CRITICAL,ALEX,2026-09-05,2026-09-05,"10:Isolate Valve:1; 20:Replace Core:4","MAT-002:1; MAT-005:8"
-MO-2004,EQ-004,Conveyor Belt Tension Tuning,1000,PREVENTIVE,LOW,JOHN,2026-09-20,2026-09-25,"10:Tension Check:2; 20:Alignment:1","MAT-005:10"
-MO-2005,EQ-005,Turbine Lubricant & Filter Service,2000,PREVENTIVE,HIGH,SARAH,2026-09-15,2026-09-22,"10:Drain Oil:1; 20:Refill Lubricant:2","MAT-003:5; MAT-002:1"

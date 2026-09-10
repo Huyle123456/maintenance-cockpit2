@@ -55,6 +55,21 @@ const translations = {
     importExcelJobPartialSuccess: "Import hoàn tất một phần: {0} đơn thành công, {1} dòng lỗi.",
     importExcelJobSuccess: "Import hoàn tất thành công 100%.",
     importExcelJobFailed: "Tiến trình import thất bại",
+
+    // General API & Order Lifecycle Messages
+    errTemplateGen: "Không thể tạo tệp mẫu Excel",
+    errNoFileUploaded: "Chưa có tệp Excel nào được tải lên",
+    errKpiQueryFailed: "Lỗi khi truy vấn chỉ số KPI",
+    errOrderNoRequired: "Mã đơn hàng là bắt buộc",
+    auditOrderCreated: "Đơn hàng bảo trì đã được tạo mới",
+    auditOrderCancelled: "Lệnh bảo trì đã bị hủy bởi người dùng",
+    auditOrderCompleted: "Lệnh bảo trì đã được đánh dấu hoàn thành",
+    historyOrderCreatedTitle: "Tạo lệnh bảo trì",
+    historyOrderCreatedText: "Đơn hàng được khởi tạo trong hệ thống",
+    historyOrderCancelledTitle: "Trạng thái đổi thành CANCELLED",
+    historyOrderCancelledText: "Lệnh bảo trì đã bị hủy",
+    historyOrderCompletedTitle: "Trạng thái đổi thành COMPLETED",
+    historyOrderCompletedText: "Công việc bảo trì đã hoàn tất",
   },
   en: {
     // Validation: Date
@@ -107,6 +122,21 @@ const translations = {
     importExcelJobPartialSuccess: "Partial import completed: {0} orders successful, {1} failed rows.",
     importExcelJobSuccess: "Import completed successfully.",
     importExcelJobFailed: "Import job failed",
+
+    // General API & Order Lifecycle Messages
+    errTemplateGen: "Failed to generate Excel template",
+    errNoFileUploaded: "No Excel file uploaded",
+    errKpiQueryFailed: "Failed to query KPI metrics",
+    errOrderNoRequired: "Order number is required",
+    auditOrderCreated: "Maintenance order created",
+    auditOrderCancelled: "Order cancelled by user",
+    auditOrderCompleted: "Order marked as completed",
+    historyOrderCreatedTitle: "Order created",
+    historyOrderCreatedText: "Order initialized in system",
+    historyOrderCancelledTitle: "Status changed to CANCELLED",
+    historyOrderCancelledText: "Order cancelled",
+    historyOrderCompletedTitle: "Status changed to COMPLETED",
+    historyOrderCompletedText: "Maintenance work finished",
   }
 };
 

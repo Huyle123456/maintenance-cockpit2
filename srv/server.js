@@ -18,12 +18,13 @@ function resolveLocalModule(name) {
 const { processExcelImport } = resolveLocalModule("excel-import-service");
 const { getExcelTemplateSampleData } = resolveLocalModule("excel-template-sample-data");
 const { getText } = resolveLocalModule("i18n");
+const { IMPORT_CONFIG } = resolveLocalModule("constants");
 
 // Configure multer for file uploads in memory buffer
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 100 * 1024 * 1024, // 100MB limit for massive Excel files
+    fileSize: IMPORT_CONFIG.MAX_FILE_SIZE_BYTES, // 100MB limit for massive Excel files
   },
 });
 
@@ -219,22 +220,23 @@ cds.on("bootstrap", (app) => {
       res.end();
     } catch (err) {
       console.error("Error generating template:", err);
-      res.status(500).json({ error: "Failed to generate Excel template" });
+      const locale = req.headers["accept-language"]?.includes("en") ? "en" : (req.query?.locale || "en");
+      res.status(500).json({ error: getText("errTemplateGen", [], locale) });
     }
   });
 
   // In-memory registry for asynchronous background import jobs
   const importJobs = new Map();
 
-  // Periodically clean up jobs older than 1 hour to prevent memory leaks
+  // Periodically clean up expired jobs to prevent memory leaks
   setInterval(() => {
-    const oneHourAgo = Date.now() - 60 * 60 * 1000;
+    const expiryThreshold = Date.now() - IMPORT_CONFIG.JOB_EXPIRY_MS;
     for (const [id, job] of importJobs.entries()) {
-      if (job.createdAt < oneHourAgo) {
+      if (job.createdAt < expiryThreshold) {
         importJobs.delete(id);
       }
     }
-  }, 15 * 60 * 1000);
+  }, IMPORT_CONFIG.JOB_CLEANUP_INTERVAL_MS);
 
   /**
    * Asynchronous Excel Import Endpoint.
@@ -243,15 +245,16 @@ cds.on("bootstrap", (app) => {
    */
   app.post("/api/maintenance/import-excel-async", upload.single("file"), (req, res) => {
     try {
+      const locale = req.headers["accept-language"]?.includes("en") ? "en" : (req.body?.locale || "en");
+      const t = (key, args) => getText(key, args, locale);
+
       if (!req.file || !req.file.buffer) {
-        return res.status(400).json({ error: "No Excel file uploaded" });
+        return res.status(400).json({ error: t("errNoFileUploaded") });
       }
 
       const jobId = `job-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
       const currentUser = req.user?.id || "Administrator";
       const fileBuffer = req.file.buffer;
-      const locale = req.headers["accept-language"]?.includes("en") ? "en" : (req.body?.locale || "vi");
-      const t = (key, args) => getText(key, args, locale);
 
       const jobRecord = {
         jobId,
@@ -291,7 +294,8 @@ cds.on("bootstrap", (app) => {
             }
           }
         } catch (err) {
-          console.error(`[AsyncImport] Job ${jobId} failed:`, err);
+          console.error(`[Async
+            Import] Job ${jobId} failed:`, err);
           const current = importJobs.get(jobId);
           if (current) {
             current.status = "FAILED";
@@ -436,7 +440,8 @@ cds.on("bootstrap", (app) => {
       });
     } catch (err) {
       console.error("[server.js] Error querying kpi metrics:", err);
-      res.status(500).json({ error: "Failed to query KPI metrics" });
+      const locale = req.headers["accept-language"]?.includes("en") ? "en" : "en";
+      res.status(500).json({ error: getText("errKpiQueryFailed", [], locale) });
     }
   });
 });

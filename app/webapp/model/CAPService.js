@@ -1,27 +1,37 @@
 sap.ui.define([], function () {
   "use strict";
 
-  const DIRECT_SRV_URL = "https://3b342f32trial-dev-zpm-maintenance-cockpit-srv.cfapps.us10-001.hana.ondemand.com";
+  const DEFAULT_FALLBACK_URL = "https://3b342f32trial-dev-zpm-maintenance-cockpit-srv.cfapps.us10-001.hana.ondemand.com";
 
   /**
    * Resolves the base URL for backend service requests.
-   * Uses relative root path if running on local CAP development server (port 4004),
-   * otherwise points directly to the deployed Cloud Foundry service URL.
+   * - On local CAP development server (port 4004), returns relative root ("").
+   * - If hosted directly on Cloud Foundry standalone domain, dynamically returns window.location.origin.
+   * - If inside an external portal iframe (Work Zone / Fiori Launchpad), falls back to the configured Cloud Foundry backend URL.
    *
    * @returns {string} Base URL for backend communications.
    */
   function getBaseUrl() {
-    // If running directly on local CAP server (port 4004), use relative path
-    if (
-      typeof window !== "undefined" &&
-      window.location &&
-      (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") &&
-      window.location.port === "4004"
-    ) {
-      return "";
+    if (typeof window !== "undefined" && window.location) {
+      const hostname = window.location.hostname || "";
+      const port = window.location.port || "";
+
+      // Local development on CAP server (port 4004)
+      if ((hostname === "localhost" || hostname === "127.0.0.1") && port === "4004") {
+        return "";
+      }
+
+      // If running on a standalone Cloud Foundry domain or custom host (not inside an external portal iframe)
+      if (
+        window.location.origin &&
+        !hostname.includes("workzone") &&
+        !hostname.includes("launchpad") &&
+        !hostname.includes("ondemand.com/site")
+      ) {
+        return window.location.origin;
+      }
     }
-    // In SAP Build Work Zone, Fiori Launchpad, or HTML5 repo, use DIRECT_SRV_URL directly
-    return DIRECT_SRV_URL;
+    return DEFAULT_FALLBACK_URL;
   }
 
   /**
@@ -50,19 +60,20 @@ sap.ui.define([], function () {
    * @returns {string} Fully qualified direct backend URL.
    */
   function _getDirectUrl(url) {
-    if (!url) return DIRECT_SRV_URL;
+    const base = getBaseUrl() || DEFAULT_FALLBACK_URL;
+    if (!url) return base;
     if (url.startsWith("http://") || url.startsWith("https://")) {
       return url;
     }
     const idx = url.indexOf("/odata/v4/maintenance");
     if (idx !== -1) {
-      return DIRECT_SRV_URL + url.substring(idx);
+      return base + url.substring(idx);
     }
     const apiIdx = url.indexOf("/api/maintenance");
     if (apiIdx !== -1) {
-      return DIRECT_SRV_URL + url.substring(apiIdx);
+      return base + url.substring(apiIdx);
     }
-    return DIRECT_SRV_URL + (url.startsWith("/") ? url : "/" + url);
+    return base + (url.startsWith("/") ? url : "/" + url);
   }
 
   /**

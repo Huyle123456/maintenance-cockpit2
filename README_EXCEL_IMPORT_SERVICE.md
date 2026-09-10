@@ -20,22 +20,23 @@ const result = await processExcelImport(fileBuffer, currentUser, {
 
 | Function                                               | Public                           | Mục đích                                                                                                                                                                                                |
 | ------------------------------------------------------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `normalizeDate(rawDate)`                               | Yes                              | Chuẩn hóa ngày về `YYYY-MM-DD`. Hỗ trợ `Date`, ISO date, `DD/MM/YYYY`, `DD-MM-YYYY`, giá trị serial date của Excel và chuỗi ngày mà JavaScript đọc được. Giá trị trống/không hợp lệ dùng ngày hiện tại. |
+| `parseAndValidateDate(rawDate, locale)`                | Yes                              | Xác thực và chuẩn hóa ngày về `YYYY-MM-DD`. Kiểm tra tính hợp lệ trên lịch, số serial Excel, định dạng DD/MM/YYYY. Trả về `{ valid: true, dateStr }` hoặc `{ valid: false, error }`. |
 | `normalizeMaintenanceType(raw)`                        | Yes                              | Quy đổi text type về `PREVENTIVE`, `CORRECTIVE`, hoặc `EMERGENCY`. Nhận cả từ khóa tiếng Anh và tiếng Việt như `PHÒNG`, `SỬA CHỮA`, `KHẨN`. Mặc định là `PREVENTIVE`.                                   |
 | `normalizePriority(raw)`                               | Yes                              | Quy đổi priority và UI state tương ứng. Trả `{ priority, priorityState }`, ví dụ `CRITICAL`/`Error`, `HIGH`/`Error`, `MEDIUM`/`Warning`, `LOW`/`Success`.                                               |
 | `normalizeRowKeys(object)`                             | No                               | Đổi tên cột Excel thành lower-case, bỏ whitespace, `_`, `-`, `#`, `.`, `(`, `)`, `/`. Nhờ đó các cách đặt header khác nhau vẫn được đọc được.                                                           |
 | `getRowField(normalizedRow, keys, defaultValue)`       | No                               | Lấy giá trị không rỗng đầu tiên trong danh sách tên cột tương đương; nếu không có thì dùng default.                                                                                                     |
-| `batchInsert(entity, entries, batchSize)`              | No                               | Insert theo chunk, mặc định `500` record/lần, tránh vượt giới hạn parameter của HANA/SQLite.                                                                                                            |
+| `batchInsert(entity, entries, batchSize)`              | No                               | Insert theo chunk song song qua `Promise.all`, mặc định `500` record/lần, tránh vượt giới hạn parameter của HANA/SQLite.                                                                                  |
 | `processExcelImport(fileSource, currentUser, options)` | Yes                              | Luồng import chính: đọc workbook, validate/chuẩn hóa, upsert order, thay thế operations/materials và tạo audit/history.                                                                                 |
 | `notifyProgress(percent, message)`                     | Local trong `processExcelImport` | Gọi `options.onProgress` nếu được truyền vào. Lỗi callback chỉ log warning, không làm fail import.                                                                                                      |
 | `findEntity(name)`                                     | Local trong `processExcelImport` | Lấy CDS entity trong namespace `sap.cap.maintenance`; fallback sang tên đầy đủ nếu runtime chưa resolve entity object.                                                                                  |
 
-Module chỉ export ba helper normalization và `processExcelImport`:
+Module export các helper chính và `processExcelImport`:
 
 ```js
 module.exports = {
   processExcelImport,
-  normalizeDate,
+  generateErrorWorkbookBuffer,
+  parseAndValidateDate,
   normalizeMaintenanceType,
   normalizePriority,
 };

@@ -7,6 +7,7 @@ sap.ui.define(
     "sap/ui/model/FilterOperator",
     "sap/ui/core/Fragment",
     "sap/m/MessageToast",
+    "sap/m/MessageBox",
     "com/fsoft/zpmmaintenancecockpit/model/AuditHistoryService",
     "com/fsoft/zpmmaintenancecockpit/model/formatter",
     "com/fsoft/zpmmaintenancecockpit/model/OrderRepository",
@@ -22,6 +23,7 @@ sap.ui.define(
     FilterOperator,
     Fragment,
     MessageToast,
+    MessageBox,
     AuditHistoryService,
     formatter,
     OrderRepository,
@@ -345,10 +347,8 @@ sap.ui.define(
             if (!g) {
               e.push(t.getText("ruleScheduleValid"));
             }
-            sap.ui.require(["sap/m/MessageBox"], (o) => {
-              o.error(e.join("\n"), {
-                title: t.getText("warning") || "Warning",
-              });
+            MessageBox.error(e.join("\n"), {
+              title: t.getText("warning") || "Warning",
             });
             return;
           }

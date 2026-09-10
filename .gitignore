@@ -10,4 +10,5 @@ archive.zip
 .*_mta_build_tmp
 gen/
 *.sqlite-shm
-*.sqlite-wal
+*.sqlite-wal
+scripts/

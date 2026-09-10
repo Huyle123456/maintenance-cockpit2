@@ -1021,10 +1021,8 @@ sap.ui.define(
             setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
           } catch (err) {
             console.error("Error downloading template:", err);
-            window.open(
-              "https://3b342f32trial-dev-zpm-maintenance-cockpit-srv.cfapps.us10-001.hana.ondemand.com/api/maintenance/download-template",
-              "_blank",
-            );
+            const downloadUrl = CAPService.getDirectUrl("/api/maintenance/download-template");
+            window.open(downloadUrl, "_blank");
           }
         },
 

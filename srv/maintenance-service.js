@@ -1,4 +1,6 @@
 const cds = global.cds || require("@sap/cds");
+const { getText } = require("./i18n");
+const { ORDER_STATUS, VALUE_STATE } = require("./constants");
 
 module.exports = cds.service.impl(async function () {
   const {
@@ -153,8 +155,8 @@ module.exports = cds.service.impl(async function () {
       }
       data.order_no = `MO-${nextNum}`;
     }
-    if (!data.status) data.status = "OPEN";
-    if (!data.status_state) data.status_state = "Success";
+    if (!data.status) data.status = ORDER_STATUS.OPEN;
+    if (!data.status_state) data.status_state = VALUE_STATE.SUCCESS;
     if (!data.etag) data.etag = `W/"${Date.now()}"`;
   });
 
@@ -167,20 +169,21 @@ module.exports = cds.service.impl(async function () {
    */
   this.after("CREATE", "MaintenanceOrders", async (data, req) => {
     const currentUser = req.user?.id || "Current User";
+    const locale = req.user?.locale || "en";
     await INSERT.into(AuditHistory).entries({
       timestamp: new Date().toISOString().replace("T", " ").substring(0, 16),
       user: currentUser,
       object: data.order_no,
       action: "CREATE",
-      details: "Maintenance order created",
+      details: getText("auditOrderCreated", [], locale),
     });
 
     await INSERT.into(OrderHistory).entries({
       order_no: data.order_no,
-      title: "Order created",
+      title: getText("historyOrderCreatedTitle", [], locale),
       dateTime: new Date().toISOString().replace("T", " ").substring(0, 16),
       userName: currentUser,
-      text: "Order initialized in system",
+      text: getText("historyOrderCreatedText", [], locale),
       icon: "sap-icon://create",
     });
   });
@@ -192,11 +195,12 @@ module.exports = cds.service.impl(async function () {
    * @returns {Promise<object|void>} Updated order, or a CAP validation error.
    */
   this.on("cancelOrder", async (req) => {
+    const locale = req.user?.locale || "en";
     const { order_no, reason } = req.data;
-    if (!order_no) return req.error(400, "Order number is required");
+    if (!order_no) return req.error(400, getText("errOrderNoRequired", [], locale));
 
     await UPDATE(MaintenanceOrders)
-      .set({ status: "CANCELLED", status_state: "Error" })
+      .set({ status: ORDER_STATUS.CANCELLED, status_state: VALUE_STATE.ERROR })
       .where({ order_no });
 
     const currentUser = req.user?.id || "Current User";
@@ -205,15 +209,15 @@ module.exports = cds.service.impl(async function () {
       user: currentUser,
       object: order_no,
       action: "CANCEL",
-      details: reason || "Order cancelled by user",
+      details: reason || getText("auditOrderCancelled", [], locale),
     });
 
     await INSERT.into(OrderHistory).entries({
       order_no: order_no,
-      title: "Status changed to CANCELLED",
+      title: getText("historyOrderCancelledTitle", [], locale),
       dateTime: new Date().toISOString().replace("T", " ").substring(0, 16),
       userName: currentUser,
-      text: reason || "Order cancelled",
+      text: reason || getText("historyOrderCancelledText", [], locale),
       icon: "sap-icon://cancel",
     });
 
@@ -227,11 +231,12 @@ module.exports = cds.service.impl(async function () {
    * @returns {Promise<object|void>} Updated order, or a CAP validation error.
    */
   this.on("completeOrder", async (req) => {
+    const locale = req.user?.locale || "en";
     const { order_no } = req.data;
-    if (!order_no) return req.error(400, "Order number is required");
+    if (!order_no) return req.error(400, getText("errOrderNoRequired", [], locale));
 
     await UPDATE(MaintenanceOrders)
-      .set({ status: "COMPLETED", status_state: "Success" })
+      .set({ status: ORDER_STATUS.COMPLETED, status_state: VALUE_STATE.SUCCESS })
       .where({ order_no });
 
     const currentUser = req.user?.id || "Current User";
@@ -240,15 +245,15 @@ module.exports = cds.service.impl(async function () {
       user: currentUser,
       object: order_no,
       action: "COMPLETE",
-      details: "Order marked as completed",
+      details: getText("auditOrderCompleted", [], locale),
     });
 
     await INSERT.into(OrderHistory).entries({
       order_no: order_no,
-      title: "Status changed to COMPLETED",
+      title: getText("historyOrderCompletedTitle", [], locale),
       dateTime: new Date().toISOString().replace("T", " ").substring(0, 16),
       userName: currentUser,
-      text: "Maintenance work finished",
+      text: getText("historyOrderCompletedText", [], locale),
       icon: "sap-icon://complete",
     });
 

@@ -1,82 +1,25 @@
+const crypto = require("crypto");
 const ExcelJS = require("exceljs");
 const XLSX = require("xlsx");
 const cds = global.cds || require("@sap/cds");
 const { getText } = require("./i18n");
+const {
+  ORDER_STATUS,
+  PRIORITY,
+  MAINTENANCE_TYPE,
+  VALUE_STATE,
+  IMPORT_CONFIG,
+} = require("./constants");
 
-/**
- * Normalizes a date value to the YYYY-MM-DD format.
- * Supports:
- * - Date objects
- * - ISO strings (YYYY-MM-DD)
- * - Slash formats (DD/MM/YYYY or MM/DD/YYYY)
- * - Excel serial number dates (e.g., 45123)
- *
- * @param {*} rawDate Date value to normalize.
- * @returns {string} Normalized date string in YYYY-MM-DD format.
- */
-function normalizeDate(rawDate) {
-  if (!rawDate) return new Date().toISOString().slice(0, 10);
-  if (rawDate instanceof Date) {
-    if (!isNaN(rawDate.getTime())) {
-      return rawDate.toISOString().slice(0, 10);
-    }
-    return new Date().toISOString().slice(0, 10);
-  }
-
-  // Handle numeric Excel date serial number (e.g. 45231)
-  if (
-    typeof rawDate === "number" ||
-    (!isNaN(rawDate) &&
-      !isNaN(parseFloat(rawDate)) &&
-      String(rawDate).indexOf("-") === -1 &&
-      String(rawDate).indexOf("/") === -1)
-  ) {
-    const serial = parseFloat(rawDate);
-    if (serial > 1000) {
-      const utcDays = Math.floor(serial - 25569);
-      const utcValue = utcDays * 86400;
-      const dateInfo = new Date(utcValue * 1000);
-      if (!isNaN(dateInfo.getTime())) {
-        return dateInfo.toISOString().slice(0, 10);
-      }
-    }
-  }
-
-  const s = String(rawDate).trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-
-  // Check DD/MM/YYYY or DD-MM-YYYY
-  const dmyMatch = s.match(/^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})$/);
-  if (dmyMatch) {
-    let day = parseInt(dmyMatch[1], 10);
-    let month = parseInt(dmyMatch[2], 10);
-    const year = parseInt(dmyMatch[3], 10);
-    // If month > 12 and day <= 12, swap
-    if (month > 12 && day <= 12) {
-      const temp = day;
-      day = month;
-      month = temp;
-    }
-    const mm = String(month).padStart(2, "0");
-    const dd = String(day).padStart(2, "0");
-    return `${year}-${mm}-${dd}`;
-  }
-
-  const d = new Date(s);
-  if (!isNaN(d.getTime())) {
-    return d.toISOString().slice(0, 10);
-  }
-  return new Date().toISOString().slice(0, 10);
-}
 
 /**
  * Normalizes Maintenance Type strings to valid system values.
  *
- * @param {string} raw
+ * @param {string} raw Raw maintenance type from Excel.
  * @returns {string} PREVENTIVE | CORRECTIVE | EMERGENCY
  */
 function normalizeMaintenanceType(raw) {
-  if (!raw) return "PREVENTIVE";
+  if (!raw) return MAINTENANCE_TYPE.PREVENTIVE;
   const s = String(raw).toUpperCase().trim();
   if (
     s.includes("PREV") ||
@@ -84,7 +27,7 @@ function normalizeMaintenanceType(raw) {
     s.includes("ĐỊNH KỲ") ||
     s.includes("PLAN")
   ) {
-    return "PREVENTIVE";
+    return MAINTENANCE_TYPE.PREVENTIVE;
   }
   if (
     s.includes("CORR") ||
@@ -92,22 +35,22 @@ function normalizeMaintenanceType(raw) {
     s.includes("FIX") ||
     s.includes("BREAK")
   ) {
-    return "CORRECTIVE";
+    return MAINTENANCE_TYPE.CORRECTIVE;
   }
   if (s.includes("EMERG") || s.includes("KHẨN") || s.includes("URGENT")) {
-    return "EMERGENCY";
+    return MAINTENANCE_TYPE.EMERGENCY;
   }
-  return "PREVENTIVE";
+  return MAINTENANCE_TYPE.PREVENTIVE;
 }
 
 /**
- * Normalizes Priority strings and determines UI state.
+ * Normalizes Priority strings and determines UI value state.
  *
- * @param {string} raw
- * @returns {{ priority: string, priorityState: string }}
+ * @param {string} raw Raw priority string from Excel.
+ * @returns {{ priority: string, priorityState: string }} Normalized priority and Fiori value state.
  */
 function normalizePriority(raw) {
-  if (!raw) return { priority: "MEDIUM", priorityState: "Warning" };
+  if (!raw) return { priority: PRIORITY.MEDIUM, priorityState: VALUE_STATE.WARNING };
   const s = String(raw).toUpperCase().trim();
   if (
     s.includes("CRIT") ||
@@ -115,15 +58,15 @@ function normalizePriority(raw) {
     s.includes("VERY HIGH") ||
     s.includes("P1")
   ) {
-    return { priority: "CRITICAL", priorityState: "Error" };
+    return { priority: PRIORITY.CRITICAL, priorityState: VALUE_STATE.ERROR };
   }
   if (s.includes("HIGH") || s.includes("CAO") || s.includes("P2")) {
-    return { priority: "HIGH", priorityState: "Error" };
+    return { priority: PRIORITY.HIGH, priorityState: VALUE_STATE.ERROR };
   }
   if (s.includes("LOW") || s.includes("THẤP") || s.includes("P4")) {
-    return { priority: "LOW", priorityState: "Success" };
+    return { priority: PRIORITY.LOW, priorityState: VALUE_STATE.SUCCESS };
   }
-  return { priority: "MEDIUM", priorityState: "Warning" };
+  return { priority: PRIORITY.MEDIUM, priorityState: VALUE_STATE.WARNING };
 }
 
 /**
@@ -166,18 +109,21 @@ function getRowField(normRow, keys, def = "") {
 }
 
 /**
- * High-performance batch insert for database operations to prevent parameter limits.
+ * High-performance parallel batch insert for database operations using Promise.all.
  *
  * @param {*} entity CDS entity definition.
  * @param {object[]} entries Array of entries to insert.
- * @param {number} batchSize Batch chunk size.
+ * @param {number} [batchSize=IMPORT_CONFIG.DEFAULT_BATCH_SIZE] Batch chunk size.
+ * @returns {Promise<void>}
  */
-async function batchInsert(entity, entries, batchSize = 500) {
+async function batchInsert(entity, entries, batchSize = IMPORT_CONFIG.DEFAULT_BATCH_SIZE) {
   if (!entries || entries.length === 0) return;
+  const promises = [];
   for (let i = 0; i < entries.length; i += batchSize) {
     const chunk = entries.slice(i, i + batchSize);
-    await INSERT.into(entity).entries(chunk);
+    promises.push(INSERT.into(entity).entries(chunk));
   }
+  await Promise.all(promises);
 }
 
 /**
@@ -307,6 +253,20 @@ async function generateErrorWorkbookBuffer(errorList, locale = "vi") {
     fgColor: { argb: "FFD32F2F" } // Danger Red
   };
 
+  const FIELD_TO_COL = {
+    order: 2,
+    equipment: 3,
+    description: 4,
+    plant: 5,
+    type: 6,
+    priority: 7,
+    planner: 8,
+    scheduledFrom: 9,
+    scheduledTo: 10,
+    operations: 11,
+    materials: 12,
+  };
+
   errorList.forEach((item) => {
     const raw = item.rawRow || {};
     const row = ws.addRow({
@@ -325,13 +285,64 @@ async function generateErrorWorkbookBuffer(errorList, locale = "vi") {
       errorReason: item.error || raw.errorReason || "",
     });
 
+    // 1. Highlight Error Reason column (column 13)
     const errCell = row.getCell(13);
-    errCell.font = { color: { argb: "FFC62828" }, bold: true };
+    errCell.font = { color: { argb: "FFB71C1C" }, bold: true };
     errCell.fill = {
       type: "pattern",
       pattern: "solid",
       fgColor: { argb: "FFFFEBEE" }
     };
+
+    // 2. Identify and highlight specific error cells in RED
+    const errorFields = new Set(item.errorFields || []);
+    const errText = (item.error || "").toLowerCase();
+
+    if (errText.includes("equipment") || errText.includes("thiết bị")) {
+      errorFields.add("equipment");
+    }
+    if (errText.includes("description") || errText.includes("mô tả")) {
+      errorFields.add("description");
+    }
+    if (errText.includes("plant") || errText.includes("nhà xưởng")) {
+      errorFields.add("plant");
+    }
+    if (errText.includes("start date") || errText.includes("ngày bắt đầu")) {
+      errorFields.add("scheduledFrom");
+    }
+    if (errText.includes("end date") || errText.includes("ngày kết thúc")) {
+      errorFields.add("scheduledTo");
+    }
+    if (errText.includes("later than end date") || errText.includes("lớn hơn ngày kết thúc")) {
+      errorFields.add("scheduledFrom");
+      errorFields.add("scheduledTo");
+    }
+    if (errText.includes("operation") || errText.includes("công việc") || errText.includes("giờ")) {
+      errorFields.add("operations");
+    }
+    if (errText.includes("material") || errText.includes("vật tư") || errText.includes("số lượng")) {
+      errorFields.add("materials");
+    }
+
+    // Highlight each identified cell with red background, bold dark-red text, and red border
+    errorFields.forEach((fieldName) => {
+      const colIdx = FIELD_TO_COL[fieldName];
+      if (colIdx) {
+        const cell = row.getCell(colIdx);
+        cell.font = { color: { argb: "FFB71C1C" }, bold: true };
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFFFCDD2" } // Soft prominent red fill
+        };
+        cell.border = {
+          top: { style: "thin", color: { argb: "FFE57373" } },
+          left: { style: "thin", color: { argb: "FFE57373" } },
+          bottom: { style: "thin", color: { argb: "FFE57373" } },
+          right: { style: "thin", color: { argb: "FFE57373" } },
+        };
+      }
+    });
   });
 
   return await workbook.xlsx.writeBuffer();
@@ -440,7 +451,7 @@ async function processExcelImport(
 
   // Calculate highest existing order sequence in DB
   const mapExistingOrders = new Map();
-  let maxOrderSeq = 1000;
+  let maxOrderSeq = IMPORT_CONFIG.BASE_ORDER_SEQ;
   (aExistingOrders || []).forEach((o) => {
     mapExistingOrders.set(o.order_no, o);
     const m = String(o.order_no).match(/MO-(\d+)/i);
@@ -629,7 +640,7 @@ async function processExcelImport(
     .toISOString()
     .replace("T", " ")
     .substring(0, 16);
-  const laborRatePerHour = 50.0;
+  const laborRatePerHour = IMPORT_CONFIG.LABOR_RATE_PER_HOUR;
   const seenOrderNosInFile = new Set();
 
   for (let idx = 0; idx < orderRowsRaw.length; idx++) {
@@ -713,27 +724,32 @@ async function processExcelImport(
     totalRows++;
 
     const rowErrors = [];
+    const errorFields = new Set();
 
     // 1. Equipment validation (Mandatory & Must exist in master data)
     let equipmentNo = rawEquipment ? rawEquipment.trim().toUpperCase() : "";
     if (!equipmentNo) {
       rowErrors.push(t("importExcelEquipmentRequired"));
+      errorFields.add("equipment");
     } else if (setEquipments.size > 0 && !setEquipments.has(equipmentNo)) {
       rowErrors.push(t("importExcelEquipmentNotFound", [rawEquipment.trim()]));
+      errorFields.add("equipment");
     }
 
     // 2. Description validation (Mandatory)
     const description = rawDescription ? rawDescription.trim() : "";
     if (!description) {
       rowErrors.push(t("importExcelDescriptionRequired"));
+      errorFields.add("description");
     }
 
     // 3. Plant validation
     let plant = rawPlant ? rawPlant.trim().toUpperCase() : "";
     if (!plant) {
-      plant = "1000"; // default plant if not provided
+      plant = IMPORT_CONFIG.DEFAULT_PLANT; // default plant if not provided
     } else if (setPlants.size > 0 && !setPlants.has(plant)) {
       rowErrors.push(t("importExcelPlantNotFound", [rawPlant.trim()]));
+      errorFields.add("plant");
     }
 
     // 4. Date validation
@@ -743,6 +759,7 @@ async function processExcelImport(
       const vFrom = parseAndValidateDate(rawFrom, locale);
       if (!vFrom.valid) {
         rowErrors.push(vFrom.error || t("importExcelDateInvalid", [rawFrom]));
+        errorFields.add("scheduledFrom");
       } else {
         scheduledFrom = vFrom.dateStr;
       }
@@ -754,6 +771,7 @@ async function processExcelImport(
       const vTo = parseAndValidateDate(rawTo, locale);
       if (!vTo.valid) {
         rowErrors.push(vTo.error || t("importExcelDateEndInvalid", [rawTo]));
+        errorFields.add("scheduledTo");
       } else {
         scheduledTo = vTo.dateStr;
       }
@@ -763,6 +781,8 @@ async function processExcelImport(
 
     if (scheduledFrom && scheduledTo && scheduledFrom > scheduledTo) {
       rowErrors.push(t("importExcelDateFromAfterTo", [scheduledFrom, scheduledTo]));
+      errorFields.add("scheduledFrom");
+      errorFields.add("scheduledTo");
     }
 
     // 5. Inline Operations syntax validation
@@ -775,6 +795,7 @@ async function processExcelImport(
           const numH = parseFloat(rawH);
           if (isNaN(numH) || numH < 0) {
             rowErrors.push(t("importExcelOpHoursInvalid", [p.trim()]));
+            errorFields.add("operations");
             break;
           }
         }
@@ -791,6 +812,7 @@ async function processExcelImport(
           const numQ = parseFloat(rawQ);
           if (isNaN(numQ) || numQ <= 0) {
             rowErrors.push(t("importExcelMatQtyInvalid", [p.trim()]));
+            errorFields.add("materials");
             break;
           }
         }
@@ -803,6 +825,7 @@ async function processExcelImport(
         row: rowNumber,
         order: rawOrderNo || t("importExcelLineFallback", [rowNumber]),
         error: rowErrors.join("; "),
+        errorFields: Array.from(errorFields),
         rawRow: {
           order: rawOrderNo || "",
           equipment: rawEquipment || "",
@@ -847,7 +870,7 @@ async function processExcelImport(
     let planner = rawPlanner ? rawPlanner.trim() : "";
     if (!planner || (setPlanners.size > 0 && !setPlanners.has(planner))) {
       planner =
-        currentUser && currentUser !== "Current User" ? currentUser : "JOHN";
+        currentUser && currentUser !== "Current User" ? currentUser : IMPORT_CONFIG.DEFAULT_PLANNER;
     }
 
     // Parse Inline Operations
@@ -868,11 +891,11 @@ async function processExcelImport(
             order_no: finalOrderNo,
             no: opNo,
             description: opDesc,
-            workCenter: "WC-001",
-            technician: "T-001",
+            workCenter: IMPORT_CONFIG.DEFAULT_WORK_CENTER,
+            technician: IMPORT_CONFIG.DEFAULT_TECHNICIAN,
             plannedHours: opHours,
             actualHours: 0.0,
-            status: "OPEN",
+            status: ORDER_STATUS.OPEN,
           });
         }
       });
@@ -931,41 +954,41 @@ async function processExcelImport(
 
     // Deduplicate and resequence operations to guarantee unique (order_no, no)
     const opMap = new Map();
-    let opSeq = 10;
+    let opSeq = IMPORT_CONFIG.OPERATION_SEQ_STEP;
     const finalOps = [];
 
     for (const op of combinedOps) {
       let opNo = op.no ? String(op.no).trim() : "";
       if (!opNo || opMap.has(opNo)) {
         while (opMap.has(String(opSeq))) {
-          opSeq += 10;
+          opSeq += IMPORT_CONFIG.OPERATION_SEQ_STEP;
         }
         opNo = String(opSeq);
-        opSeq += 10;
+        opSeq += IMPORT_CONFIG.OPERATION_SEQ_STEP;
       }
       opMap.set(opNo, true);
       finalOps.push({
         order_no: finalOrderNo,
         no: opNo,
         description: op.description || t("importExcelDefaultTask"),
-        workCenter: op.workCenter || "WC-001",
-        technician: op.technician || "T-001",
-        plannedHours: Number(op.plannedHours) || 2.0,
+        workCenter: op.workCenter || IMPORT_CONFIG.DEFAULT_WORK_CENTER,
+        technician: op.technician || IMPORT_CONFIG.DEFAULT_TECHNICIAN,
+        plannedHours: Number(op.plannedHours) || IMPORT_CONFIG.DEFAULT_PLANNED_HOURS,
         actualHours: Number(op.actualHours) || 0.0,
-        status: op.status || "OPEN",
+        status: op.status || ORDER_STATUS.OPEN,
       });
     }
 
     if (finalOps.length === 0) {
       finalOps.push({
         order_no: finalOrderNo,
-        no: "10",
+        no: String(IMPORT_CONFIG.OPERATION_SEQ_STEP),
         description: t("importExcelDefaultOpDesc"),
-        workCenter: "WC-001",
-        technician: "T-001",
-        plannedHours: 2.0,
+        workCenter: IMPORT_CONFIG.DEFAULT_WORK_CENTER,
+        technician: IMPORT_CONFIG.DEFAULT_TECHNICIAN,
+        plannedHours: IMPORT_CONFIG.DEFAULT_PLANNED_HOURS,
         actualHours: 0.0,
-        status: "OPEN",
+        status: ORDER_STATUS.OPEN,
       });
     }
 
@@ -1007,10 +1030,10 @@ async function processExcelImport(
       totalMaterialCost + totalPlannedHours * laborRatePerHour;
 
     const existingInDb = isUpdate ? mapExistingOrders.get(finalOrderNo) : null;
-    const status = existingInDb ? existingInDb.status || "OPEN" : "OPEN";
+    const status = existingInDb ? existingInDb.status || ORDER_STATUS.OPEN : ORDER_STATUS.OPEN;
     const statusState = existingInDb
-      ? existingInDb.status_state || "Success"
-      : "Success";
+      ? existingInDb.status_state || VALUE_STATE.SUCCESS
+      : VALUE_STATE.SUCCESS;
 
     const orderEntity = {
       order_no: finalOrderNo,
@@ -1046,9 +1069,9 @@ async function processExcelImport(
     finalMats.forEach((mat) => materialsToSave.push(mat));
 
     // Keep history records compact for large bulk imports
-    if (ordersToInsert.length + ordersToUpdate.length <= 5000) {
+    if (ordersToInsert.length + ordersToUpdate.length <= IMPORT_CONFIG.MAX_HISTORY_RECORD_COUNT) {
       historyToInsert.push({
-        ID: cds.utils?.uuid ? cds.utils.uuid() : require("crypto").randomUUID(),
+        ID: cds.utils?.uuid ? cds.utils.uuid() : crypto.randomUUID(),
         order_no: finalOrderNo,
         title: isUpdate ? t("importExcelHistoryOrderUpdated") : t("importExcelHistoryOrderCreated"),
         dateTime: timestampStr,
@@ -1072,15 +1095,15 @@ async function processExcelImport(
         ...ordersToUpdate.map((o) => o.order_no),
       ];
       if (allProcessedOrderNos.length > 0) {
-        for (let i = 0; i < allProcessedOrderNos.length; i += 200) {
-          const chunk = allProcessedOrderNos.slice(i, i + 200);
+        for (let i = 0; i < allProcessedOrderNos.length; i += IMPORT_CONFIG.CLEANUP_CHUNK_SIZE) {
+          const chunk = allProcessedOrderNos.slice(i, i + IMPORT_CONFIG.CLEANUP_CHUNK_SIZE);
           await DELETE.from(MaintenanceOperations).where({ order_no: { in: chunk } });
           await DELETE.from(OrderMaterials).where({ order_no: { in: chunk } });
         }
       }
 
-      // 1. Insert new orders in batches of 500
-      await batchInsert(MaintenanceOrders, ordersToInsert, 500);
+      // 1. Insert new orders in batches
+      await batchInsert(MaintenanceOrders, ordersToInsert, IMPORT_CONFIG.DEFAULT_BATCH_SIZE);
 
       // 2. Update existing orders
       for (const ord of ordersToUpdate) {
@@ -1114,7 +1137,7 @@ async function processExcelImport(
           cleanOperations.push(op);
         }
       }
-      await batchInsert(MaintenanceOperations, cleanOperations, 500);
+      await batchInsert(MaintenanceOperations, cleanOperations, IMPORT_CONFIG.DEFAULT_BATCH_SIZE);
 
       // 4. Batch save materials (safeguard deduplication by order_no + material)
       const uniqueMatsMap = new Map();
@@ -1130,10 +1153,10 @@ async function processExcelImport(
           existing.value = Number((existing.qty * existing.unitPrice).toFixed(2));
         }
       }
-      await batchInsert(OrderMaterials, cleanMaterials, 500);
+      await batchInsert(OrderMaterials, cleanMaterials, IMPORT_CONFIG.DEFAULT_BATCH_SIZE);
 
       // 5. Batch save history
-      await batchInsert(OrderHistory, historyToInsert, 500);
+      await batchInsert(OrderHistory, historyToInsert, IMPORT_CONFIG.DEFAULT_BATCH_SIZE);
     });
   }
 
@@ -1158,7 +1181,7 @@ async function processExcelImport(
   notifyProgress(95, t("importExcelProgressRecordingAudit"));
   if (importedCount > 0) {
     await INSERT.into(AuditHistory).entries({
-      ID: cds.utils?.uuid ? cds.utils.uuid() : require("crypto").randomUUID(),
+      ID: cds.utils?.uuid ? cds.utils.uuid() : crypto.randomUUID(),
       timestamp: timestampStr,
       user: currentUser,
       object: t("importExcelAuditObject", [importedCount]),
@@ -1192,7 +1215,6 @@ module.exports = {
   processExcelImport,
   generateErrorWorkbookBuffer,
   parseAndValidateDate,
-  normalizeDate,
   normalizeMaintenanceType,
   normalizePriority,
 };

@@ -32,6 +32,15 @@ sap.ui.define([], () => {
     }),
 
     /**
+     * Maintenance Order Types
+     */
+    MAINTENANCE_TYPE: Object.freeze({
+      PREVENTIVE: "PREVENTIVE",
+      CORRECTIVE: "CORRECTIVE",
+      EMERGENCY: "EMERGENCY",
+    }),
+
+    /**
      * SAPUI5 Value State Colors
      */
     VALUE_STATE: Object.freeze({
