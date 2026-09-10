@@ -1,0 +1,120 @@
+@localBaseUrl = http://localhost:4004
+@cloudBaseUrl = https://3b342f32trial-dev-zpm-maintenance-cockpit-srv.cfapps.us10-001.hana.ondemand.com
+@baseUrl = {{cloudBaseUrl}}
+@serviceUrl = {{baseUrl}}/odata/v4/maintenance
+@testOrderId = MO-TEST-HTTP-001
+34
+### OData service document
+GET {{serviceUrl}}/
+Accept: application/json
+
+### OData metadata
+GET {{serviceUrl}}/$metadata
+Accept: application/xml
+
+### List maintenance orders: first 10 records
+GET {{serviceUrl}}/MaintenanceOrders?$top=10&$orderby=order_no desc
+Accept: application/json
+
+### Count maintenance orders
+GET {{serviceUrl}}/MaintenanceOrders/$count
+Accept: text/plain
+
+### Filter orders by status
+GET {{serviceUrl}}/MaintenanceOrders?$filter=status eq 'OPEN'&$top=10&$orderby=order_no desc
+Accept: application/json
+
+### Read one order with detail relations
+GET {{serviceUrl}}/MaintenanceOrders('MO-1001')?$expand=operations,materials,equipment,history
+Accept: application/json
+
+### Read master data: Plants
+GET {{serviceUrl}}/Plants?$orderby=key
+Accept: application/json
+
+### Read master data: Priorities
+GET {{serviceUrl}}/Priorities?$orderby=key
+Accept: application/json
+
+### Read master data: Technicians
+GET {{serviceUrl}}/Technicians?$top=20
+Accept: application/json
+
+### Read operations for one order
+GET {{serviceUrl}}/MaintenanceOperations?$filter=order_no eq 'MO-1001'&$orderby=no
+Accept: application/json
+
+### Read materials for one order
+GET {{serviceUrl}}/OrderMaterials?$filter=order_no eq 'MO-1001'
+Accept: application/json
+
+### Read history for one order
+GET {{serviceUrl}}/OrderHistory?$filter=order_no eq 'MO-1001'&$orderby=dateTime desc
+Accept: application/json
+
+### Current authenticated user profile
+GET {{serviceUrl}}/getUserInfo()
+Accept: application/json
+
+### Server-calculated KPI summary
+GET {{serviceUrl}}/getKpiMetrics()
+Accept: application/json
+
+### Create an isolated test order
+# Run only against a non-production environment. Re-running this request with
+# the same key returns a duplicate-key error; delete the test order first.
+POST {{serviceUrl}}/MaintenanceOrders
+Content-Type: application/json
+Accept: application/json
+
+{
+  "order_no": "{{testOrderId}}",
+  "equipment_no": "EQ-001",
+  "description": "HTTP API test order",
+  "plant": "1000",
+  "maintenance_type": "PREVENTIVE",
+  "priority": "MEDIUM",
+  "priority_state": "Warning",
+  "status": "OPEN",
+  "status_state": "Success",
+  "planner": "JOHN",
+  "scheduled_from": "2026-09-09",
+  "scheduled_to": "2026-09-10",
+  "estimated_cost": 100.00,
+  "currency": "USD"
+}
+
+### Update the test order
+PATCH {{serviceUrl}}/MaintenanceOrders('{{testOrderId}}')
+Content-Type: application/json
+Accept: application/json
+
+{
+  "priority": "HIGH",
+  "priority_state": "Error",
+  "estimated_cost": 250.00
+}
+
+### Complete the test order
+POST {{serviceUrl}}/completeOrder
+Content-Type: application/json
+Accept: application/json
+
+{
+  "order_no": "{{testOrderId}}"
+}
+
+### Cancel a test order
+# Use a separate test order, because a completed order should normally not be cancelled.
+POST {{serviceUrl}}/cancelOrder
+Content-Type: application/json
+Accept: application/json
+
+{
+  "order_no": "{{testOrderId}}",
+  "reason": "HTTP API test cleanup"
+}
+
+### Delete the isolated test order
+DELETE {{serviceUrl}}/MaintenanceOrders('{{testOrderId}}')
+Accept: application/json
